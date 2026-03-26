@@ -1,0 +1,73 @@
+###############################################################################
+#  CORE-Gateway — Docker Compose
+#  Services :
+#    - rtsp-proxy  : MediaMTX — passerelle RTSP/HLS/WebRTC (2 caméras robot)
+#    - face-server : FastAPI  — Stockage Sécurisé (Faces, MyGES, Core State)
+###############################################################################
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  RTSP Proxy — MediaMTX
+  # ─────────────────────────────────────────────────────────────────────────
+  rtsp-proxy:
+    image: bluenviron/mediamtx:latest
+    container_name: bastet-rtsp-proxy
+    restart: unless-stopped
+    environment:
+      - MTX_PATHS_CAM1_SOURCE=${CAM1_SOURCE:-rtsp://127.0.0.1:8554/cam1}
+      - MTX_PATHS_CAM2_SOURCE=${CAM2_SOURCE:-rtsp://127.0.0.1:8554/cam2}
+      - MTX_LOGLEVEL=info
+    volumes:
+      - ./rtsp-proxy/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "${RTSP_PORT:-8554}:8554"       # RTSP  → clients
+      - "${HLS_PORT:-8888}:8888"        # HLS   → navigateur / app mobile
+      - "${WEBRTC_PORT:-8889}:8889"     # WebRTC
+      - "9997:9997"                      # API interne MediaMTX (admin)
+    networks:
+      - bastet-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9997/v3/paths/list"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ─────────────────────────────────────────────────────────────────────────
+  #  Face & State Server — FastAPI (HTTPS)
+  # ─────────────────────────────────────────────────────────────────────────
+  face-server:
+    build:
+      context: ./face-server
+      dockerfile: Dockerfile
+    container_name: bastet-face-server
+    restart: unless-stopped
+    environment:
+      - FACES_DIR=/data/faces
+      - API_TOKEN=${API_TOKEN:-your-api-token-here}
+    volumes:
+      - gateway-data:/data
+    ports:
+      - "${FACE_SERVER_PORT:-8001}:8001"
+    networks:
+      - bastet-net
+    # HTTPS healthcheck (insecure car certificat auto-signé)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; urllib.request.urlopen('https://localhost:8001/health', context=ctx)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# ─── Volumes ──────────────────────────────────────────────────────────────────
+volumes:
+  gateway-data:
+    driver: local
+    name: bastet-gateway-data
+
+# ─── Réseau partagé ───────────────────────────────────────────────────────────
+networks:
+  bastet-net:
+    name: bastet-net
+    driver: bridge

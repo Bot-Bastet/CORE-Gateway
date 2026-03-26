@@ -1,0 +1,50 @@
+###############################################################################
+#  MediaMTX — Configuration passerelle RTSP pour robot Bastet (2 caméras)
+#  Doc : https://github.com/bluenviron/mediamtx
+###############################################################################
+
+# ─── API interne MediaMTX ────────────────────────────────────────────────────
+api: yes
+apiAddress: :9997
+
+# ─── Protocoles exposés ───────────────────────────────────────────────────────
+rtspAddress: :8554          # RTSP  → clients (CORE / app mobile / VLC)
+rtspsAddress: :8555         # RTSPS (TLS)
+rtmpAddress: :1935          # RTMP  (optionnel)
+hlsAddress: :8888           # HLS   → lecture navigateur / app mobile
+webrtcAddress: :8889        # WebRTC → lecture web temps réel
+
+# ─── HLS ─────────────────────────────────────────────────────────────────────
+hls: yes
+hlsVariant: lowLatency      # mode LL-HLS pour latence réduite
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+
+# ─── WebRTC ──────────────────────────────────────────────────────────────────
+webrtc: yes
+
+# ─── Niveau de log ───────────────────────────────────────────────────────────
+logLevel: info
+logDestinations: [stdout]
+
+# ─── Paths (caméras) ─────────────────────────────────────────────────────────
+paths:
+  # --- Caméra 1 (avant / frontale) ---
+  cam1:
+    source: automatic
+    sourceProtocol: automatic
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 10s
+
+  # --- Caméra 2 (arrière / autre angle) ---
+  cam2:
+    source: automatic
+    sourceProtocol: automatic
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 10s
+    sourceOnDemandCloseAfter: 10s
+
+  # --- Path wildcard (permet publication depuis le robot sans config fixe) ---
+  "~^robot/(.+)$":
+    source: publisher
