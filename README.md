@@ -60,3 +60,28 @@ Test rapide avec token ignoré (le proxy vidéo n'est pas authentifié par défa
 ```bash
 ffplay rtsp://localhost:8554/cam1
 ```
+
+---
+
+## 🌐 ROADMAP : CORE-Gateway (Le Serveur Central)
+
+Le routeur de données doit maintenant gérer des flux audio bidirectionnels en plus de la vidéo et du texte.
+
+### Étape 1 : Hub de Communication et Routage (Vidéo & Audio)
+- [ ] Mettre en place le serveur WebSocket/MQTT.
+- [ ] Configurer le pont RTSP pour la vidéo.
+- [ ] Nouveau : Créer un pont de streaming audio bidirectionnel entre le robot (micro/haut-parleur) et le PC (CORE-Node) lorsque l'offloading audio est actif.
+
+### Étape 2 : Base de données et API Sécurisée
+- [ ] Base de données : Comptes, Fichiers, Identifiants Intranet chiffrés, Paramètres de Cooldown.
+- [ ] API Mobile : Inscription, upload visage, identifiants école.
+- [ ] API Admin : Modification des délais de Cooldown.
+
+### Étape 3 : Le Routeur d'Offloading Global
+- [ ] Écouter les signaux du CORE-Node : YOLO, Reconnaissance Faciale, et maintenant STT/TTS.
+- [ ] Relayer les ordres de désactivation/activation des nœuds locaux au robot.
+
+### Étape 4 : Le Cerveau Contextuel
+- [ ] Vérification des droits et du cooldown de l'utilisateur reconnu.
+- [ ] Assemblage du contexte (Emploi du temps, notes, environnement).
+- [ ] Envoi du "Super-Prompt" (ou du contexte à lier au flux audio) vers le CORE-Node.
