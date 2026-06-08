@@ -6,8 +6,8 @@ import threading
 import sys
 import os
 
-RTSP_URL = "rtsp://127.0.0.1:8554/cam1"
-WS_URL = "ws://127.0.0.1:8001/ws/robot"
+RTSP_URL = "rtsp://127.0.0.1:48554/cam1"
+WS_URL = "ws://127.0.0.1:44888/ws/robot"
 
 # La capture webcam a été déplacée directement dans CORE-Node pour la simulation locale.
 
