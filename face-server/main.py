@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Security, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Security, Depends, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
@@ -110,6 +110,67 @@ def cleanup_duplicates():
 @app.on_event("startup")
 def startup_event():
     cleanup_duplicates()
+
+# ─── WebSockets Hub (Routage Temps-Réel) ──────────────────────────────────────
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, list[WebSocket]] = {
+            "robot": [],
+            "node": [],
+            "app": []
+        }
+
+    async def connect(self, websocket: WebSocket, client_type: str):
+        await websocket.accept()
+        if client_type in self.active_connections:
+            self.active_connections[client_type].append(websocket)
+
+    def disconnect(self, websocket: WebSocket, client_type: str):
+        if client_type in self.active_connections and websocket in self.active_connections[client_type]:
+            self.active_connections[client_type].remove(websocket)
+
+    async def broadcast(self, message: str, target_client_type: str):
+        for connection in self.active_connections.get(target_client_type, []):
+            try:
+                await connection.send_text(message)
+            except Exception:
+                pass
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/robot")
+async def websocket_robot(websocket: WebSocket):
+    await manager.connect(websocket, "robot")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Routage automatique du robot vers le noeud (offloading STT/Texte)
+            await manager.broadcast(data, "node")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "robot")
+
+@app.websocket("/ws/node")
+async def websocket_node(websocket: WebSocket):
+    await manager.connect(websocket, "node")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Routage de la réponse du noeud (LLM streamé ou audio TTS) vers le robot
+            await manager.broadcast(data, "robot")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "node")
+
+@app.websocket("/ws/app")
+async def websocket_app(websocket: WebSocket):
+    await manager.connect(websocket, "app")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # Routage des commandes de l'app mobile vers le robot
+            await manager.broadcast(data, "robot")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "app")
 
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 

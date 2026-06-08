@@ -1,10 +1,11 @@
 # CORE-Gateway
 
-Passerelle locale entre le **robot Bastet**, l'**application mobile** et l'application **CORE** (agent IA).
+Passerelle locale entre le **robot Bastet**, l'**application mobile** et le **CORE-Node** (serveur de calcul).
 
-```
-Robot  ──RTSP──►  [ RTSP Proxy / MediaMTX ]  ──RTSP/HLS/WebRTC──►  CORE / App Mobile
-Robot  ──HTTP──►  [ Face Server / FastAPI  ]  ──HTTP REST──►         CORE / App Mobile
+```text
+[ Robot ]  <─── WebSockets (Texte, Audio, Contrôle) ───>  [ Gateway Hub ]  <─── WebSockets ───>  [ CORE-Node ]
+[ Robot ]  ─── RTSP (Vidéo) ───────────────────────────>  [ MediaMTX ]     ─── WebRTC/HLS ───>  [ App Mobile ]
+[ App Mobile ] <── REST (Comptes, Intranet, Visages) ──>  [ Gateway API ]
 ```
 
 ## Services & Ports à ouvrir
@@ -63,25 +64,25 @@ ffplay rtsp://localhost:8554/cam1
 
 ---
 
-## 🌐 ROADMAP : CORE-Gateway (Le Serveur Central)
+## 🌐 ROADMAP : CORE-Gateway (Le Hub Central)
 
-Le routeur de données doit maintenant gérer des flux audio bidirectionnels en plus de la vidéo et du texte.
+La passerelle évolue pour devenir un véritable Hub temps-réel gérant la délégation des tâches (offloading) et la sécurité des utilisateurs.
 
-### Étape 1 : Hub de Communication et Routage (Vidéo & Audio)
-- [ ] Mettre en place le serveur WebSocket/MQTT.
-- [ ] Configurer le pont RTSP pour la vidéo.
-- [ ] Nouveau : Créer un pont de streaming audio bidirectionnel entre le robot (micro/haut-parleur) et le PC (CORE-Node) lorsque l'offloading audio est actif.
+### Étape 1 : Le Hub WebSockets (Instantanéité)
+- [ ] **Canal Robot (`/ws/robot`)** : Recevoir le texte (STT local) ou l'audio brut, et lui renvoyer le flux TTS généré.
+- [ ] **Canal Node (`/ws/node`)** : Connecter le serveur de calcul lourd pour lui envoyer les requêtes et recevoir les réponses textuelles/audio streamées.
+- [ ] **Canal App (`/ws/app`)** : Permettre à l'app mobile de voir l'état du robot en direct et de le piloter (Télécommande).
 
-### Étape 2 : Base de données et API Sécurisée
-- [ ] Base de données : Comptes, Fichiers, Identifiants Intranet chiffrés, Paramètres de Cooldown.
-- [ ] API Mobile : Inscription, upload visage, identifiants école.
-- [ ] API Admin : Modification des délais de Cooldown.
+### Étape 2 : L'App Mobile et la Sécurité
+- [ ] **Comptes Utilisateurs** : Inscription/Connexion depuis l'app mobile (génération de JWT).
+- [ ] **Identifiants Scolaires** : Stockage chiffré (AES) des identifiants MyGES. La Gateway doit les déchiffrer à la volée uniquement pour l'offloading.
+- [ ] **Reconnaissance Faciale** : Upload de photos par l'utilisateur depuis l'app vers la base de la Gateway.
+- [ ] **Administration** : API permettant de bannir un utilisateur ou de purger ses données sensibles (Intranet).
 
-### Étape 3 : Le Routeur d'Offloading Global
-- [ ] Écouter les signaux du CORE-Node : YOLO, Reconnaissance Faciale, et maintenant STT/TTS.
-- [ ] Relayer les ordres de désactivation/activation des nœuds locaux au robot.
+### Étape 3 : Le Routeur Intelligent (Le Cerveau)
+- [ ] **Décisionnaire de flux** : Si le robot envoie du texte, l'envoyer au LLM du Node. S'il envoie de l'audio, l'envoyer au STT + LLM du Node.
+- [ ] **Assemblage Contextuel** : Avant d'envoyer la requête au Node, la Gateway ajoute au "Super-Prompt" l'emploi du temps (via MyGES), l'historique récent, et ce que voit la caméra.
 
-### Étape 4 : Le Cerveau Contextuel
-- [ ] Vérification des droits et du cooldown de l'utilisateur reconnu.
-- [ ] Assemblage du contexte (Emploi du temps, notes, environnement).
-- [ ] Envoi du "Super-Prompt" (ou du contexte à lier au flux audio) vers le CORE-Node.
+### Étape 4 : Contrôle et Vidéo
+- [ ] **Télécommande** : API permettant de forcer des mouvements au robot ou de lui faire dire des phrases spécifiques.
+- [ ] **Streaming Vidéo** : Intégration fluide des 2 caméras via WebRTC pour l'app mobile.
