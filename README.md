@@ -42,7 +42,7 @@ docker compose ps
 ### Méthode 2 : Lancement express (Docker seul, sans proxy vidéo)
 ```bash
 docker build -t bastet-face-server ./face-server
-docker run -d --name bastet-gateway -p 44888:44888 -v bastet-data:/data -e API_TOKEN="MonSuperSecret" bastet-face-server
+docker run -d --name bastet-gateway -p 44888:44888 -v bastet-data:/data -e API_TOKEN="VotreTokenSecuriseIci" bastet-face-server
 ```
 
 ---
