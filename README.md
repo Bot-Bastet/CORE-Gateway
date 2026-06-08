@@ -90,7 +90,8 @@ La passerelle évolue pour devenir un véritable Hub temps-réel gérant la dél
 
 ### Étape 3 : Le Routeur Intelligent (Le Cerveau)
 - [ ] **Décisionnaire de flux** : Si le robot envoie du texte, l'envoyer au LLM du Node. S'il envoie de l'audio, l'envoyer au STT + LLM du Node.
-- [ ] **Assemblage Contextuel** : Avant d'envoyer la requête au Node, la Gateway ajoute au "Super-Prompt" l'emploi du temps (via MyGES), l'historique récent, et ce que voit la caméra.
+- [x] **Injection d'Agenda MyGES** : La Gateway interroge l'API Kordis et glisse le planning des 7 prochains jours dans le "Super-Prompt".
+- [ ] **Assemblage Contextuel Avancé** : Intégrer l'historique récent et ce que voit la caméra au contexte.
 
 ### Étape 4 : Contrôle et Vidéo
 - [ ] **Télécommande** : API permettant de forcer des mouvements au robot ou de lui faire dire des phrases spécifiques.
