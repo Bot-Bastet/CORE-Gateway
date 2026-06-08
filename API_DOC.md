@@ -8,7 +8,7 @@ La passerelle (Gateway) sert de pont central entre le **Robot Bastet (CORE)**, l
 
 Pour garantir une latence minimale (< 50ms) et gérer le streaming (texte ou audio), les flux principaux utilisent des WebSockets.
 
-### `ws://GATEWAY_IP:8001/ws/robot` (Connexion Robot)
+### `ws://GATEWAY_IP:44888/ws/robot` (Connexion Robot)
 Canal bidirectionnel exclusif pour le robot.
 - **Envoi (Robot -> Gateway)** : 
   - Audio brut (si STT offloaded).
@@ -19,12 +19,12 @@ Canal bidirectionnel exclusif pour le robot.
   - Texte (réponse LLM).
   - Ordres de contrôle (ex: avance, tourne).
 
-### `ws://GATEWAY_IP:8001/ws/node` (Connexion CORE-Node)
+### `ws://GATEWAY_IP:44888/ws/node` (Connexion CORE-Node)
 Canal bidirectionnel exclusif pour le serveur de calcul.
 - **Réception (Gateway -> Node)** : Audio à transcrire, texte à processer dans le LLM, ou images pour YOLO. Inclut le contexte complet (identifiants intranet déchiffrés par la gateway).
 - **Envoi (Node -> Gateway)** : Texte streamé (token par token) ou flux audio TTS généré.
 
-### `ws://GATEWAY_IP:8001/ws/app` (Connexion Application Mobile)
+### `ws://GATEWAY_IP:44888/ws/app` (Connexion Application Mobile)
 Canal pour l'utilisateur.
 - Reçoit en direct l'état du robot (ce qu'il fait, ce qu'il dit).
 - Envoie des instructions de télécommande (joystick virtuel).
@@ -69,8 +69,8 @@ L'App permet à l'utilisateur de s'enregistrer pour être reconnu par le robot.
 
 La Gateway inclut un proxy vidéo (MediaMTX).
 - **Caméra 1 & Caméra 2** : Le robot envoie ses flux en RTSP à la Gateway.
-- **App Mobile** : Lit le flux en WebRTC (ultra-basse latence) via `http://GATEWAY_IP:8889/cam1` (ou cam2).
-- **Node / Robot (Analyse)** : Consomme le flux en RTSP `rtsp://GATEWAY_IP:8554/cam1`.
+- **App Mobile** : Lit le flux en WebRTC (ultra-basse latence) via `http://GATEWAY_IP:48889/cam1` (ou cam2).
+- **Node / Robot (Analyse)** : Consomme le flux en RTSP `rtsp://GATEWAY_IP:48554/cam1`.
 
 ---
 

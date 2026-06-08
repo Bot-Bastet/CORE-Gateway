@@ -23,7 +23,7 @@ COPY main.py .
 # Volumes (faces + state/myges data)
 VOLUME ["/data"]
 
-EXPOSE 8001
+EXPOSE 44888
 
 # Lancement HTTPS natif d'Uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--ssl-keyfile", "/app/key.pem", "--ssl-certfile", "/app/cert.pem", "--log-level", "info", "--proxy-headers"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "44888", "--ssl-keyfile", "/app/key.pem", "--ssl-certfile", "/app/cert.pem", "--log-level", "info", "--proxy-headers"]

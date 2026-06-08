@@ -379,9 +379,9 @@ def dashboard():
        const iframe = document.getElementById('videoPlayer');
        const container = document.getElementById('videoContainer');
        const btnLarge = document.getElementById('camBtnLarge');
-       // Assuming WebRTC proxy is running correctly on gateway's IP at port 8889
+       // Assuming WebRTC proxy is running correctly on gateway's IP at port 48889
        const host = window.location.hostname;
-       iframe.src = `http://${{host}}:8889/cam1/`;
+       iframe.src = `http://${{host}}:48889/cam1/`;
        container.style.display = 'block';
        btnLarge.style.display = 'none';
        iframe.scrollIntoView({{behavior: 'smooth'}});

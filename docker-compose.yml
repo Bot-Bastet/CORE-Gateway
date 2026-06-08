@@ -21,10 +21,10 @@ services:
     volumes:
       - ./rtsp-proxy/mediamtx.yml:/mediamtx.yml:ro
     ports:
-      - "${RTSP_PORT:-8554}:8554"       # RTSP  → clients
-      - "${HLS_PORT:-8888}:8888"        # HLS   → navigateur / app mobile
-      - "${WEBRTC_PORT:-8889}:8889"     # WebRTC
-      - "9997:9997"                      # API interne MediaMTX (admin)
+      - "${RTSP_PORT:-48554}:8554"       # RTSP  → clients
+      - "${HLS_PORT:-48888}:8888"        # HLS   → navigateur / app mobile
+      - "${WEBRTC_PORT:-48889}:8889"     # WebRTC
+      - "49997:9997"                      # API interne MediaMTX (admin)
     networks:
       - bastet-net
     healthcheck:
@@ -49,12 +49,12 @@ services:
     volumes:
       - gateway-data:/data
     ports:
-      - "${FACE_SERVER_PORT:-8001}:8001"
+      - "${FACE_SERVER_PORT:-44888}:44888"
     networks:
       - bastet-net
     # HTTPS healthcheck (insecure car certificat auto-signé)
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; urllib.request.urlopen('https://localhost:8001/health', context=ctx)"]
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; urllib.request.urlopen('https://localhost:44888/health', context=ctx)"]
       interval: 30s
       timeout: 5s
       retries: 3
