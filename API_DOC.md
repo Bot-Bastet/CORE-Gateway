@@ -31,14 +31,23 @@ Canal pour l'utilisateur.
 
 ---
 
-## 2. Authentification et Comptes Utilisateurs (REST)
+## 2. Comptes Utilisateurs (REST)
 
-L'application mobile permet de créer des profils utilisateurs distincts. Toute requête nécessite un JWT ou Token d'accès.
+L'application mobile permet de créer des profils utilisateurs distincts. La Gateway gère la création et la récupération des profils.
+L'API est protégée par le Token Global de la Gateway (`X-API-Token`).
 
-- **POST `/auth/register`** : Création d'un compte (Nécessite email/pseudo, mot de passe).
-- **POST `/auth/login`** : Connexion, retourne un token JWT (`Authorization: Bearer <token>`).
-- **GET `/users/me`** : Récupérer son profil (Préférences, rôle).
-- **PUT `/users/me`** : Modifier son profil.
+- **POST `/accounts`** : Création ou mise à jour d'un compte.
+  ```json
+  {
+    "email": "utilisateur@bastet.com",
+    "pseudo": "Pseudo",
+    "last_name": "Nom",
+    "first_name": "Prénom",
+    "phone": "0600000000",
+    "is_admin": false
+  }
+  ```
+- **GET `/accounts`** : Liste de tous les comptes enregistrés.
 
 ---
 
