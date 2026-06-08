@@ -17,6 +17,7 @@ DATA_DIR = Path("/data") # general data dir for state/myges
 META_FILE = FACES_DIR / "meta.json"
 MYGES_FILE = DATA_DIR / "myges.json"
 STATE_FILE = DATA_DIR / "core_state.json"
+USERS_FILE = DATA_DIR / "users.json"
 
 FACES_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -59,6 +60,14 @@ class CoreState(BaseModel):
     seen_objects: list[str] = []
     last_chat: list[dict] = []
     robot_status: str = "idle"
+
+class AccountInfo(BaseModel):
+    email: str
+    pseudo: str
+    last_name: str
+    first_name: str
+    phone: str
+    is_admin: bool = False
 
 # ─── Nettoyage & Helpers ──────────────────────────────────────────────────────
 
@@ -433,6 +442,12 @@ async def upload_face(
         raise HTTPException(status_code=400, detail=f"Format non supporté : {ext}")
 
     meta = load_json(META_FILE)
+    
+    # Vérification de la limite de 8 photos par utilisateur
+    user_photos = [e for e in meta if e["name"].lower() == name.lower()]
+    if len(user_photos) >= 8:
+        raise HTTPException(status_code=400, detail=f"Limite atteinte : Impossible d'ajouter plus de 8 photos pour {name}.")
+
     content = await file.read()
     file_hash = hashlib.md5(content).hexdigest()
     
@@ -514,6 +529,18 @@ def get_myges():
 
 
 # ─── CORE State ───────────────────────────────────────────────────────────────
+
+@app.post("/accounts", tags=["Accounts"], summary="Créer ou MAJ un compte utilisateur", dependencies=[Depends(verify_token)])
+def save_account(info: AccountInfo):
+    users = load_json(USERS_FILE, default={})
+    full_name = f"{info.first_name} {info.last_name}"
+    users[full_name] = info.model_dump()
+    save_json(USERS_FILE, users)
+    return {"status": "saved", "user": full_name}
+
+@app.get("/accounts", tags=["Accounts"], summary="Lister les comptes", dependencies=[Depends(verify_token)])
+def get_accounts():
+    return load_json(USERS_FILE, default={})
 
 @app.post("/core/state", tags=["CORE State"], summary="Mettre à jour l'état du robot", dependencies=[Depends(verify_token)])
 def update_state(state: CoreState):
