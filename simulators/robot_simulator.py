@@ -12,11 +12,11 @@ WS_URL = "ws://127.0.0.1:44888/ws/robot"
 # La capture webcam a été déplacée directement dans CORE-Node pour la simulation locale.
 
 async def robot_websocket():
-    print("🤖 [Cerveau] Connexion au Hub Central...")
+    print("[Cerveau] Connexion au Hub Central...")
     while True:
         try:
             async with websockets.connect(WS_URL) as ws:
-                print("✅ [Cerveau] Connecté au Gateway.")
+                print("[Cerveau] Connecte au Gateway.")
                 
                 # Simuler l'envoi d'un message audio/texte au démarrage pour tester
                 welcome_msg = '{"type": "chat", "text": "Bonjour, je suis Bastet, initialisé et prêt!"}'
@@ -25,14 +25,14 @@ async def robot_websocket():
                 import json
                 while True:
                     msg = await ws.recv()
-                    print(f"📩 [Cerveau] Reçu du Node/App : {msg}")
+                    print(f"[Cerveau] Recu du Node/App : {msg}")
                     
                     try:
                         data = json.loads(msg)
                         if data.get("type") == "feature_request":
                             feature = data.get("feature")
                             state = data.get("state")
-                            print(f"⚙️ [Cerveau] Demande d'activation de {feature} à {state}. Envoi de l'acquittement...")
+                            print(f"[Cerveau] Demande d'activation de {feature} a {state}. Envoi de l'acquittement...")
                             
                             # Répondre avec un acquittement
                             ack = {
@@ -46,15 +46,15 @@ async def robot_websocket():
                         # Message texte ou audio brut
                         pass
         except Exception as e:
-            print(f"⚠️ [Cerveau] Déconnecté du Gateway ({e}). Reconnexion dans 5s...")
+            print(f"[Cerveau] Deconnecte du Gateway ({e}). Reconnexion dans 5s...")
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    print("🤖 --- Démarrage du Simulateur Robot ---")
+    print("--- Demarrage du Simulateur Robot ---")
     
     # Lancement de la boucle WebSocket dans le thread principal
     try:
         asyncio.run(robot_websocket())
     except KeyboardInterrupt:
-        print("🤖 --- Arrêt ---")
+        print("--- Arret ---")
         sys.exit(0)

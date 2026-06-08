@@ -10,6 +10,7 @@ import json
 import hashlib
 from pathlib import Path
 from typing import Optional
+from myges_api import MyGesAPI
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 FACES_DIR = Path(os.getenv("FACES_DIR", "/data/faces"))
@@ -154,7 +155,24 @@ async def websocket_robot(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # Routage automatique du robot vers le noeud (offloading STT/Texte)
+            
+            # Injection contextuelle (Emploi du temps MyGES)
+            try:
+                msg_json = json.loads(data)
+                if msg_json.get("type") == "chat":
+                    comptes = load_json(MYGES_FILE, default={})
+                    if comptes:
+                        user_name = list(comptes.keys())[0]
+                        creds = comptes[user_name]
+                        api = MyGesAPI(creds["username"], creds["password"])
+                        agenda_text = api.get_upcoming_agenda_text(days=7)
+                        msg_json["context"] = f"[CONTEXTE CACHÉ - Agenda de {user_name} pour les 7 prochains jours] : \n{agenda_text}"
+                        data = json.dumps(msg_json)
+                        print(f"OK: Contexte injecte pour {user_name}.")
+            except Exception as e:
+                print(f"Erreur injection contexte : {e}")
+                
+            # Routage automatique du robot vers le noeud
             await manager.broadcast(data, "node")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "robot")
