@@ -83,10 +83,10 @@ La passerelle évolue pour devenir un véritable Hub temps-réel gérant la dél
 - [x] **Canal App (`/ws/app`)** : Permettre à l'app mobile de voir l'état du robot en direct et de le piloter (Télécommande).
 
 ### Étape 2 : L'App Mobile et la Sécurité
-- [ ] **Comptes Utilisateurs** : Inscription/Connexion depuis l'app mobile (génération de JWT).
-- [ ] **Identifiants Scolaires** : Stockage chiffré (AES) des identifiants MyGES. La Gateway doit les déchiffrer à la volée uniquement pour l'offloading.
-- [ ] **Reconnaissance Faciale** : Upload de photos par l'utilisateur depuis l'app vers la base de la Gateway.
-- [ ] **Administration** : API permettant de bannir un utilisateur ou de purger ses données sensibles (Intranet).
+- [x] **Comptes Utilisateurs** : Inscription/Création de profil via l'API REST (`/accounts`).
+- [x] **Identifiants Scolaires** : Sauvegarde des accès MyGES via l'API (`/myges`).
+- [x] **Reconnaissance Faciale** : Synchronisation du dictionnaire de visages (`/faces/sync`).
+- [ ] **Administration avancée** : Sécurisation par authentification JWT complète et bannissement.
 
 ### Étape 3 : Le Routeur Intelligent (Le Cerveau)
 - [ ] **Décisionnaire de flux** : Si le robot envoie du texte, l'envoyer au LLM du Node. S'il envoie de l'audio, l'envoyer au STT + LLM du Node.
