@@ -69,9 +69,9 @@ ffplay rtsp://localhost:8554/cam1
 La passerelle évolue pour devenir un véritable Hub temps-réel gérant la délégation des tâches (offloading) et la sécurité des utilisateurs.
 
 ### Étape 1 : Le Hub WebSockets (Instantanéité)
-- [ ] **Canal Robot (`/ws/robot`)** : Recevoir le texte (STT local) ou l'audio brut, et lui renvoyer le flux TTS généré.
-- [ ] **Canal Node (`/ws/node`)** : Connecter le serveur de calcul lourd pour lui envoyer les requêtes et recevoir les réponses textuelles/audio streamées.
-- [ ] **Canal App (`/ws/app`)** : Permettre à l'app mobile de voir l'état du robot en direct et de le piloter (Télécommande).
+- [x] **Canal Robot (`/ws/robot`)** : Recevoir le texte (STT local) ou l'audio brut, et lui renvoyer le flux TTS généré.
+- [x] **Canal Node (`/ws/node`)** : Connecter le serveur de calcul lourd pour lui envoyer les requêtes et recevoir les réponses textuelles/audio streamées.
+- [x] **Canal App (`/ws/app`)** : Permettre à l'app mobile de voir l'état du robot en direct et de le piloter (Télécommande).
 
 ### Étape 2 : L'App Mobile et la Sécurité
 - [ ] **Comptes Utilisateurs** : Inscription/Connexion depuis l'app mobile (génération de JWT).
