@@ -31,19 +31,11 @@ logDestinations: [stdout]
 paths:
   # --- Caméra 1 (avant / frontale) ---
   cam1:
-    source: automatic
-    sourceProtocol: automatic
-    sourceOnDemand: yes
-    sourceOnDemandStartTimeout: 10s
-    sourceOnDemandCloseAfter: 10s
+    source: publisher
 
   # --- Caméra 2 (arrière / autre angle) ---
   cam2:
-    source: automatic
-    sourceProtocol: automatic
-    sourceOnDemand: yes
-    sourceOnDemandStartTimeout: 10s
-    sourceOnDemandCloseAfter: 10s
+    source: publisher
 
   # --- Path wildcard (permet publication depuis le robot sans config fixe) ---
   "~^robot/(.+)$":

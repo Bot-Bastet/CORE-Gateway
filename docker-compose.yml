@@ -15,16 +15,23 @@ services:
     container_name: bastet-rtsp-proxy
     restart: unless-stopped
     environment:
-      - MTX_PATHS_CAM1_SOURCE=${CAM1_SOURCE:-rtsp://127.0.0.1:8554/cam1}
-      - MTX_PATHS_CAM2_SOURCE=${CAM2_SOURCE:-rtsp://127.0.0.1:8554/cam2}
       - MTX_LOGLEVEL=info
+      - MTX_WEBRTCADDRESS=:8889
+      - MTX_WEBRTCLOCALUDPADDRESS=:48189
+      - MTX_WEBRTCLOCALTCPADDRESS=:48189
+      - MTX_WEBRTCADDITIONALHOSTS=79.94.238.213
+      - MTX_HLSVARIANT=lowLatency
+      - MTX_HLSSEGMENTCOUNT=7
+      - MTX_HLSSEGMENTDURATION=1s
     volumes:
       - ./rtsp-proxy/mediamtx.yml:/mediamtx.yml:ro
     ports:
-      - "${RTSP_PORT:-48554}:8554"       # RTSP  → clients
-      - "${HLS_PORT:-48888}:8888"        # HLS   → navigateur / app mobile
-      - "${WEBRTC_PORT:-48889}:8889"     # WebRTC
-      - "49997:9997"                      # API interne MediaMTX (admin)
+      - "48554:8554"                     # RTSP
+      - "48888:8888"                     # HLS
+      - "48889:8889/tcp"                 # WebRTC Signaling (HTTP)
+      - "48189:48189/udp"                # WebRTC ICE UDP
+      - "48189:48189/tcp"                # WebRTC ICE TCP
+      - "49997:9997"                     # API
     networks:
       - bastet-net
     healthcheck:

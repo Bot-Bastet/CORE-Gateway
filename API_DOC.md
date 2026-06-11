@@ -87,9 +87,9 @@ L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
 ## 5. Flux Vidéos (RTSP / WebRTC)
 
 Géré par MediaMTX (intégré à la Gateway).
-- **RTSP** : `rtsp://GATEWAY_IP:48554/cam1` (Basse latence, pour le Node/IA)
-- **HLS** : `http://GATEWAY_IP:48888/cam1` (Streaming web)
-- **WebRTC** : `http://GATEWAY_IP:48889/cam1` (Ultra-basse latence pour l'App Mobile)
+- **RTSP (Publication/Lecture)** : `rtsp://GATEWAY_IP:48554/robot/cam1` (Basse latence, pour le Node/IA)
+- **HLS** : `http://GATEWAY_IP:48888/robot/cam1` (Streaming web)
+- **WebRTC** : `http://GATEWAY_IP:48889/robot/cam1` (Ultra-basse latence pour l'App Mobile)
 
 ---
 

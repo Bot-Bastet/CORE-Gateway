@@ -1,20 +1,17 @@
 import asyncio
 import websockets
-import cv2
-import subprocess
-import threading
-import sys
-import os
 import json
 import httpx
-import time
+import sys
+import os
+import subprocess
 
-# Configuration via variables d'environnement ou valeurs par défaut
-API_TOKEN = os.getenv("API_TOKEN", "bastet-super-secret-token")
-BASE_URL = os.getenv("BASE_URL", "https://ha.arthonetwork.fr:44888") # Serveur de prod par défaut
-RTSP_URL = os.getenv("RTSP_URL", "rtsp://ha.arthonetwork.fr:48554/robot/cam1")
-# WebSocket URL avec token pour l'authentification
-WS_URL = f"{BASE_URL.replace('http', 'ws')}/ws/robot?token={API_TOKEN}"
+# Configuration pour le serveur de production
+PROD_TOKEN = "bst_c9f28d3a1e4b85c7f0d4b9a2e6f1c3d5"
+BASE_URL = "https://ha.arthonetwork.fr:44888"
+RTSP_URL = "rtsp://ha.arthonetwork.fr:48554/robot/cam1"
+# WebSocket URL sécurisée (WSS) avec le token de production
+WS_URL = f"wss://ha.arthonetwork.fr:44888/ws/robot?token={PROD_TOKEN}"
 
 async def stream_video():
     """Lance le flux vidéo avec des paramètres d'optimisation extrême pour la latence."""
@@ -101,76 +98,69 @@ async def stream_video():
         await asyncio.sleep(5)
 
 async def update_robot_state():
-    """Envoie périodiquement l'état du robot à la gateway via REST."""
-    print("[État] Démarrage de la mise à jour de l'état...")
+    """Envoie périodiquement l'état du robot au serveur de production."""
+    print(f"[État] Connexion à {BASE_URL}/core/state...")
     while True:
         try:
             state = {
-                "seen_person": "Teano", # Simulation : voit toujours l'utilisateur principal
-                "seen_objects": ["ordinateur", "bouteille", "tasse"],
+                "seen_person": "Utilisateur Distant",
+                "seen_objects": ["caméra", "serveur", "cloud"],
                 "robot_status": "online",
-                "last_chat": [{"role": "assistant", "content": "Je suis prêt à vous aider avec le flux vidéo actif."}]
+                "last_chat": [{"role": "assistant", "content": "Connecté au serveur de production avec flux vidéo."}]
             }
-            # verify=False si on était en local HTTPS auto-signé, True en prod
             async with httpx.AsyncClient(verify=True) as client:
                 response = await client.post(
                     f"{BASE_URL}/core/state",
                     json=state,
-                    headers={"X-API-Token": API_TOKEN},
-                    timeout=5.0
+                    headers={"X-API-Token": PROD_TOKEN},
+                    timeout=10.0
                 )
                 if response.status_code == 200:
-                    # print("[État] Mise à jour réussie.")
-                    pass
+                    print("[État] Mise à jour réussie sur la production.")
                 else:
                     print(f"[État] Erreur {response.status_code}: {response.text}")
         except Exception as e:
-            print(f"[État] Erreur de connexion : {e}")
+            print(f"[État] Erreur de connexion production : {e}")
         
-        await asyncio.sleep(5) # Mise à jour toutes les 5 secondes
+        await asyncio.sleep(10)
 
 async def robot_websocket():
-    """Gère la communication bidirectionnelle temps-réel."""
-    print(f"[Cerveau] Connexion au Hub Central : {WS_URL}")
+    """Gère la communication WSS temps-réel avec le serveur de production."""
+    print(f"[Cerveau] Connexion WSS : {WS_URL}")
     while True:
         try:
             async with websockets.connect(WS_URL) as ws:
-                print("[Cerveau] Connecté au Gateway.")
+                print("[Cerveau] Connecté au Hub Central (PROD).")
                 
-                # Message de bienvenue
                 welcome_msg = {
                     "type": "chat",
-                    "text": "Bonjour, je suis Bastet, simulateur initialisé et prêt!"
+                    "text": "Bastet Robot (PROD SIM + VIDEO) est en ligne."
                 }
                 await ws.send(json.dumps(welcome_msg))
                 
                 while True:
                     msg = await ws.recv()
-                    print(f"[Cerveau] Reçu : {msg}")
+                    print(f"[Cerveau] Message reçu de la PROD : {msg}")
                     
                     try:
                         data = json.loads(msg)
                         if data.get("type") == "feature_request":
-                            feature = data.get("feature")
-                            state = data.get("state")
-                            print(f"[Cerveau] Commande reçue : {feature} -> {state}")
-                            
-                            # Acquittement
+                            print(f"[Cerveau] Commande PROD : {data.get('feature')} -> {data.get('state')}")
                             ack = {
                                 "type": "feature_ack",
-                                "feature": feature,
-                                "state": state,
+                                "feature": data.get("feature"),
+                                "state": data.get("state"),
                                 "status": "ok"
                             }
                             await ws.send(json.dumps(ack))
                     except json.JSONDecodeError:
                         pass
         except Exception as e:
-            print(f"[Cerveau] Déconnecté ({e}). Reconnexion dans 5s...")
+            print(f"[Cerveau] Déconnecté de la PROD ({e}). Reconnexion dans 5s...")
             await asyncio.sleep(5)
 
 async def main():
-    # Lancement des trois tâches en parallèle
+    # Exécution parallèle des 3 tâches : Vidéo, WebSocket et État
     await asyncio.gather(
         robot_websocket(),
         update_robot_state(),
@@ -178,7 +168,7 @@ async def main():
     )
 
 if __name__ == "__main__":
-    print("--- Démarrage du Simulateur Robot (v2.0 avec Vidéo) ---")
+    print("--- Démarrage du Simulateur Robot Complet (PRODUCTION) ---")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:

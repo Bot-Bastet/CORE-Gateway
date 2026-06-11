@@ -170,7 +170,12 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 @app.websocket("/ws/robot")
-async def websocket_robot(websocket: WebSocket):
+async def websocket_robot(websocket: WebSocket, token: Optional[str] = Query(None)):
+    if token != API_TOKEN:
+        await websocket.accept()
+        await websocket.close(code=4003)
+        return
+
     await manager.connect(websocket, "robot")
     try:
         while True:
@@ -199,7 +204,12 @@ async def websocket_robot(websocket: WebSocket):
         manager.disconnect(websocket, "robot")
 
 @app.websocket("/ws/node")
-async def websocket_node(websocket: WebSocket):
+async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None)):
+    if token != API_TOKEN:
+        await websocket.accept()
+        await websocket.close(code=4003)
+        return
+
     await manager.connect(websocket, "node")
     try:
         while True:
@@ -211,7 +221,12 @@ async def websocket_node(websocket: WebSocket):
         manager.disconnect(websocket, "node")
 
 @app.websocket("/ws/app")
-async def websocket_app(websocket: WebSocket):
+async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)):
+    if token != API_TOKEN:
+        await websocket.accept()
+        await websocket.close(code=4003)
+        return
+
     await manager.connect(websocket, "app")
     try:
         while True:

@@ -15,9 +15,10 @@ Pour un accès externe via IP publique, les ports suivants doivent être redirig
 | Service | Port externe | Protocole | Description |
 |---|---|---|---|
 | **API Gateway** | `44888` | HTTPS (Standard, pas de mTLS) | API (Auth, MyGES, Visages, État CORE) |
-| **RTSP Proxy** | `48554` | RTSP (TCP/UDP) | Flux directs pour le robot et l'IA |
-| **HLS Stream** | `48888` | HTTP (TCP) | Flux vidéo pour navigateurs |
-| **WebRTC Stream** | `48889` | UDP/TCP | Flux vidéo ultra-basse latence (App Mobile) |
+| **RTSP Proxy** | `48554` | TCP/UDP | Flux directs pour le robot et l'IA |
+| **HLS Stream** | `48888` | TCP | Flux vidéo de secours |
+| **WebRTC Signal** | `48889` | TCP | Interface web / Signalisation WebRTC |
+| **WebRTC ICE** | `48189` | TCP/UDP | **CRITIQUE : Transfert vidéo Ultra-Basse Latence** |
 
 ---
 
@@ -56,9 +57,9 @@ Chaque requête doit inclure le Header : `X-API-Token: votre-token`.
 
 | Format | URL |
 |---|---|
-| RTSP | `rtsp://IP_GATEWAY:48554/cam1` |
-| HLS  | `http://IP_GATEWAY:48888/cam1` |
-| WebRTC | `http://IP_GATEWAY:48889/cam1` |
+| RTSP | `rtsp://IP_GATEWAY:48554/robot/cam1` |
+| HLS  | `http://IP_GATEWAY:48888/robot/cam1` |
+| WebRTC | `http://IP_GATEWAY:48889/robot/cam1` |
 
 ---
 
