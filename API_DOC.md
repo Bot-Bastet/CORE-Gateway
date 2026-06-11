@@ -6,10 +6,11 @@ La passerelle (Gateway) sert de pont central entre le **Robot Bastet (CORE)**, l
 
 ## 0. Accès & Sécurité
 
-L'API est accessible en **HTTP** (SSL désactivé pour faciliter l'accès via IP publique).
+L'API est accessible en **HTTPS** via le domaine `ha.arthonetwork.fr`.
 Toutes les requêtes (REST et WebSockets) doivent inclure l'authentification :
 
 - **Port** : `44888`
+- **URL** : `https://ha.arthonetwork.fr:44888`
 - **Header REST** : `X-API-Token: votre_token`
 - **Paramètre WebSocket** : `?token=votre_token`
 
@@ -19,13 +20,13 @@ Toutes les requêtes (REST et WebSockets) doivent inclure l'authentification :
 
 Pour garantir une latence minimale (< 50ms), les flux principaux utilisent des WebSockets.
 
-### `ws://GATEWAY_IP:44888/ws/robot` (Connexion Robot)
+### `wss://ha.arthonetwork.fr:44888/ws/robot` (Connexion Robot)
 Canal bidirectionnel exclusif pour le robot.
 
-### `ws://GATEWAY_IP:44888/ws/node` (Connexion CORE-Node)
+### `wss://ha.arthonetwork.fr:44888/ws/node` (Connexion CORE-Node)
 Canal bidirectionnel exclusif pour le serveur de calcul.
 
-### `ws://GATEWAY_IP:44888/ws/app` (Connexion Application Mobile)
+### `wss://ha.arthonetwork.fr:44888/ws/app` (Connexion Application Mobile)
 Canal pour l'utilisateur (État du robot, télécommande).
 
 ---

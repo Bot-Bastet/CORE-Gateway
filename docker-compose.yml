@@ -49,7 +49,7 @@ services:
     volumes:
       - gateway-data:/data
     ports:
-      - "${FACE_SERVER_PORT:-44888}:44888"
+      - "127.0.0.1:44887:44888"
     networks:
       - bastet-net
     # HTTP healthcheck
