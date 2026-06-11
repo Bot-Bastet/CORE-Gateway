@@ -11,6 +11,15 @@ import hashlib
 from pathlib import Path
 from typing import Optional
 from myges_api import MyGesAPI
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 FACES_DIR = Path(os.getenv("FACES_DIR", "/data/faces"))
@@ -68,7 +77,18 @@ class AccountInfo(BaseModel):
     last_name: str
     first_name: str
     phone: str
+    password: Optional[str] = None
+    password_hash: Optional[str] = None
     is_admin: bool = False
+    preferences: dict = {}
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class PreferencesUpdate(BaseModel):
+    full_name: str
+    preferences: dict
 
 # ─── Nettoyage & Helpers ──────────────────────────────────────────────────────
 
@@ -172,8 +192,9 @@ async def websocket_robot(websocket: WebSocket):
             except Exception as e:
                 print(f"Erreur injection contexte : {e}")
                 
-            # Routage automatique du robot vers le noeud
+            # Routage automatique du robot vers le noeud et l'app
             await manager.broadcast(data, "node")
+            await manager.broadcast(data, "app")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "robot")
 
@@ -183,8 +204,9 @@ async def websocket_node(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
-            # Routage de la réponse du noeud (LLM streamé ou audio TTS) vers le robot
+            # Routage de la réponse du noeud (LLM streamé ou audio TTS) vers le robot et l'app
             await manager.broadcast(data, "robot")
+            await manager.broadcast(data, "app")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "node")
 
@@ -552,9 +574,46 @@ def get_myges():
 def save_account(info: AccountInfo):
     users = load_json(USERS_FILE, default={})
     full_name = f"{info.first_name} {info.last_name}"
-    users[full_name] = info.model_dump()
+    
+    existing = users.get(full_name, {})
+    dumped_info = info.model_dump()
+    
+    if info.password:
+        dumped_info["password_hash"] = get_password_hash(info.password)
+    else:
+        dumped_info["password_hash"] = existing.get("password_hash")
+        
+    if not info.preferences and "preferences" in existing:
+        dumped_info["preferences"] = existing["preferences"]
+        
+    dumped_info.pop("password", None) # Do not save raw password
+    
+    users[full_name] = dumped_info
     save_json(USERS_FILE, users)
     return {"status": "saved", "user": full_name}
+
+@app.post("/preferences", tags=["Accounts"], summary="MAJ des préférences utilisateur", dependencies=[Depends(verify_token)])
+def update_preferences(req: PreferencesUpdate):
+    users = load_json(USERS_FILE, default={})
+    if req.full_name not in users:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+    
+    if "preferences" not in users[req.full_name]:
+        users[req.full_name]["preferences"] = {}
+        
+    users[req.full_name]["preferences"].update(req.preferences)
+    save_json(USERS_FILE, users)
+    return {"status": "updated", "preferences": users[req.full_name]["preferences"]}
+
+@app.post("/auth/login", tags=["Auth"], summary="Connexion utilisateur", dependencies=[Depends(verify_token)])
+def login_user(creds: LoginRequest):
+    users = load_json(USERS_FILE, default={})
+    for name, u in users.items():
+        if u.get("email", "").lower() == creds.email.lower():
+            if "password_hash" in u and verify_password(creds.password, u["password_hash"]):
+                return {"status": "success", "user": u}
+            raise HTTPException(status_code=401, detail="Mot de passe incorrect")
+    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
 @app.get("/accounts", tags=["Accounts"], summary="Lister les comptes", dependencies=[Depends(verify_token)])
 def get_accounts():
