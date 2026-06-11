@@ -1,109 +1,97 @@
 # Documentation API : CORE-Gateway
 
-La passerelle (Gateway) sert de pont central entre le **Robot Bastet (CORE)**, le **CORE-Node (Traitement lourd)**, et l'**Application Mobile**. Elle assure le routage instantané (WebSockets), la sécurité (chiffrement) et la gestion des comptes.
+La passerelle (Gateway) sert de pont central entre le **Robot Bastet (CORE)**, le **CORE-Node (Traitement lourd)**, et l'**Application Mobile**. Elle assure le routage instantané (WebSockets), la sécurité et la gestion des comptes.
+
+---
+
+## 0. Accès & Sécurité
+
+L'API est accessible en **HTTP** (SSL désactivé pour faciliter l'accès via IP publique).
+Toutes les requêtes (REST et WebSockets) doivent inclure l'authentification :
+
+- **Port** : `44888`
+- **Header REST** : `X-API-Token: votre_token`
+- **Paramètre WebSocket** : `?token=votre_token`
 
 ---
 
 ## 1. Hub WebSockets (Communication Temps-Réel)
 
-Pour garantir une latence minimale (< 50ms) et gérer le streaming (texte ou audio), les flux principaux utilisent des WebSockets.
+Pour garantir une latence minimale (< 50ms), les flux principaux utilisent des WebSockets.
 
 ### `ws://GATEWAY_IP:44888/ws/robot` (Connexion Robot)
 Canal bidirectionnel exclusif pour le robot.
-- **Envoi (Robot -> Gateway)** : 
-  - Audio brut (si STT offloaded).
-  - Texte (si STT calculé localement sur le robot).
-  - État système (Batterie, position, visage détecté).
-- **Réception (Gateway -> Robot)** :
-  - Audio TTS (généré par le Node et streamé au robot).
-  - Texte (réponse LLM).
-  - Ordres de contrôle (ex: avance, tourne).
 
 ### `ws://GATEWAY_IP:44888/ws/node` (Connexion CORE-Node)
 Canal bidirectionnel exclusif pour le serveur de calcul.
-- **Réception (Gateway -> Node)** : Audio à transcrire, texte à processer dans le LLM, ou images pour YOLO. Inclut le contexte complet (identifiants intranet déchiffrés par la gateway).
-- **Envoi (Node -> Gateway)** : Texte streamé (token par token) ou flux audio TTS généré.
 
 ### `ws://GATEWAY_IP:44888/ws/app` (Connexion Application Mobile)
-Canal pour l'utilisateur.
-- Reçoit en direct l'état du robot (ce qu'il fait, ce qu'il dit).
-- Envoie des instructions de télécommande (joystick virtuel).
+Canal pour l'utilisateur (État du robot, télécommande).
 
 ---
 
-## 2. Comptes Utilisateurs (REST)
+## 2. Authentification & Comptes (REST)
 
-L'application mobile permet de créer des profils utilisateurs distincts. La Gateway gère la création et la récupération des profils.
-L'API est protégée par le Token Global de la Gateway (`X-API-Token`).
+L'API utilise maintenant des endpoints dédiés pour l'authentification, tout en conservant la gestion des profils.
 
-- **POST `/accounts`** : Création ou mise à jour d'un compte.
-  ```json
-  {
-    "email": "utilisateur@bastet.com",
-    "pseudo": "Pseudo",
-    "last_name": "Nom",
-    "first_name": "Prénom",
-    "phone": "0600000000",
-    "is_admin": false
-  }
-  ```
-- **GET `/accounts`** : Liste de tous les comptes enregistrés.
+### **POST `/auth/register`** (ou `/accounts`)
+Crée ou met à jour un compte utilisateur.
+```json
+{
+  "email": "utilisateur@bastet.com",
+  "pseudo": "Pseudo",
+  "first_name": "Prénom",
+  "last_name": "Nom",
+  "phone": "0600000000",
+  "password": "votre_mot_de_passe",
+  "is_admin": false,
+  "preferences": {}
+}
+```
+
+### **POST `/auth/login`**
+Vérifie les identifiants et retourne les informations de l'utilisateur.
+```json
+{
+  "email": "utilisateur@bastet.com",
+  "password": "votre_mot_de_passe"
+}
+```
+
+### **GET `/accounts`**
+Liste tous les comptes enregistrés (nécessite d'être Admin).
 
 ---
 
-## 3. Identifiants Intranet / Écoles (REST - Sécurisé)
+## 3. Identifiants Intranet / MyGES (REST)
 
-Le robot a besoin d'accéder aux données scolaires/persos (MyGES). Ces données sont stockées **chiffrées** (AES) sur la Gateway. Seule la Gateway peut les déchiffrer avant de les envoyer dans le contexte au Node.
+Le robot accède aux données MyGES via ces endpoints.
 
-- **POST `/users/me/intranet`**
-  ```json
-  { "service": "myges", "username": "id", "password": "mot_de_passe" }
-  ```
-  *(La Gateway chiffre "mot_de_passe" avant l'insertion en BDD)*
-- **PUT `/users/me/intranet/{service}`** : Mettre à jour les identifiants.
-- **DELETE `/users/me/intranet/{service}`** : Supprimer ses accès.
+- **POST `/myges/login`** : Enregistre les identifiants MyGES pour l'utilisateur.
+- **GET `/myges/planning`** : Récupère le planning (interroge l'API Kordis via la gateway).
 
 ---
 
-## 4. Base de Visages et Reconnaissance (REST)
+## 4. Base de Visages (REST)
 
-L'App permet à l'utilisateur de s'enregistrer pour être reconnu par le robot.
+L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
 
-- **POST `/users/me/faces`** : Upload de plusieurs photos (Multipart/FormData) par l'utilisateur via l'app.
-- **GET `/faces/sync`** : Endpoint appelé par le robot au démarrage pour télécharger le dictionnaire des encodages ou des images brutes autorisées.
+- **POST `/faces/upload`** : Upload de photos (Multipart).
+- **GET `/faces/sync`** : Synchronisation des encodages pour le robot.
+- **DELETE `/faces/{face_id}`** : Supprimer un visage.
 
 ---
 
 ## 5. Flux Vidéos (RTSP / WebRTC)
 
-La Gateway inclut un proxy vidéo (MediaMTX).
-- **Caméra 1 & Caméra 2** : Le robot envoie ses flux en RTSP à la Gateway.
-- **App Mobile** : Lit le flux en WebRTC (ultra-basse latence) via `http://GATEWAY_IP:48889/cam1` (ou cam2).
-- **Node / Robot (Analyse)** : Consomme le flux en RTSP `rtsp://GATEWAY_IP:48554/cam1`.
+Géré par MediaMTX (intégré à la Gateway).
+- **RTSP** : `rtsp://GATEWAY_IP:48554/cam1` (Basse latence, pour le Node/IA)
+- **HLS** : `http://GATEWAY_IP:48888/cam1` (Streaming web)
+- **WebRTC** : `http://GATEWAY_IP:48889/cam1` (Ultra-basse latence pour l'App Mobile)
 
 ---
 
-## 6. Contrôle à Distance depuis l'App (REST)
+## 6. État du Robot (CORE State)
 
-En plus des WebSockets, une API REST permet d'envoyer des commandes spécifiques.
-
-- **POST `/robot/command`**
-  ```json
-  {
-    "action": "move",
-    "direction": "forward",
-    "speed": 1.0
-  }
-  ```
-  *La Gateway traduit cette requête et l'injecte instantanément dans `/ws/robot`.*
-
----
-
-## 7. Administration (Pour le Créateur / Admin)
-
-L'utilisateur Admin (Teano) peut gérer la passerelle.
-
-- **GET `/admin/users`** : Lister tous les utilisateurs.
-- **DELETE `/admin/users/{user_id}`** : Supprimer un compte (entraîne la suppression en cascade de ses visages et identifiants).
-- **DELETE `/admin/users/{user_id}/intranet`** : Purger les accès intranet d'un utilisateur par sécurité.
-- **PUT `/admin/settings`** : Configurer la Gateway (ex: Délais de cooldown entre les interactions, activation/désactivation de modules).
+- **POST `/core/state`** : Mise à jour de l'état (par le robot).
+- **GET `/core/state`** : Récupération de l'état (par l'app).

@@ -570,6 +570,7 @@ def get_myges():
 
 # ─── CORE State ───────────────────────────────────────────────────────────────
 
+@app.post("/auth/register", tags=["Auth"], summary="Créer un compte utilisateur (Alias)", dependencies=[Depends(verify_token)])
 @app.post("/accounts", tags=["Accounts"], summary="Créer ou MAJ un compte utilisateur", dependencies=[Depends(verify_token)])
 def save_account(info: AccountInfo):
     users = load_json(USERS_FILE, default={})
