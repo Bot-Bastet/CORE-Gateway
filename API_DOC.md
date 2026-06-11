@@ -6,11 +6,12 @@ La passerelle (Gateway) sert de pont central entre le **Robot Bastet (CORE)**, l
 
 ## 0. Accès & Sécurité
 
-L'API est accessible en **HTTPS** via le domaine `ha.arthonetwork.fr`.
+L'API est accessible en **HTTPS standard** (sans mTLS / certificat client) via le domaine `ha.arthonetwork.fr`.
 Toutes les requêtes (REST et WebSockets) doivent inclure l'authentification :
 
 - **Port** : `44888`
 - **URL** : `https://ha.arthonetwork.fr:44888`
+- **Auth** : HTTPS Simple + API Token (X-API-Token)
 - **Header REST** : `X-API-Token: votre_token`
 - **Paramètre WebSocket** : `?token=votre_token`
 
