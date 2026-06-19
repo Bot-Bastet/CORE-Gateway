@@ -37,7 +37,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 API_TOKEN = os.getenv("API_TOKEN", "your-api-token-here")
 api_key_header = APIKeyHeader(name="X-API-Token", auto_error=False)
 
-# ─── Auto-Update au démarrage ─────────────────────────────────────────────────
+# ─── Auto-Update au démarrage & Périodique ────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     def _run_update():
@@ -49,7 +49,22 @@ async def lifespan(app: FastAPI):
                 os.kill(os.getpid(), signal.SIGTERM)  # Demander un redémarrage via PM2/systemd
         except Exception as e:
             print(f"[AutoUpdater] Erreur : {e}")
-    threading.Thread(target=_run_update, daemon=True).start()
+
+    def _hourly_check():
+        time.sleep(10)  # Attendre que l'app démarre
+        _run_update()
+        while True:
+            time.sleep(3600)
+            try:
+                state = load_json(STATE_FILE, default={"robot_status": "offline"})
+                status = state.get("robot_status", "offline")
+                if status != "online":
+                    print("[AutoUpdater] Robot inactif. Vérification de mise à jour Gateway...")
+                    _run_update()
+            except Exception as e:
+                print(f"[AutoUpdater] Erreur : {e}")
+
+    threading.Thread(target=_hourly_check, daemon=True).start()
     yield
 
 app = FastAPI(
@@ -90,6 +105,10 @@ class CoreState(BaseModel):
     robot_status: str = "idle"
     robot_version: Optional[str] = "v0.0.0"
     sensors: dict = {}
+
+class UpdateProgress(BaseModel):
+    status: str
+    percent: int
 
 class AccountInfo(BaseModel):
     email: str
@@ -667,6 +686,61 @@ def update_state(state: CoreState):
 def get_state():
     """L'app mobile appelle ceci pour afficher ce que fait/voit le robot."""
     return load_json(STATE_FILE, default={"robot_status": "offline"})
+
+# ─── System Updates API ───────────────────────────────────────────────────────
+GATEWAY_UPDATE_FILE = DATA_DIR / "gateway_update_state.json"
+ROBOT_UPDATE_FILE = DATA_DIR / "robot_update_state.json"
+
+@app.post("/system/update/gateway", tags=["System Update"], summary="Lancer la mise à jour de la Gateway", dependencies=[Depends(verify_token)])
+async def trigger_gateway_update():
+    """Lancer instantanément la mise à jour de la Gateway."""
+    def run_up():
+        try:
+            from updater import check_and_apply_update
+            # Reset progress
+            save_json(GATEWAY_UPDATE_FILE, {"status": "starting", "percent": 0})
+            updated = check_and_apply_update()
+            if updated:
+                import os, signal
+                save_json(GATEWAY_UPDATE_FILE, {"status": "done", "percent": 100})
+                os.kill(os.getpid(), signal.SIGTERM)
+            else:
+                save_json(GATEWAY_UPDATE_FILE, {"status": "idle", "percent": 100})
+        except Exception as e:
+            save_json(GATEWAY_UPDATE_FILE, {"status": f"failed: {e}", "percent": 0})
+            
+    threading.Thread(target=run_up, daemon=True).start()
+    return {"status": "triggered"}
+
+@app.get("/system/update/gateway/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Gateway", dependencies=[Depends(verify_token)])
+def get_gateway_update_progress():
+    return load_json(GATEWAY_UPDATE_FILE, default={"status": "idle", "percent": 100})
+
+@app.post("/system/update/gateway/progress", tags=["System Update"], summary="Mettre à jour le progrès Gateway", dependencies=[Depends(verify_token)])
+async def update_gateway_progress(progress: UpdateProgress):
+    data = progress.model_dump()
+    save_json(GATEWAY_UPDATE_FILE, data)
+    await manager.broadcast(json.dumps({"type": "gateway_update_progress", **data}), "app")
+    return {"status": "ok"}
+
+@app.post("/system/update/robot", tags=["System Update"], summary="Lancer la mise à jour du robot", dependencies=[Depends(verify_token)])
+async def trigger_robot_update():
+    """Lancer instantanément la mise à jour du robot."""
+    save_json(ROBOT_UPDATE_FILE, {"status": "starting", "percent": 0})
+    await manager.broadcast(json.dumps({"type": "trigger_update"}), "robot")
+    await manager.broadcast(json.dumps({"type": "robot_update_progress", "status": "starting", "percent": 0}), "app")
+    return {"status": "triggered"}
+
+@app.post("/system/update/robot/progress", tags=["System Update"], summary="Mettre à jour le progrès du robot", dependencies=[Depends(verify_token)])
+async def update_robot_progress(progress: UpdateProgress):
+    data = progress.model_dump()
+    save_json(ROBOT_UPDATE_FILE, data)
+    await manager.broadcast(json.dumps({"type": "robot_update_progress", **data}), "app")
+    return {"status": "ok"}
+
+@app.get("/system/update/robot/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour robot", dependencies=[Depends(verify_token)])
+def get_robot_update_progress():
+    return load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
 
 # ─── System ───────────────────────────────────────────────────────────────────
 

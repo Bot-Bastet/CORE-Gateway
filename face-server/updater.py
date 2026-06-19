@@ -72,22 +72,41 @@ def check_and_apply_update() -> bool:
         return False
 
     try:
+        import json
         # Télécharger l'archive
         repo_root = Path(__file__).parent.parent
         zip_path = repo_root / "update.zip"
+        
+        progress_file = Path("/data/gateway_update_state.json")
+        def save_progress(status: str, percent: int):
+            try:
+                with open(progress_file, "w") as f_prog:
+                    json.dump({"status": status, "percent": percent}, f_prog)
+            except Exception:
+                pass
 
         logger.info(f"[AutoUpdater] Téléchargement de {zip_asset['browser_download_url']}...")
         resp = requests.get(zip_asset["browser_download_url"], stream=True, timeout=120)
+        total_size = int(resp.headers.get("content-length", 0))
+        downloaded = 0
+        
+        save_progress("downloading", 0)
         with open(zip_path, "wb") as f:
             for chunk in resp.iter_content(chunk_size=8192):
                 f.write(chunk)
+                downloaded += len(chunk)
+                if total_size > 0:
+                    percent = int((downloaded / total_size) * 100)
+                    save_progress("downloading", percent)
 
         # Extraire sur place (écrase les fichiers existants)
+        save_progress("extracting", 100)
         subprocess.run(["unzip", "-o", str(zip_path), "-d", str(repo_root)], check=True)
         zip_path.unlink()
 
         # Mettre à jour la version
         VERSION_FILE.write_text(latest_tag)
+        save_progress("idle", 100)
         logger.info(f"[AutoUpdater] Mise à jour {latest_tag} appliquée. Redémarrage requis.")
         return True
 
