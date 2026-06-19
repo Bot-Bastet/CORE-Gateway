@@ -10,6 +10,7 @@ import time
 import json
 import hashlib
 import threading
+import requests
 from pathlib import Path
 from typing import Optional
 from myges_api import MyGesAPI
@@ -335,6 +336,39 @@ def delete_account(full_name: str):
     if full_name in users:
         del users[full_name]
         save_json(USERS_FILE, users)
+        return {"status": "deleted", "user": full_name}
+    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+
+@app.delete("/accounts/{full_name}", tags=["Accounts"], summary="Supprimer un compte", dependencies=[Depends(verify_token)])
+def delete_account(full_name: str):
+    users = load_json(USERS_FILE, default={})
+    if full_name in users:
+        # Supprimer des comptes
+        del users[full_name]
+        save_json(USERS_FILE, users)
+
+        # Nettoyer les identifiants MyGES associés
+        myges = load_json(MYGES_FILE, default={})
+        if full_name in myges:
+            del myges[full_name]
+            save_json(MYGES_FILE, myges)
+
+        # Nettoyer les photos de visage associées
+        meta = load_json(META_FILE, default=[])
+        new_meta = []
+        for entry in meta:
+            if entry.get("name", "").lower() == full_name.lower():
+                path = FACES_DIR / entry["filename"]
+                try:
+                    if path.exists():
+                        path.unlink()
+                except Exception as e:
+                    print(f"Error deleting face image {path}: {e}")
+            else:
+                new_meta.append(entry)
+        save_json(META_FILE, new_meta)
+
         return {"status": "deleted", "user": full_name}
     raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
@@ -1130,6 +1164,17 @@ def dashboard():
         .sensor-val {
             font-weight: 600;
         }
+        
+        #chat-messages-box::-webkit-scrollbar {
+            width: 4px;
+        }
+        #chat-messages-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #chat-messages-box::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 999px;
+        }
     </style>
 </head>
 <body>
@@ -1255,6 +1300,14 @@ def dashboard():
                         <div class="sensor-item"><span class="sensor-label">Dernière mise à jour</span><span id="sensor-last-seen" class="sensor-val">--</span></div>
                     </div>
                 </div>
+                
+                <!-- Live Chat Card -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 280px; max-height: 280px;">
+                    <div class="card-title">Conversation Live avec Bastet</div>
+                    <div id="chat-messages-box" style="flex: 1; overflow-y: auto; padding-right: 0.5rem; margin-top: 0.5rem; display: flex; flex-direction: column;">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;">Aucune conversation en cours.</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Caméras on-demand -->
@@ -1343,6 +1396,14 @@ def dashboard():
                 <div class="card">
                     <div class="card-title">Mise à jour — Gateway Serveur</div>
                     <div style="margin: 1rem 0;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Version actuelle :</span>
+                            <span id="gateway-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Dernière version dispo :</span>
+                            <span id="gateway-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                        </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
                             <span>Statut de la Gateway :</span>
                             <span id="gateway-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
@@ -1367,6 +1428,14 @@ def dashboard():
                 <div class="card">
                     <div class="card-title">Mise à jour — Robot Pi</div>
                     <div style="margin: 1rem 0;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Version actuelle :</span>
+                            <span id="robot-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Dernière version dispo :</span>
+                            <span id="robot-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                        </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
                             <span>Statut de l'agent :</span>
                             <span id="robot-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
@@ -1679,6 +1748,52 @@ def dashboard():
                     } else {
                         serviceBadge.textContent = 'Inconnu';
                         serviceBadge.className = 'status-badge';
+                    }
+                    
+                    // Live Chat messages display
+                    const chatContainer = document.getElementById('chat-messages-box');
+                    if (chatContainer && state.last_chat) {
+                        const chatHash = JSON.stringify(state.last_chat);
+                        if (chatContainer.dataset.lastHash !== chatHash) {
+                            chatContainer.dataset.lastHash = chatHash;
+                            chatContainer.innerHTML = '';
+                            if (state.last_chat.length === 0) {
+                                chatContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;">Aucune conversation en cours.</div>`;
+                            } else {
+                                state.last_chat.forEach(msg => {
+                                    const role = msg.role || msg.sender || 'user';
+                                    const text = msg.content || msg.text || '';
+                                    
+                                    const isRobot = role.toLowerCase() === 'assistant' || role.toLowerCase() === 'bot' || role.toLowerCase() === 'robot';
+                                    
+                                    const bubble = document.createElement('div');
+                                    bubble.style.display = 'flex';
+                                    bubble.style.flexDirection = 'column';
+                                    bubble.style.alignItems = isRobot ? 'flex-start' : 'flex-end';
+                                    bubble.style.marginBottom = '0.75rem';
+                                    
+                                    const senderName = isRobot ? 'Bastet' : 'Utilisateur';
+                                    const senderColor = isRobot ? '#a5b4fc' : 'var(--text-secondary)';
+                                    
+                                    bubble.innerHTML = `
+                                        <span style="font-size: 0.7rem; color: ${senderColor}; margin-bottom: 0.15rem; font-weight: 600; padding: 0 0.25rem;">${senderName}</span>
+                                        <div style="background-color: ${isRobot ? 'rgba(99, 102, 241, 0.15)' : 'var(--border-color)'}; 
+                                                    border: 1px solid ${isRobot ? 'rgba(99, 102, 241, 0.3)' : 'transparent'};
+                                                    color: var(--text-primary);
+                                                    padding: 0.6rem 0.85rem;
+                                                    border-radius: 12px;
+                                                    max-width: 85%;
+                                                    font-size: 0.85rem;
+                                                    line-height: 1.4;
+                                                    word-break: break-word;
+                                                    white-space: pre-wrap;">${text}</div>
+                                    `;
+                                    chatContainer.appendChild(bubble);
+                                });
+                                // Scroll to bottom
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                        }
                     }
                 }
             } catch (e) {
@@ -2222,6 +2337,8 @@ def dashboard():
                     document.getElementById('gateway-update-status').textContent = gw.status || 'Prêt';
                     document.getElementById('gateway-update-bar').style.width = `${gw.percent}%`;
                     document.getElementById('gateway-update-percent').textContent = `${gw.percent}%`;
+                    document.getElementById('gateway-current-version').textContent = gw.current_version || 'Inconnu';
+                    document.getElementById('gateway-latest-version').textContent = gw.latest_version || 'Inconnu';
                 }
 
                 if (robotRes.ok) {
@@ -2229,6 +2346,8 @@ def dashboard():
                     document.getElementById('robot-update-status').textContent = rb.status || 'Prêt';
                     document.getElementById('robot-update-bar').style.width = `${rb.percent}%`;
                     document.getElementById('robot-update-percent').textContent = `${rb.percent}%`;
+                    document.getElementById('robot-current-version').textContent = rb.current_version || 'Inconnu';
+                    document.getElementById('robot-latest-version').textContent = rb.latest_version || 'Inconnu';
                 }
             } catch (e) {
                 console.error("Updates progress fetch error:", e);
@@ -2287,6 +2406,7 @@ def dashboard():
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
 
 
 
@@ -2463,6 +2583,29 @@ def get_state():
     return load_json(STATE_FILE, default={"robot_status": "offline"})
 
 # ─── System Updates API ───────────────────────────────────────────────────────
+GITHUB_RELEASES_CACHE = {} # repo_name -> (tag_name, timestamp)
+
+def get_cached_latest_release(repo: str) -> str:
+    now = time.time()
+    if repo in GITHUB_RELEASES_CACHE:
+        tag, cached_time = GITHUB_RELEASES_CACHE[repo]
+        if now - cached_time < 300: # 5 minutes cache
+            return tag
+            
+    try:
+        url = f"https://api.github.com/repos/{repo}/releases/latest"
+        resp = requests.get(url, timeout=3, headers={"Accept": "application/vnd.github+json"})
+        if resp.status_code == 200:
+            tag = resp.json().get("tag_name", "v0.0.0")
+            GITHUB_RELEASES_CACHE[repo] = (tag, now)
+            return tag
+    except Exception as e:
+        print(f"Error fetching latest release for {repo}: {e}")
+        
+    if repo in GITHUB_RELEASES_CACHE:
+        return GITHUB_RELEASES_CACHE[repo][0]
+    return "v0.0.0"
+
 GATEWAY_UPDATE_FILE = DATA_DIR / "gateway_update_state.json"
 ROBOT_UPDATE_FILE = DATA_DIR / "robot_update_state.json"
 
@@ -2489,7 +2632,11 @@ async def trigger_gateway_update():
 
 @app.get("/system/update/gateway/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Gateway", dependencies=[Depends(verify_token)])
 def get_gateway_update_progress():
-    return load_json(GATEWAY_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    progress = load_json(GATEWAY_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    from updater import get_current_version
+    progress["current_version"] = get_current_version()
+    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE-Gateway")
+    return progress
 
 @app.post("/system/update/gateway/progress", tags=["System Update"], summary="Mettre à jour le progrès Gateway", dependencies=[Depends(verify_token)])
 async def update_gateway_progress(progress: UpdateProgress):
@@ -2515,7 +2662,11 @@ async def update_robot_progress(progress: UpdateProgress):
 
 @app.get("/system/update/robot/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour robot", dependencies=[Depends(verify_token)])
 def get_robot_update_progress():
-    return load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    progress = load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    state = load_json(STATE_FILE, default={})
+    progress["current_version"] = state.get("robot_version", "v0.0.0")
+    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")
+    return progress
 
 # ─── System ───────────────────────────────────────────────────────────────────
 
