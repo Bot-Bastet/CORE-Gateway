@@ -1949,6 +1949,14 @@ def dashboard():
                                 <button class="btn btn-secondary" id="yolo-ctrl-disabled" onclick="setAIControl('yolo', 'disabled')">Désactivé</button>
                             </div>
                         </div>
+
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Reconnaissance Faciale</h4>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="face_rec-ctrl-enabled" onclick="setAIControl('face_rec', 'enabled')">Activé</button>
+                                <button class="btn btn-secondary" id="face_rec-ctrl-disabled" onclick="setAIControl('face_rec', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2071,15 +2079,15 @@ def dashboard():
                 </div>
 
                 <!-- ROS 2 Topics -->
-                <div class="card" style="display:flex; flex-direction:column; max-height: 310px;">
+                <div class="card" style="display:flex; flex-direction:column; max-height: 310px; min-width: 0; overflow: hidden;">
                     <div class="card-title">Flux de Topics ROS 2 Actifs</div>
                     <div style="flex:1; overflow:auto; margin-top: 0.5rem; max-width: 100%;">
-                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left; min-width: 450px;">
                             <thead>
                                 <tr style="color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 600;">
-                                    <th style="padding: 0.4rem 0;">Nom du Topic</th>
-                                    <th style="padding: 0.4rem 0;">Type</th>
-                                    <th style="padding: 0.4rem 0; text-align: right;">Hz</th>
+                                    <th style="padding: 0.4rem 0; white-space: nowrap;">Nom du Topic</th>
+                                    <th style="padding: 0.4rem 0; white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem;">Type</th>
+                                    <th style="padding: 0.4rem 0; text-align: right; white-space: nowrap;">Hz</th>
                                 </tr>
                             </thead>
                             <tbody id="ros2-topics-list">
@@ -2584,6 +2592,7 @@ def dashboard():
                         updateAIControlUI('stt', payload.ai_state.stt);
                         updateAIControlUI('chat', payload.ai_state.chat);
                         updateAIControlUI('yolo', payload.ai_state.yolo);
+                        updateAIControlUI('face_rec', payload.ai_state.face_rec);
                     }
                     
                     // Update joint angles (0 to 11)
@@ -2623,9 +2632,9 @@ def dashboard():
                                 const tr = document.createElement('tr');
                                 tr.style.borderBottom = '1px solid var(--border-color)';
                                 tr.innerHTML = `
-                                    <td style="padding: 0.4rem 0; font-family:monospace; color:var(--accent);">${t.name}</td>
-                                    <td style="padding: 0.4rem 0; color:var(--text-secondary);">${t.type}</td>
-                                    <td style="padding: 0.4rem 0; text-align:right; font-weight:bold;">${t.hz.toFixed(1)}</td>
+                                    <td style="padding: 0.4rem 0; font-family:monospace; color:var(--accent); white-space: nowrap;">${t.name}</td>
+                                    <td style="padding: 0.4rem 0; color:var(--text-secondary); white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem;">${t.type}</td>
+                                    <td style="padding: 0.4rem 0; text-align:right; font-weight:bold; white-space: nowrap;">${t.hz.toFixed(1)}</td>
                                 `;
                                 tbody.appendChild(tr);
                             });
@@ -2723,7 +2732,8 @@ def dashboard():
                 'tts': ['robot', 'node', 'disabled'],
                 'stt': ['robot', 'node', 'disabled'],
                 'chat': ['robot', 'node', 'disabled'],
-                'yolo': ['enabled', 'disabled']
+                'yolo': ['enabled', 'disabled'],
+                'face_rec': ['enabled', 'disabled']
             };
             
             buttons[feature].forEach(t => {
@@ -2744,9 +2754,9 @@ def dashboard():
         }
 
         function updateAIControlUI(feature, target) {
-            const list = (feature === 'yolo') ? ['enabled', 'disabled'] : ['robot', 'node', 'disabled'];
+            const list = (feature === 'yolo' || feature === 'face_rec') ? ['enabled', 'disabled'] : ['robot', 'node', 'disabled'];
             list.forEach(t => {
-                const suffix = (t === 'disabled' && feature !== 'yolo') ? 'off' : t;
+                const suffix = (t === 'disabled' && feature !== 'yolo' && feature !== 'face_rec') ? 'off' : t;
                 const btnId = `${feature}-ctrl-${suffix}`;
                 const btn = document.getElementById(btnId);
                 if (btn) {
@@ -3322,6 +3332,7 @@ def dashboard():
                         updateAIControlUI('stt', state.ai_state.stt);
                         updateAIControlUI('chat', state.ai_state.chat);
                         updateAIControlUI('yolo', state.ai_state.yolo);
+                        updateAIControlUI('face_rec', state.ai_state.face_rec);
                     }
                     
                     if (state.updated_at) {
