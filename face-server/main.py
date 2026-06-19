@@ -88,6 +88,8 @@ class CoreState(BaseModel):
     seen_objects: list[str] = []
     last_chat: list[dict] = []
     robot_status: str = "idle"
+    robot_version: Optional[str] = "v0.0.0"
+    sensors: dict = {}
 
 class AccountInfo(BaseModel):
     email: str
