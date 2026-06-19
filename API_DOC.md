@@ -69,8 +69,8 @@ Liste tous les comptes enregistrés (nécessite d'être Admin).
 
 Le robot accède aux données MyGES via ces endpoints.
 
-- **POST `/myges/login`** : Enregistre les identifiants MyGES pour l'utilisateur.
-- **GET `/myges/planning`** : Récupère le planning (interroge l'API Kordis via la gateway).
+- **POST `/myges`** : Enregistre les identifiants MyGES (username/password) pour un utilisateur.
+- **GET `/myges`** : Récupère les identifiants MyGES (interrogé par le robot).
 
 ---
 
@@ -78,8 +78,9 @@ Le robot accède aux données MyGES via ces endpoints.
 
 L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
 
-- **POST `/faces/upload`** : Upload de photos (Multipart).
-- **GET `/faces/sync`** : Synchronisation des encodages pour le robot.
+- **POST `/faces/upload`** : Upload de photos (Multipart). Limité à 8 photos par personne.
+- **GET `/faces`** : Lister tous les visages enregistrés.
+- **GET `/faces/{face_id}/image`** : Récupérer l'image correspondante.
 - **DELETE `/faces/{face_id}`** : Supprimer un visage.
 
 ---
@@ -95,5 +96,63 @@ Géré par MediaMTX (intégré à la Gateway).
 
 ## 6. État du Robot (CORE State)
 
+Permet de suivre en temps réel ce que voit et fait le robot.
+
 - **POST `/core/state`** : Mise à jour de l'état (par le robot).
 - **GET `/core/state`** : Récupération de l'état (par l'app).
+
+**Payload de l'état :**
+```json
+{
+  "seen_person": "Nom reconnu ou null",
+  "seen_objects": ["liste", "objets", "detectes"],
+  "last_chat": [{"role": "user", "content": "..."}],
+  "robot_status": "online / hibernating / offline",
+  "robot_version": "v0.1.6",
+  "sensors": {
+    "system": {
+      "cpu_temp": 45.2,
+      "cpu_load_1m": 0.8,
+      "ram_total_mb": 8192,
+      "ram_used_mb": 2048,
+      "ram_percent": 25.0
+    },
+    "spotbot_service": "active / inactive"
+  }
+}
+```
+
+---
+
+## 7. Mises à Jour & Télémétrie (REST + WebSockets)
+
+Permet de contrôler et surveiller les mises à jour de la Gateway et du Robot.
+
+### **POST `/system/update/gateway`**
+Lance instantanément la recherche et l'application de mise à jour sur la Gateway (redémarre le conteneur si une mise à jour est installée).
+
+### **GET `/system/update/gateway/progress`**
+Récupère le statut de progression de l'update de la Gateway.
+```json
+{
+  "status": "idle / downloading / extracting / done",
+  "percent": 100
+}
+```
+
+### **POST `/system/update/robot`**
+Envoie un signal de mise à jour instantanée au robot via WebSocket (`{"type": "trigger_update"}`).
+
+### **GET `/system/update/robot/progress`**
+Récupère le statut de progression de l'update du robot (reconstruit de manière réelle pendant le `colcon build`).
+```json
+{
+  "status": "idle / downloading / extracting / compiling / done / failed",
+  "percent": 45
+}
+```
+
+### Télémétrie en temps réel (WebSockets App)
+Lorsqu'un processus de mise à jour est en cours, la Gateway diffuse ces messages en direct sur le canal mobile `/ws/app` :
+- `{"type": "gateway_update_progress", "status": "...", "percent": ...}`
+- `{"type": "robot_update_progress", "status": "...", "percent": ...}`
