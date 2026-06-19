@@ -406,6 +406,39 @@ def delete_account(full_name: str):
     raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
 
+@app.delete("/accounts/{full_name}", tags=["Accounts"], summary="Supprimer un compte", dependencies=[Depends(verify_token)])
+def delete_account(full_name: str):
+    users = load_json(USERS_FILE, default={})
+    if full_name in users:
+        # Supprimer des comptes
+        del users[full_name]
+        save_json(USERS_FILE, users)
+
+        # Nettoyer les identifiants MyGES associés
+        myges = load_json(MYGES_FILE, default={})
+        if full_name in myges:
+            del myges[full_name]
+            save_json(MYGES_FILE, myges)
+
+        # Nettoyer les photos de visage associées
+        meta = load_json(META_FILE, default=[])
+        new_meta = []
+        for entry in meta:
+            if entry.get("name", "").lower() == full_name.lower():
+                path = FACES_DIR / entry["filename"]
+                try:
+                    if path.exists():
+                        path.unlink()
+                except Exception as e:
+                    print(f"Error deleting face image {path}: {e}")
+            else:
+                new_meta.append(entry)
+        save_json(META_FILE, new_meta)
+
+        return {"status": "deleted", "user": full_name}
+    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def dashboard():
     """Dashboard d'administration complet de Bastet (Télémétrie, Comptes, Caméras on-demand, Photos)."""
@@ -1175,6 +1208,100 @@ def dashboard():
             background: var(--border-color);
             border-radius: 999px;
         }
+
+        /* Dossiers Galerie Style */
+        .folders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .folder-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+
+        .folder-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+            box-shadow: 0 12px 24px rgba(99, 102, 241, 0.15);
+        }
+
+        .folder-icon-wrapper {
+            position: relative;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            transition: transform 0.3s ease;
+        }
+
+        .folder-card:hover .folder-icon-wrapper {
+            transform: scale(1.08);
+        }
+
+        .folder-avatar-badge {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #27272a;
+            color: var(--text-primary);
+            font-size: 0.7rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--bg-card);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .folder-name {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+            text-align: center;
+            width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .folder-count {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .folder-open-view {
+            display: none;
+            animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .folder-open-view.active {
+            display: block;
+        }
+
+        .back-btn-wrapper {
+            margin-bottom: 1.5rem;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -1375,17 +1502,42 @@ def dashboard():
 
         <!-- ─────────────────── TAB 3: FACES GALLERY ─────────────────── -->
         <div id="tab-faces-content" class="tab-content">
-            <div class="upload-box" onclick="triggerFaceUpload()">
-                <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent); margin: 0 auto 0.75rem;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                </svg>
-                <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem;">Charger une nouvelle photo de visage</h4>
-                <p style="color: var(--text-secondary); font-size: 0.8rem;">Glissez-déposez ou cliquez ici pour sélectionner une image (Max 8 par utilisateur)</p>
-                <input type="file" id="face-file-input" style="display: none;" accept="image/*" onchange="handleFaceUploadSelected(event)"/>
+            <!-- Folders List View -->
+            <div id="faces-folders-view">
+                <div class="folders-grid" id="folders-container">
+                    <!-- User folders will be loaded here dynamically -->
+                </div>
             </div>
 
-            <div id="faces-gallery-container">
-                <!-- Faces grouped by name will be loaded here dynamically -->
+            <!-- Single Folder Detailed View -->
+            <div id="faces-details-view" class="folder-open-view">
+                <div class="back-btn-wrapper">
+                    <button class="btn btn-secondary" onclick="closeFolderDetails()">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
+                            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                        </svg>
+                        Retour aux dossiers
+                    </button>
+                </div>
+                
+                <div class="upload-box" onclick="triggerFaceUpload()">
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent); margin: 0 auto 0.75rem;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem;">Charger une nouvelle photo pour <span id="current-folder-username-label">l'utilisateur</span></h4>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem;">Glissez-déposez ou cliquez ici pour ajouter une image (Max 8 photos)</p>
+                    <input type="file" id="face-file-input" style="display: none;" accept="image/*" onchange="handleFaceUploadSelected(event)"/>
+                </div>
+
+                <div class="faces-section" style="border: none; padding: 0; background: transparent;">
+                    <div class="face-user-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.5rem;">
+                        <span id="details-folder-name" style="font-size: 1.25rem; font-weight: 700;">Nom</span>
+                        <span id="details-folder-count" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">0 / 8 photos</span>
+                    </div>
+                    <div class="faces-grid" id="details-faces-grid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1551,25 +1703,6 @@ def dashboard():
         </div>
     </div>
 
-    <!-- Modal : Sélection de l'utilisateur pour l'upload d'un visage -->
-    <div id="faceUploadUserModal" class="modal-overlay" onclick="closeFaceUploadUserModalOnClick(event)">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">Associer la photo</h3>
-                <button class="modal-close" onclick="closeFaceUploadUserModal()">&times;</button>
-            </div>
-            <div class="form-group">
-                <label class="form-label" for="face-upload-name-select">À qui appartient ce visage ?</label>
-                <select id="face-upload-name-select" class="form-input">
-                    <!-- Loaded dynamically -->
-                </select>
-                <div style="margin: 0.75rem 0; text-align: center; color: var(--text-secondary); font-size: 0.8rem;">ou créer un nouveau profil :</div>
-                <input type="text" id="face-upload-new-name" class="form-input" placeholder="Saisir un nouveau nom complet..."/>
-            </div>
-            <button class="btn btn-primary" onclick="executeFaceUpload()" style="width: 100%; justify-content: center; margin-top: 1.5rem;">Téléverser la photo</button>
-        </div>
-    </div>
-
     <!-- Screen lightbox overlay for viewing images -->
     <div id="lightbox" class="modal-overlay" onclick="closeLightbox()" style="background-color: rgba(0,0,0,0.95); cursor: zoom-out;">
         <img id="lightbox-img" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);"/>
@@ -1581,6 +1714,8 @@ def dashboard():
         let telemetryInterval = null;
         let updateInterval = null;
         let accountsCached = {};
+        let activeFolderName = null;
+        let facesCached = [];
         window.camWebsockets = { 1: null, 2: null };
 
         // ─── INIT ─────────────────────────────────────────────────────────────
@@ -1681,6 +1816,7 @@ def dashboard():
             if (tabId === 'users') {
                 loadAccounts();
             } else if (tabId === 'faces') {
+                closeFolderDetails();
                 loadFacesGallery();
             }
         }
@@ -2111,73 +2247,132 @@ def dashboard():
 
         async function loadFacesGallery() {
             try {
-                const res = await fetch('/faces', { headers: { 'X-API-Token': apiToken } });
-                if (res.ok) {
-                    const data = await res.json();
+                const facesRes = await fetch('/faces', { headers: { 'X-API-Token': apiToken } });
+                const accountsRes = await fetch('/accounts', { headers: { 'X-API-Token': apiToken } });
+                
+                if (facesRes.ok && accountsRes.ok) {
+                    const data = await facesRes.json();
+                    const accounts = await accountsRes.json();
+                    
                     const faces = data.faces || [];
+                    facesCached = faces;
+                    
+                    // Gather all distinct user names
+                    const usersList = Object.keys(accounts);
                     
                     // Group faces by user name
                     const grouped = {};
-                    faces.forEach(f => {
-                        if (!grouped[f.name]) grouped[f.name] = [];
-                        grouped[f.name].push(f);
+                    usersList.forEach(name => {
+                        grouped[name] = [];
                     });
 
-                    const container = document.getElementById('faces-gallery-container');
-                    container.innerHTML = '';
+                    faces.forEach(f => {
+                        const matchedName = usersList.find(u => u && f.name && u.toLowerCase() === f.name.toLowerCase()) || f.name;
+                        if (!grouped[matchedName]) grouped[matchedName] = [];
+                        grouped[matchedName].push(f);
+                    });
+
+                    // Render folders container
+                    const foldersContainer = document.getElementById('folders-container');
+                    foldersContainer.innerHTML = '';
 
                     const keys = Object.keys(grouped);
                     if (keys.length === 0) {
-                        container.innerHTML = `
-                            <div style="text-align: center; padding: 4rem; color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card);">
-                                Aucune photo enregistrée pour la reconnaissance faciale.
+                        foldersContainer.innerHTML = `
+                            <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card);">
+                                Aucun dossier utilisateur disponible. Créez un compte d'abord.
                             </div>`;
                         return;
                     }
 
-                    for (const name of keys) {
+                    keys.forEach(name => {
                         const userFaces = grouped[name];
-                        const section = document.createElement('div');
-                        section.className = 'faces-section';
+                        const count = userFaces.length;
+                        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
                         
-                        section.innerHTML = `
-                            <div class="face-user-header">
-                                <span>${name}</span>
-                                <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">${userFaces.length} / 8 photos</span>
+                        const card = document.createElement('div');
+                        card.className = 'folder-card';
+                        card.onclick = () => openFolderDetails(name, userFaces);
+                        
+                        card.innerHTML = `
+                            <div class="folder-icon-wrapper">
+                                <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor" style="opacity: 0.85;">
+                                    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/>
+                                </svg>
+                                <div class="folder-avatar-badge">${initials}</div>
                             </div>
-                            <div class="faces-grid"></div>
+                            <div class="folder-name font-outfit">${name}</div>
+                            <div class="folder-count">${count} photo${count > 1 ? 's' : ''}</div>
                         `;
-                        
-                        container.appendChild(section);
-                        
-                        const grid = section.querySelector(`.faces-grid`);
-                        for (const f of userFaces) {
-                            const card = document.createElement('div');
-                            card.className = 'face-img-card';
-                            card.innerHTML = `
-                                <img src="#" id="face-img-${f.id}" class="face-img-element" onclick="showLightbox(this.src)" title="Agrandir"/>
-                                <button class="face-delete-btn" onclick="deleteFace('${f.id}')" title="Supprimer">✕</button>
-                                <div class="face-img-overlay">
-                                    <div class="face-img-info">${f.original_name}</div>
-                                    <div style="font-size: 0.6rem; color: #71717a;">${new Date(f.uploaded_at).toLocaleDateString()}</div>
-                                </div>
-                            `;
-                            grid.appendChild(card);
-                            
-                            // Load image with Authorization Headers
-                            fetch(`/faces/${f.id}/image`, { headers: { 'X-API-Token': apiToken } })
-                                .then(res => res.blob())
-                                .then(blob => {
-                                    const img = document.getElementById(`face-img-${f.id}`);
-                                    if (img) img.src = URL.createObjectURL(blob);
-                                })
-                                .catch(err => console.error("Error loading face image file:", err));
-                        }
+                        foldersContainer.appendChild(card);
+                    });
+
+                    // If a folder is currently open, refresh its contents
+                    if (activeFolderName) {
+                        const activeUserFaces = grouped[activeFolderName] || [];
+                        renderFolderDetails(activeFolderName, activeUserFaces);
                     }
                 }
             } catch (e) {
                 console.error("Gallery loading error:", e);
             }
+        }
+
+        function openFolderDetails(name, userFaces) {
+            activeFolderName = name;
+            
+            document.getElementById('faces-folders-view').style.display = 'none';
+            document.getElementById('faces-details-view').classList.add('active');
+            
+            document.getElementById('current-folder-username-label').textContent = name;
+            
+            renderFolderDetails(name, userFaces);
+        }
+
+        function closeFolderDetails() {
+            activeFolderName = null;
+            document.getElementById('faces-details-view').classList.remove('active');
+            document.getElementById('faces-folders-view').style.display = 'block';
+            loadFacesGallery();
+        }
+
+        function renderFolderDetails(name, userFaces) {
+            document.getElementById('details-folder-name').textContent = name;
+            document.getElementById('details-folder-count').textContent = `${userFaces.length} / 8 photos`;
+            
+            const grid = document.getElementById('details-faces-grid');
+            grid.innerHTML = '';
+            
+            if (userFaces.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: var(--text-secondary); border: 1px dashed var(--border-color); border-radius: 8px;">
+                        Aucune photo pour cet utilisateur. Utilisez la zone ci-dessus pour en ajouter.
+                    </div>`;
+                return;
+            }
+            
+            userFaces.forEach(f => {
+                const card = document.createElement('div');
+                card.className = 'face-img-card';
+                card.innerHTML = `
+                    <img src="#" id="face-img-${f.id}" class="face-img-element" onclick="showLightbox(this.src)" title="Agrandir"/>
+                    <button class="face-delete-btn" onclick="deleteFace('${f.id}')" title="Supprimer">✕</button>
+                    <div class="face-img-overlay">
+                        <div class="face-img-info">${f.original_name}</div>
+                        <div style="font-size: 0.6rem; color: #71717a;">${new Date(f.uploaded_at).toLocaleDateString()}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+                
+                // Load image with Authorization Headers
+                fetch(`/faces/${f.id}/image`, { headers: { 'X-API-Token': apiToken } })
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const img = document.getElementById(`face-img-${f.id}`);
+                        if (img) img.src = URL.createObjectURL(blob);
+                    })
+                    .catch(err => console.error("Error loading face image file:", err));
+            });
         }
 
         async function deleteFace(faceId) {
@@ -2209,8 +2404,9 @@ def dashboard():
             if (!files || files.length === 0) return;
             currentUploadFile = files[0];
             
-            // Open modal to choose user
-            openFaceUploadUserModal();
+            if (activeFolderName) {
+                executeFaceUploadDirect(activeFolderName);
+            }
         }
 
         function initDragAndDrop() {
@@ -2237,64 +2433,22 @@ def dashboard():
                     const files = dt.files;
                     if (files && files.length > 0) {
                         currentUploadFile = files[0];
-                        openFaceUploadUserModal();
+                        if (activeFolderName) {
+                            executeFaceUploadDirect(activeFolderName);
+                        }
                     }
                 }, false);
             }
         }
 
-        async function openFaceUploadUserModal() {
-            // Load users list inside selector
-            const select = document.getElementById('face-upload-name-select');
-            select.innerHTML = '';
-            
-            // Load accounts
-            try {
-                const res = await fetch('/accounts', { headers: { 'X-API-Token': apiToken } });
-                if (res.ok) {
-                    const accounts = await res.json();
-                    Object.keys(accounts).forEach(name => {
-                        const opt = document.createElement('option');
-                        opt.value = name;
-                        opt.textContent = name;
-                        select.appendChild(opt);
-                    });
-                }
-            } catch(e) {}
-            
-            document.getElementById('face-upload-new-name').value = '';
-            document.getElementById('faceUploadUserModal').classList.add('active');
-        }
-
-        function closeFaceUploadUserModal() {
-            document.getElementById('faceUploadUserModal').classList.remove('active');
-            document.getElementById('face-file-input').value = '';
-            currentUploadFile = null;
-        }
-
-        function closeFaceUploadUserModalOnClick(e) {
-            if (e.target === document.getElementById('faceUploadUserModal')) closeFaceUploadUserModal();
-        }
-
-        async function executeFaceUpload() {
-            if (!currentUploadFile) return;
-
-            let name = document.getElementById('face-upload-new-name').value.trim();
-            if (!name) {
-                name = document.getElementById('face-upload-name-select').value;
-            }
-
-            if (!name) {
-                alert("Veuillez sélectionner ou saisir le nom de la personne.");
-                return;
-            }
+        async function executeFaceUploadDirect(userName) {
+            if (!currentUploadFile || !userName) return;
 
             const fd = new FormData();
             fd.append('file', currentUploadFile);
 
             try {
-                // Post to face upload API with name in query param
-                const res = await fetch(`/faces/upload?name=${encodeURIComponent(name)}`, {
+                const res = await fetch(`/faces/upload?name=${encodeURIComponent(userName)}`, {
                     method: 'POST',
                     headers: { 'X-API-Token': apiToken },
                     body: fd
@@ -2305,7 +2459,8 @@ def dashboard():
                     if (json.status === 'already_exists') {
                         alert(json.msg);
                     }
-                    closeFaceUploadUserModal();
+                    currentUploadFile = null;
+                    document.getElementById('face-file-input').value = '';
                     loadFacesGallery();
                 } else {
                     const txt = await res.text();
@@ -2407,6 +2562,7 @@ def dashboard():
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
 
 
 
