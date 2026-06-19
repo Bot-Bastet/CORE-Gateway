@@ -5,9 +5,9 @@ LABEL description="Face & State Secure Server"
 
 WORKDIR /app
 
-# Dépendances système (libmagic1, curl pour le healthcheck)
+# Dépendances système (libmagic1, curl pour le healthcheck, unzip+git pour l'auto-updater)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libmagic1 curl \
+    libmagic1 curl unzip git \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer les dépendances Python
