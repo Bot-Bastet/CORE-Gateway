@@ -2187,7 +2187,7 @@ def dashboard():
     </div>
 
     <!-- Full page Calibration Overlay -->
-    <div id="calibration-overlay" class="modal-overlay" style="display: none; justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+    <div id="calibration-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
         <div style="width: 95vw; height: 95vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: #121214;">
                 <div>
@@ -2762,12 +2762,12 @@ def dashboard():
         // ─── CALIBRATION WINDOW FUNCTIONS ──────────────────────────────────────
         
         function openCalibrationOverlay() {
-            document.getElementById('calibration-overlay').style.display = 'flex';
+            document.getElementById('calibration-overlay').classList.add('active');
             setTimeout(drawMinimap, 100);
         }
 
         function closeCalibrationOverlay() {
-            document.getElementById('calibration-overlay').style.display = 'none';
+            document.getElementById('calibration-overlay').classList.remove('active');
         }
 
         function updateCalibSliderVal(index) {
