@@ -109,6 +109,7 @@ class CoreState(BaseModel):
     robot_version: Optional[str] = "v0.0.0"
     arduino_version: Optional[str] = "v0.0.0"
     sensors: dict = {}
+    ai_state: dict = {}
 
 class UpdateProgress(BaseModel):
     status: str
@@ -2578,6 +2579,13 @@ def dashboard():
                 logToJSONConsole(JSON.stringify(payload, null, 2));
                 
                 if (payload.type === "telemetry_diagnostics") {
+                    if (payload.ai_state) {
+                        updateAIControlUI('tts', payload.ai_state.tts);
+                        updateAIControlUI('stt', payload.ai_state.stt);
+                        updateAIControlUI('chat', payload.ai_state.chat);
+                        updateAIControlUI('yolo', payload.ai_state.yolo);
+                    }
+                    
                     // Update joint angles (0 to 11)
                     if (payload.joints && payload.joints.length === 12) {
                         for (let i = 0; i < 12; i++) {
@@ -2733,6 +2741,22 @@ def dashboard():
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "ai_control", feature: feature, target: target }));
             }
+        }
+
+        function updateAIControlUI(feature, target) {
+            const list = (feature === 'yolo') ? ['enabled', 'disabled'] : ['robot', 'node', 'disabled'];
+            list.forEach(t => {
+                const suffix = (t === 'disabled' && feature !== 'yolo') ? 'off' : t;
+                const btnId = `${feature}-ctrl-${suffix}`;
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    if (t === target) {
+                        btn.classList.add('active-control');
+                    } else {
+                        btn.classList.remove('active-control');
+                    }
+                }
+            });
         }
 
         // ─── CALIBRATION WINDOW FUNCTIONS ──────────────────────────────────────
@@ -3292,6 +3316,13 @@ def dashboard():
                     document.getElementById('sensor-seen-person').textContent = state.seen_person || 'Personne';
                     document.getElementById('sensor-seen-objects').textContent = (state.seen_objects && state.seen_objects.length > 0) ? state.seen_objects.join(', ') : 'Aucun';
                     document.getElementById('sensor-version').textContent = state.robot_version || 'v0.0.0';
+                    
+                    if (state.ai_state) {
+                        updateAIControlUI('tts', state.ai_state.tts);
+                        updateAIControlUI('stt', state.ai_state.stt);
+                        updateAIControlUI('chat', state.ai_state.chat);
+                        updateAIControlUI('yolo', state.ai_state.yolo);
+                    }
                     
                     if (state.updated_at) {
                         const date = new Date(state.updated_at * 1000);
