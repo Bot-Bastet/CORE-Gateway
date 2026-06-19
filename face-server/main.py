@@ -2,12 +2,14 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Query, Security, D
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security.api_key import APIKeyHeader
+from contextlib import asynccontextmanager
 from pydantic import BaseModel
 import os
 import uuid
 import time
 import json
 import hashlib
+import threading
 from pathlib import Path
 from typing import Optional
 from myges_api import MyGesAPI
@@ -35,10 +37,26 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 API_TOKEN = os.getenv("API_TOKEN", "your-api-token-here")
 api_key_header = APIKeyHeader(name="X-API-Token", auto_error=False)
 
+# ─── Auto-Update au démarrage ─────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    def _run_update():
+        try:
+            from updater import check_and_apply_update
+            updated = check_and_apply_update()
+            if updated:
+                import os, signal
+                os.kill(os.getpid(), signal.SIGTERM)  # Demander un redémarrage via PM2/systemd
+        except Exception as e:
+            print(f"[AutoUpdater] Erreur : {e}")
+    threading.Thread(target=_run_update, daemon=True).start()
+    yield
+
 app = FastAPI(
     title="Bastet Gateway API",
     description="API Gateway pour le robot Bastet (Faces, MyGES, Core State). Protégée par Token.",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

@@ -1,0 +1,51 @@
+name: Release CORE-Gateway
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Create Release Archive
+        run: |
+          zip -r core-gateway-${{ steps.version.outputs.VERSION }}.zip . \
+            --exclude "*.git*" \
+            --exclude "*.env*" \
+            --exclude "verification.jpg" \
+            --exclude "*.log"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "CORE-Gateway ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## CORE-Gateway ${{ steps.version.outputs.VERSION }}
+
+            ### Installation rapide
+            ```bash
+            # Télécharger et déployer
+            curl -L https://github.com/Bot-Bastet/CORE-Gateway/releases/download/${{ steps.version.outputs.VERSION }}/core-gateway-${{ steps.version.outputs.VERSION }}.zip -o gateway.zip
+            unzip gateway.zip
+            cp .env.example .env  # Configurer le token
+            docker compose up -d --build
+            ```
+
+            ### Mise à jour depuis une installation existante
+            Le service se met à jour automatiquement via l'auto-updater intégré.
+          files: |
+            core-gateway-${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, '-beta') || contains(steps.version.outputs.VERSION, '-rc') }}
