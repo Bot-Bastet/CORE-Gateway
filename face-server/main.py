@@ -1568,7 +1568,7 @@ def dashboard():
                             <span id="gateway-update-percent">0%</span>
                         </div>
                     </div>
-                    <button class="btn btn-secondary" onclick="triggerUpdate('gateway')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                    <button id="btn-update-gateway" class="btn btn-secondary" onclick="triggerUpdate('gateway')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                         </svg>
@@ -1600,7 +1600,7 @@ def dashboard():
                             <span id="robot-update-percent">0%</span>
                         </div>
                     </div>
-                    <button class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                    <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                         </svg>
@@ -1619,13 +1619,13 @@ def dashboard():
                     <span id="spotbot-service-badge" class="status-badge">Statut inconnu</span>
                 </div>
                 <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-                    <button class="btn btn-success" onclick="controlRobotService('start')" style="gap: 0.5rem;">
+                    <button id="btn-start-spotbot" class="btn btn-success" onclick="controlRobotService('start')" style="gap: 0.5rem;">
                         ▶ Démarrer SpotBot
                     </button>
-                    <button class="btn btn-danger" onclick="controlRobotService('stop')" style="gap: 0.5rem;">
+                    <button id="btn-stop-spotbot" class="btn btn-danger" onclick="controlRobotService('stop')" style="gap: 0.5rem;">
                         ■ Arrêter SpotBot
                     </button>
-                    <button class="btn btn-secondary" onclick="controlRobotService('restart')" style="gap: 0.5rem;">
+                    <button id="btn-restart-spotbot" class="btn btn-secondary" onclick="controlRobotService('restart')" style="gap: 0.5rem;">
                         🔄 Redémarrer
                     </button>
                 </div>
@@ -1875,15 +1875,28 @@ def dashboard():
                     // ROS service badge
                     const serviceBadge = document.getElementById('spotbot-service-badge');
                     const isSpotbotActive = sensors.spotbot_service_active;
+                    const btnStart = document.getElementById('btn-start-spotbot');
+                    const btnStop = document.getElementById('btn-stop-spotbot');
+                    const btnRestart = document.getElementById('btn-restart-spotbot');
+
                     if (isSpotbotActive === true) {
                         serviceBadge.textContent = 'Actif';
                         serviceBadge.className = 'status-badge active';
+                        if (btnStart) btnStart.style.display = 'none';
+                        if (btnStop) btnStop.style.display = '';
+                        if (btnRestart) btnRestart.style.display = '';
                     } else if (isSpotbotActive === false) {
                         serviceBadge.textContent = 'Arrêté';
                         serviceBadge.className = 'status-badge offline';
+                        if (btnStart) btnStart.style.display = '';
+                        if (btnStop) btnStop.style.display = 'none';
+                        if (btnRestart) btnRestart.style.display = 'none';
                     } else {
                         serviceBadge.textContent = 'Inconnu';
                         serviceBadge.className = 'status-badge';
+                        if (btnStart) btnStart.style.display = '';
+                        if (btnStop) btnStop.style.display = '';
+                        if (btnRestart) btnRestart.style.display = '';
                     }
                     
                     // Live Chat messages display
@@ -2495,6 +2508,23 @@ def dashboard():
                     document.getElementById('gateway-update-percent').textContent = `${gw.percent}%`;
                     document.getElementById('gateway-current-version').textContent = gw.current_version || 'Inconnu';
                     document.getElementById('gateway-latest-version').textContent = gw.latest_version || 'Inconnu';
+
+                    const gwStatusLower = (gw.status || '').toLowerCase();
+                    const gwInProgress = gw.status &&
+                        !gwStatusLower.includes('idle') &&
+                        !gwStatusLower.includes('prêt') &&
+                        !gwStatusLower.includes('pret') &&
+                        !gwStatusLower.includes('done') &&
+                        !gwStatusLower.includes('failed') &&
+                        !gwStatusLower.includes('error') &&
+                        gw.percent < 100;
+
+                    const gwBtn = document.getElementById('btn-update-gateway');
+                    if (gwBtn) {
+                        gwBtn.disabled = gwInProgress;
+                        gwBtn.style.opacity = gwInProgress ? '0.5' : '1';
+                        gwBtn.style.pointerEvents = gwInProgress ? 'none' : 'auto';
+                    }
                 }
 
                 if (robotRes.ok) {
@@ -2504,6 +2534,23 @@ def dashboard():
                     document.getElementById('robot-update-percent').textContent = `${rb.percent}%`;
                     document.getElementById('robot-current-version').textContent = rb.current_version || 'Inconnu';
                     document.getElementById('robot-latest-version').textContent = rb.latest_version || 'Inconnu';
+
+                    const rbStatusLower = (rb.status || '').toLowerCase();
+                    const rbInProgress = rb.status &&
+                        !rbStatusLower.includes('idle') &&
+                        !rbStatusLower.includes('prêt') &&
+                        !rbStatusLower.includes('pret') &&
+                        !rbStatusLower.includes('done') &&
+                        !rbStatusLower.includes('failed') &&
+                        !rbStatusLower.includes('error') &&
+                        rb.percent < 100;
+
+                    const rbBtn = document.getElementById('btn-update-robot');
+                    if (rbBtn) {
+                        rbBtn.disabled = rbInProgress;
+                        rbBtn.style.opacity = rbInProgress ? '0.5' : '1';
+                        rbBtn.style.pointerEvents = rbInProgress ? 'none' : 'auto';
+                    }
                 }
             } catch (e) {
                 console.error("Updates progress fetch error:", e);
