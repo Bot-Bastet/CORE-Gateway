@@ -2305,20 +2305,28 @@ async def upload_face(
 
     meta = load_json(META_FILE)
     
+    # Normalisation du nom par rapport aux comptes existants
+    users = load_json(USERS_FILE, default={})
+    normalized_name = name
+    for u_name in users.keys():
+        if u_name.lower() == name.lower():
+            normalized_name = u_name
+            break
+    
     # Vérification de la limite de 8 photos par utilisateur
-    user_photos = [e for e in meta if e["name"].lower() == name.lower()]
+    user_photos = [e for e in meta if e["name"].lower() == normalized_name.lower()]
     if len(user_photos) >= 8:
-        raise HTTPException(status_code=400, detail=f"Limite atteinte : Impossible d'ajouter plus de 8 photos pour {name}.")
+        raise HTTPException(status_code=400, detail=f"Limite atteinte : Impossible d'ajouter plus de 8 photos pour {normalized_name}.")
 
     content = await file.read()
     file_hash = hashlib.md5(content).hexdigest()
     
     # Anti-doublon (même contenu (hash) et même user)
     for e in meta:
-        if e["name"] == name and e.get("hash") == file_hash:
+        if e["name"].lower() == normalized_name.lower() and e.get("hash") == file_hash:
             return {"status": "already_exists", "face": e, "msg": "Image identique déjà présente."}
         # Fallback sur original_name si pas de hash
-        if e["name"] == name and e.get("original_name") == file.filename and "hash" not in e:
+        if e["name"].lower() == normalized_name.lower() and e.get("original_name") == file.filename and "hash" not in e:
             return {"status": "already_exists", "face": e, "msg": "Image avec le même nom déjà présente."}
 
     face_id = str(uuid.uuid4())
@@ -2329,12 +2337,11 @@ async def upload_face(
 
     entry = {
         "id": face_id,
-        "name": name,
+        "name": normalized_name,
         "filename": f"{face_id}{ext}",
         "original_name": file.filename,
         "hash": file_hash,
         "size_bytes": len(content),
-
         "uploaded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     meta.append(entry)
