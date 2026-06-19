@@ -1308,9 +1308,151 @@ def dashboard():
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* ─── RESPONSIVE DESIGN ─────────────────────────────────────────────── */
+        
+        .hamburger-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            padding: 0.5rem;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+
+        .hamburger-btn:hover {
+            background-color: var(--border-color);
+        }
+
+        .mobile-header-bar {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(2px);
+            z-index: 99;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (max-width: 1024px) {
+            body {
+                flex-direction: column;
+                overflow: auto;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: -280px;
+                z-index: 100;
+                transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+            }
+
+            .sidebar.active {
+                left: 0;
+            }
+
+            .sidebar-overlay {
+                display: block;
+            }
+
+            .mobile-header-bar {
+                display: flex;
+            }
+
+            .content-wrapper {
+                padding: 1.5rem 1rem;
+                height: auto;
+                min-height: calc(100vh - 65px);
+                overflow-y: visible;
+            }
+
+            .header-bar {
+                margin-bottom: 1.5rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .header-title {
+                font-size: 1.75rem;
+            }
+
+            .hamburger-btn {
+                display: flex;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .form-row-layout {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+
+            .gauge-container {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 1.5rem;
+            }
+
+            .gauge-item {
+                flex: none;
+                width: 80px;
+            }
+            
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stream-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .user-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .folders-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 1rem;
+            }
+
+            .faces-grid {
+                grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+                gap: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
     <!-- Login screen -->
     <div id="authOverlay" class="auth-overlay">
         <div class="auth-card">
@@ -1372,6 +1514,24 @@ def dashboard():
                 Déconnexion
             </button>
         </div>
+    </div>
+
+    <!-- Mobile Header Bar -->
+    <div class="mobile-header-bar">
+        <button class="hamburger-btn" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+        <div class="mobile-brand" style="display: flex; align-items: center; gap: 0.5rem;">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #6366f1;">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            <span class="brand-name font-outfit" style="font-size: 1.15rem; font-weight: 700; letter-spacing: 0.05em; background: linear-gradient(135deg, #a5b4fc, var(--accent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">BASTET GATEWAY</span>
+        </div>
+        <div style="width: 38px;"></div> <!-- spacer -->
     </div>
 
     <!-- Main Content Panel -->
@@ -1794,9 +1954,31 @@ def dashboard():
             if (updateInterval) clearInterval(updateInterval);
         }
 
+        // ─── MOBILE SIDEBAR ACTIONS ───────────────────────────────────────────
+
+        function toggleSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('active');
+                overlay.classList.toggle('active');
+            }
+        }
+
+        function closeSidebar() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            if (sidebar && overlay) {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            }
+        }
+
         // ─── TABS SWITCHING ───────────────────────────────────────────────────
 
         function switchTab(tabId) {
+            closeSidebar();
+            
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             
