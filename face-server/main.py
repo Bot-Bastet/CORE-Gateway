@@ -451,6 +451,7 @@ def dashboard():
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
     <style>
         :root {
             --bg-main: #09090b;
@@ -754,6 +755,11 @@ def dashboard():
         .status-badge.active, .status-badge.online {
             background-color: rgba(16, 185, 129, 0.15);
             color: #34d399;
+        }
+
+        .status-badge.error {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #f87171;
         }
 
         .status-badge.hibernating {
@@ -1960,50 +1966,139 @@ def dashboard():
 
         // ─── CAMERA STREAM ON-DEMAND ─────────────────────────────────────────
 
-        function toggleStream(camId) {
+        function stopStreamUI(camId) {
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
             const iframe = document.getElementById(`stream-iframe-${camId}`);
             const statusEl = document.getElementById(`stream-status-${camId}`);
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
-            
+            const videoEl = document.getElementById(`stream-video-${camId}`);
+
+            if (iframe) { iframe.style.display = 'none'; iframe.src = ''; }
+            if (videoEl) {
+                if (window.camHls && window.camHls[camId]) {
+                    window.camHls[camId].destroy();
+                    window.camHls[camId] = null;
+                }
+                videoEl.pause();
+                videoEl.src = '';
+                videoEl.style.display = 'none';
+            }
+            placeholder.style.display = 'flex';
+            statusEl.textContent = 'Inactif';
+            statusEl.className = 'status-badge';
+            btnText.textContent = 'Démarrer le flux';
+            window.camWebsockets[camId] = null;
+        }
+
+        async function startStreamHLS(camId) {
+            const placeholder = document.getElementById(`stream-placeholder-${camId}`);
+            const statusEl = document.getElementById(`stream-status-${camId}`);
+            const btnText = document.getElementById(`stream-btn-text-${camId}`);
+
+            const streamProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+            const hlsUrl = `${streamProtocol}//${window.location.hostname}:48888/robot/cam${camId}/index.m3u8`;
+
+            // Créer/récupérer l'élément vidéo
+            let videoEl = document.getElementById(`stream-video-${camId}`);
+            if (!videoEl) {
+                videoEl = document.createElement('video');
+                videoEl.id = `stream-video-${camId}`;
+                videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:none;border-radius:0;';
+                videoEl.muted = true;
+                videoEl.autoplay = true;
+                videoEl.controls = true;
+                videoEl.playsInline = true;
+                placeholder.parentNode.insertBefore(videoEl, placeholder);
+            }
+
+            // Attendre max 12s que le flux soit prêt
+            let ready = false;
+            const deadline = Date.now() + 12000;
+            while (Date.now() < deadline && window.camWebsockets[camId]) {
+                try {
+                    const r = await fetch(hlsUrl, { method: 'HEAD' });
+                    if (r.ok) { ready = true; break; }
+                } catch(e) {}
+                await new Promise(res => setTimeout(res, 1500));
+                statusEl.textContent = `Démarrage… (${Math.ceil((deadline - Date.now()) / 1000)}s)`;
+            }
+
+            if (!window.camWebsockets[camId]) return; // Annulé pendant l'attente
+
+            if (!ready) {
+                statusEl.textContent = 'Flux indisponible';
+                statusEl.className = 'status-badge error';
+                btnText.textContent = 'Démarrer le flux';
+                placeholder.style.display = 'flex';
+                videoEl.style.display = 'none';
+                // Libérer le WS
+                try { window.camWebsockets[camId].close(); } catch(e) {}
+                window.camWebsockets[camId] = null;
+                return;
+            }
+
+            // Charger HLS
+            placeholder.style.display = 'none';
+            videoEl.style.display = 'block';
+            statusEl.textContent = 'En direct';
+            statusEl.className = 'status-badge active';
+            btnText.textContent = 'Couper Caméra';
+
+            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                if (window.camHls && window.camHls[camId]) window.camHls[camId].destroy();
+                const hls = new Hls({ lowLatencyMode: true, backBufferLength: 5 });
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(videoEl);
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        console.error('[HLS fatal]', data);
+                        statusEl.textContent = 'Erreur flux';
+                        statusEl.className = 'status-badge error';
+                    }
+                });
+                window.camHls = window.camHls || {};
+                window.camHls[camId] = hls;
+                videoEl.play().catch(e => console.warn('Autoplay blocked:', e));
+            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                videoEl.src = hlsUrl;
+                videoEl.play().catch(e => console.warn('Autoplay blocked:', e));
+            } else {
+                statusEl.textContent = 'Navigateur non supporté';
+                statusEl.className = 'status-badge error';
+            }
+        }
+
+        function toggleStream(camId) {
+            const placeholder = document.getElementById(`stream-placeholder-${camId}`);
+            const statusEl = document.getElementById(`stream-status-${camId}`);
+            const btnText = document.getElementById(`stream-btn-text-${camId}`);
+
             if (!window.camWebsockets[camId]) {
-                // Request stream
+                // Ouvrir WS pour signaler au robot
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 const wsUrl = `${protocol}//${window.location.host}/ws/app?token=${apiToken}`;
                 const ws = new WebSocket(wsUrl);
-                
+
+                statusEl.textContent = 'Connexion…';
+                statusEl.className = 'status-badge';
+                btnText.textContent = 'Couper Caméra';
+
                 ws.onopen = () => {
                     ws.send(JSON.stringify({type: "request_camera", camera: camId}));
-                    const streamProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-                    iframe.src = `${streamProtocol}//${window.location.hostname}:48889/robot/cam${camId}/`;
-                    iframe.style.display = 'block';
-                    placeholder.style.display = 'none';
-                    statusEl.textContent = 'En direct';
-                    statusEl.className = 'status-badge active';
-                    btnText.textContent = 'Couper Caméra';
-                };
-                
-                ws.onclose = () => {
-                    iframe.style.display = 'none';
-                    placeholder.style.display = 'flex';
-                    iframe.src = '';
-                    statusEl.textContent = 'Inactif';
-                    statusEl.className = 'status-badge';
-                    btnText.textContent = 'Démarrer Caméra';
-                    window.camWebsockets[camId] = null;
+                    window.camWebsockets[camId] = ws;
+                    startStreamHLS(camId);
                 };
 
-                ws.onerror = (err) => {
-                    console.error("WebSocket camera error", err);
-                    ws.close();
-                };
-                
+                ws.onclose = () => stopStreamUI(camId);
+                ws.onerror = () => { ws.close(); stopStreamUI(camId); };
+
+                // Stocker temporairement pour permettre annulation
                 window.camWebsockets[camId] = ws;
             } else {
-                // Close stream
-                window.camWebsockets[camId].send(JSON.stringify({type: "release_camera", camera: camId}));
-                window.camWebsockets[camId].close();
-                window.camWebsockets[camId] = null;
+                // Couper
+                try { window.camWebsockets[camId].send(JSON.stringify({type: "release_camera", camera: camId})); } catch(e) {}
+                try { window.camWebsockets[camId].close(); } catch(e) {}
+                stopStreamUI(camId);
             }
         }
 
