@@ -1572,7 +1572,7 @@ def dashboard():
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                         </svg>
-                        Lancer la mise à jour Gateway
+                        <span id="btn-update-gateway-text">Lancer la mise à jour Gateway</span>
                     </button>
                 </div>
 
@@ -1604,7 +1604,7 @@ def dashboard():
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                         </svg>
-                        Lancer la mise à jour Robot
+                        <span id="btn-update-robot-text">Lancer la mise à jour Robot</span>
                     </button>
                 </div>
             </div>
@@ -2503,13 +2503,18 @@ def dashboard():
 
                 if (gatewayRes.ok) {
                     const gw = await gatewayRes.json();
-                    document.getElementById('gateway-update-status').textContent = gw.status || 'Prêt';
+                    const gwUpToDate = gw.current_version && gw.latest_version && gw.current_version === gw.latest_version;
+                    const gwStatusLower = (gw.status || '').toLowerCase();
+                    // Corriger l'affichage si failed mais déjà à jour
+                    let gwDisplayStatus = gw.status || 'Prêt';
+                    if (gwStatusLower.includes('failed') && gwUpToDate) gwDisplayStatus = 'À jour';
+
+                    document.getElementById('gateway-update-status').textContent = gwDisplayStatus;
                     document.getElementById('gateway-update-bar').style.width = `${gw.percent}%`;
                     document.getElementById('gateway-update-percent').textContent = `${gw.percent}%`;
                     document.getElementById('gateway-current-version').textContent = gw.current_version || 'Inconnu';
                     document.getElementById('gateway-latest-version').textContent = gw.latest_version || 'Inconnu';
 
-                    const gwStatusLower = (gw.status || '').toLowerCase();
                     const gwInProgress = gw.status &&
                         !gwStatusLower.includes('idle') &&
                         !gwStatusLower.includes('prêt') &&
@@ -2520,22 +2525,31 @@ def dashboard():
                         gw.percent < 100;
 
                     const gwBtn = document.getElementById('btn-update-gateway');
+                    const gwBtnText = document.getElementById('btn-update-gateway-text');
                     if (gwBtn) {
                         gwBtn.disabled = gwInProgress;
                         gwBtn.style.opacity = gwInProgress ? '0.5' : '1';
                         gwBtn.style.pointerEvents = gwInProgress ? 'none' : 'auto';
                     }
+                    if (gwBtnText) {
+                        gwBtnText.textContent = gwUpToDate ? 'Réinstaller la Gateway' : 'Lancer la mise à jour Gateway';
+                    }
                 }
 
                 if (robotRes.ok) {
                     const rb = await robotRes.json();
-                    document.getElementById('robot-update-status').textContent = rb.status || 'Prêt';
+                    const rbUpToDate = rb.current_version && rb.latest_version && rb.current_version === rb.latest_version;
+                    const rbStatusLower = (rb.status || '').toLowerCase();
+                    // Corriger l'affichage si failed mais déjà à jour
+                    let rbDisplayStatus = rb.status || 'Prêt';
+                    if (rbStatusLower.includes('failed') && rbUpToDate) rbDisplayStatus = 'À jour';
+
+                    document.getElementById('robot-update-status').textContent = rbDisplayStatus;
                     document.getElementById('robot-update-bar').style.width = `${rb.percent}%`;
                     document.getElementById('robot-update-percent').textContent = `${rb.percent}%`;
                     document.getElementById('robot-current-version').textContent = rb.current_version || 'Inconnu';
                     document.getElementById('robot-latest-version').textContent = rb.latest_version || 'Inconnu';
 
-                    const rbStatusLower = (rb.status || '').toLowerCase();
                     const rbInProgress = rb.status &&
                         !rbStatusLower.includes('idle') &&
                         !rbStatusLower.includes('prêt') &&
@@ -2546,10 +2560,14 @@ def dashboard():
                         rb.percent < 100;
 
                     const rbBtn = document.getElementById('btn-update-robot');
+                    const rbBtnText = document.getElementById('btn-update-robot-text');
                     if (rbBtn) {
                         rbBtn.disabled = rbInProgress;
                         rbBtn.style.opacity = rbInProgress ? '0.5' : '1';
                         rbBtn.style.pointerEvents = rbInProgress ? 'none' : 'auto';
+                    }
+                    if (rbBtnText) {
+                        rbBtnText.textContent = rbUpToDate ? 'Réinstaller le Robot' : 'Lancer la mise à jour Robot';
                     }
                 }
             } catch (e) {
@@ -2558,14 +2576,17 @@ def dashboard():
         }
 
         async function triggerUpdate(target) {
-            if (!confirm(`Voulez-vous vraiment lancer la mise à jour de la ${target === 'gateway' ? 'Gateway' : 'Robot Pi'} ?`)) return;
+            const btnText = document.getElementById(`btn-update-${target}-text`);
+            const isReinstall = btnText && btnText.textContent.toLowerCase().includes('réinstaller');
+            const label = target === 'gateway' ? 'Gateway' : 'Robot Pi';
+            const action = isReinstall ? 'réinstaller' : 'mettre à jour';
+            if (!confirm(`Voulez-vous vraiment ${action} la ${label} ?`)) return;
             try {
                 const res = await fetch(`/system/update/${target}`, {
                     method: 'POST',
                     headers: { 'X-API-Token': apiToken }
                 });
                 if (res.ok) {
-                    alert('Mise à jour démarrée.');
                     fetchUpdatesProgress();
                 } else {
                     alert('Impossible de démarrer la mise à jour.');
