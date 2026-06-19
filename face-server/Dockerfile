@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copier le code applicatif
 COPY *.py .
+COPY version.txt .
 
 # Volumes (faces + state/myges data)
 VOLUME ["/data"]

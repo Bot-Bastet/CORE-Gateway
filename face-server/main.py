@@ -105,6 +105,7 @@ class CoreState(BaseModel):
     last_chat: list[dict] = []
     robot_status: str = "idle"
     robot_version: Optional[str] = "v0.0.0"
+    arduino_version: Optional[str] = "v0.0.0"
     sensors: dict = {}
 
 class UpdateProgress(BaseModel):
@@ -1744,7 +1745,10 @@ def dashboard():
 
                 <!-- Robot Update Card -->
                 <div class="card">
-                    <div class="card-title">Mise à jour — Robot Pi</div>
+                    <div class="card-title">Mise à jour — Robot Pi & Arduino</div>
+                    
+                    <!-- Partie 1 : Raspberry Pi 5 -->
+                    <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Système Principal (Pi 5)</h4>
                     <div style="margin: 1rem 0;">
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                             <span>Version actuelle :</span>
@@ -1766,12 +1770,42 @@ def dashboard():
                             <span id="robot-update-percent">0%</span>
                         </div>
                     </div>
-                    <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                    <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem; margin-bottom: 1.5rem;">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                         </svg>
                         <span id="btn-update-robot-text">Lancer la mise à jour Robot</span>
                     </button>
+
+                    <!-- Partie 2 : Arduino Mega -->
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Microcontrôleur (Arduino Mega)</h4>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Version actuelle flashée :</span>
+                            <span id="arduino-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Dernière version dispo :</span>
+                            <span id="arduino-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
+                            <span>Statut du flash :</span>
+                            <span id="arduino-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="arduino-update-bar" class="progress-bar-value progress-bar-fill"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
+                            <span>Progression</span>
+                            <span id="arduino-update-percent">0%</span>
+                        </div>
+                        <button id="btn-update-arduino" class="btn btn-secondary" onclick="triggerUpdate('arduino')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            <span id="btn-update-arduino-text">Reflasher l'Arduino</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -2777,6 +2811,7 @@ def dashboard():
             try {
                 const gatewayRes = await fetch('/system/update/gateway/progress', { headers: { 'X-API-Token': apiToken } });
                 const robotRes = await fetch('/system/update/robot/progress', { headers: { 'X-API-Token': apiToken } });
+                const arduinoRes = await fetch('/system/update/arduino/progress', { headers: { 'X-API-Token': apiToken } });
 
                 if (gatewayRes.ok) {
                     const gw = await gatewayRes.json();
@@ -2847,6 +2882,40 @@ def dashboard():
                         rbBtnText.textContent = rbUpToDate ? 'Réinstaller le Robot' : 'Lancer la mise à jour Robot';
                     }
                 }
+
+                if (arduinoRes.ok) {
+                    const ard = await arduinoRes.json();
+                    const ardUpToDate = ard.current_version && ard.latest_version && ard.current_version === ard.latest_version;
+                    const ardStatusLower = (ard.status || '').toLowerCase();
+                    let ardDisplayStatus = ard.status || 'Prêt';
+                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = 'À jour';
+
+                    document.getElementById('arduino-update-status').textContent = ardDisplayStatus;
+                    document.getElementById('arduino-update-bar').style.width = `${ard.percent}%`;
+                    document.getElementById('arduino-update-percent').textContent = `${ard.percent}%`;
+                    document.getElementById('arduino-current-version').textContent = ard.current_version || 'Inconnu';
+                    document.getElementById('arduino-latest-version').textContent = ard.latest_version || 'Inconnu';
+
+                    const ardInProgress = ard.status &&
+                        !ardStatusLower.includes('idle') &&
+                        !ardStatusLower.includes('prêt') &&
+                        !ardStatusLower.includes('pret') &&
+                        !ardStatusLower.includes('done') &&
+                        !ardStatusLower.includes('failed') &&
+                        !ardStatusLower.includes('error') &&
+                        ard.percent < 100;
+
+                    const ardBtn = document.getElementById('btn-update-arduino');
+                    const ardBtnText = document.getElementById('btn-update-arduino-text');
+                    if (ardBtn) {
+                        ardBtn.disabled = ardInProgress;
+                        ardBtn.style.opacity = ardInProgress ? '0.5' : '1';
+                        ardBtn.style.pointerEvents = ardInProgress ? 'none' : 'auto';
+                    }
+                    if (ardBtnText) {
+                        ardBtnText.textContent = ardUpToDate ? "Réinstaller le Code Arduino" : "Reflasher l'Arduino";
+                    }
+                }
             } catch (e) {
                 console.error("Updates progress fetch error:", e);
             }
@@ -2855,7 +2924,7 @@ def dashboard():
         async function triggerUpdate(target) {
             const btnText = document.getElementById(`btn-update-${target}-text`);
             const isReinstall = btnText && btnText.textContent.toLowerCase().includes('réinstaller');
-            const label = target === 'gateway' ? 'Gateway' : 'Robot Pi';
+            const label = target === 'gateway' ? 'Gateway' : target === 'arduino' ? 'Arduino Mega' : 'Robot Pi';
             const action = isReinstall ? 'réinstaller' : 'mettre à jour';
             if (!confirm(`Voulez-vous vraiment ${action} la ${label} ?`)) return;
             try {
@@ -3110,6 +3179,7 @@ def get_cached_latest_release(repo: str) -> str:
 
 GATEWAY_UPDATE_FILE = DATA_DIR / "gateway_update_state.json"
 ROBOT_UPDATE_FILE = DATA_DIR / "robot_update_state.json"
+ARDUINO_UPDATE_FILE = DATA_DIR / "arduino_update_state.json"
 
 @app.post("/system/update/gateway", tags=["System Update"], summary="Lancer la mise à jour de la Gateway", dependencies=[Depends(verify_token)])
 async def trigger_gateway_update():
@@ -3167,6 +3237,29 @@ def get_robot_update_progress():
     progress = load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
     state = load_json(STATE_FILE, default={})
     progress["current_version"] = state.get("robot_version", "v0.0.0")
+    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")
+    return progress
+
+@app.post("/system/update/arduino", tags=["System Update"], summary="Lancer la mise à jour de l'Arduino", dependencies=[Depends(verify_token)])
+async def trigger_arduino_update():
+    """Lancer instantanément le flashage de l'Arduino."""
+    save_json(ARDUINO_UPDATE_FILE, {"status": "starting", "percent": 0})
+    await manager.broadcast(json.dumps({"type": "trigger_arduino_flash"}), "robot")
+    await manager.broadcast(json.dumps({"type": "arduino_update_progress", "status": "starting", "percent": 0}), "app")
+    return {"status": "triggered"}
+
+@app.post("/system/update/arduino/progress", tags=["System Update"], summary="Mettre à jour le progrès de l'Arduino", dependencies=[Depends(verify_token)])
+async def update_arduino_progress(progress: UpdateProgress):
+    data = progress.model_dump()
+    save_json(ARDUINO_UPDATE_FILE, data)
+    await manager.broadcast(json.dumps({"type": "arduino_update_progress", **data}), "app")
+    return {"status": "ok"}
+
+@app.get("/system/update/arduino/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Arduino", dependencies=[Depends(verify_token)])
+def get_arduino_update_progress():
+    progress = load_json(ARDUINO_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    state = load_json(STATE_FILE, default={})
+    progress["current_version"] = state.get("arduino_version", "v0.0.0")
     progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")
     return progress
 

@@ -27,7 +27,7 @@ services:
       - ./rtsp-proxy/mediamtx.yml:/mediamtx.yml:ro
     ports:
       - "48554:8554"                     # RTSP
-      - "48888:8888"                     # HLS
+      - "127.0.0.1:48886:8888"           # HLS (local, proxifié par Caddy pour HTTPS)
       - "127.0.0.1:48890:8889/tcp"       # WebRTC Signaling (HTTP)
       - "48189:48189/udp"                # WebRTC ICE UDP
       - "48189:48189/tcp"                # WebRTC ICE TCP
