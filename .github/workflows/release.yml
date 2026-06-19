@@ -19,6 +19,9 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
 
+      - name: Update version.txt
+        run: echo "${{ steps.version.outputs.VERSION }}" > face-server/version.txt
+
       - name: Create Release Archive
         run: |
           zip -r core-gateway-${{ steps.version.outputs.VERSION }}.zip . \
