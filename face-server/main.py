@@ -1825,7 +1825,8 @@ def dashboard():
                 
                 ws.onopen = () => {
                     ws.send(JSON.stringify({type: "request_camera", camera: camId}));
-                    iframe.src = `http://${window.location.hostname}:48889/cam${camId}/`;
+                    const streamProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+                    iframe.src = `${streamProtocol}//${window.location.hostname}:48889/robot/cam${camId}/`;
                     iframe.style.display = 'block';
                     placeholder.style.display = 'none';
                     statusEl.textContent = 'En direct';

@@ -28,7 +28,7 @@ services:
     ports:
       - "48554:8554"                     # RTSP
       - "48888:8888"                     # HLS
-      - "48889:8889/tcp"                 # WebRTC Signaling (HTTP)
+      - "127.0.0.1:48890:8889/tcp"       # WebRTC Signaling (HTTP)
       - "48189:48189/udp"                # WebRTC ICE UDP
       - "48189:48189/tcp"                # WebRTC ICE TCP
       - "49997:9997"                     # API
