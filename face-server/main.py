@@ -2073,7 +2073,7 @@ def dashboard():
                 <!-- ROS 2 Topics -->
                 <div class="card" style="display:flex; flex-direction:column; max-height: 310px;">
                     <div class="card-title">Flux de Topics ROS 2 Actifs</div>
-                    <div style="flex:1; overflow-y:auto; margin-top: 0.5rem;">
+                    <div style="flex:1; overflow:auto; margin-top: 0.5rem; max-width: 100%;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
                             <thead>
                                 <tr style="color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 600;">
