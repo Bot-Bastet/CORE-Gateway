@@ -339,6 +339,39 @@ def delete_account(full_name: str):
     raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
 
+@app.delete("/accounts/{full_name}", tags=["Accounts"], summary="Supprimer un compte", dependencies=[Depends(verify_token)])
+def delete_account(full_name: str):
+    users = load_json(USERS_FILE, default={})
+    if full_name in users:
+        # Supprimer des comptes
+        del users[full_name]
+        save_json(USERS_FILE, users)
+
+        # Nettoyer les identifiants MyGES associés
+        myges = load_json(MYGES_FILE, default={})
+        if full_name in myges:
+            del myges[full_name]
+            save_json(MYGES_FILE, myges)
+
+        # Nettoyer les photos de visage associées
+        meta = load_json(META_FILE, default=[])
+        new_meta = []
+        for entry in meta:
+            if entry.get("name", "").lower() == full_name.lower():
+                path = FACES_DIR / entry["filename"]
+                try:
+                    if path.exists():
+                        path.unlink()
+                except Exception as e:
+                    print(f"Error deleting face image {path}: {e}")
+            else:
+                new_meta.append(entry)
+        save_json(META_FILE, new_meta)
+
+        return {"status": "deleted", "user": full_name}
+    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def dashboard():
     """Dashboard d'administration complet de Bastet (Télémétrie, Comptes, Caméras on-demand, Photos)."""
@@ -951,7 +984,8 @@ def dashboard():
             background-color: #0c0c0e;
             border: 1px solid var(--border-color);
             border-radius: 10px;
-            overflow: relative;
+            overflow: hidden;
+            position: relative;
             aspect-ratio: 1;
             display: flex;
             align-items: center;
@@ -963,6 +997,7 @@ def dashboard():
             height: 100%;
             object-fit: cover;
             transition: transform 0.3s ease;
+            cursor: pointer;
         }
 
         .face-img-card:hover .face-img-element {
@@ -979,6 +1014,7 @@ def dashboard():
             flex-direction: column;
             justify-content: flex-end;
             padding: 0.5rem;
+            pointer-events: none;
         }
 
         .face-img-card:hover .face-img-overlay {
@@ -1291,7 +1327,7 @@ def dashboard():
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
                 </svg>
                 <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem;">Charger une nouvelle photo de visage</h4>
-                <p style="color: var(--text-secondary); font-size: 0.8rem;">Sélectionnez une image pour la reconnaissance faciale (Max 8 par utilisateur)</p>
+                <p style="color: var(--text-secondary); font-size: 0.8rem;">Glissez-déposez ou cliquez ici pour sélectionner une image (Max 8 par utilisateur)</p>
                 <input type="file" id="face-file-input" style="display: none;" accept="image/*" onchange="handleFaceUploadSelected(event)"/>
             </div>
 
@@ -1411,6 +1447,10 @@ def dashboard():
                     <label class="form-label" for="form-password">Mot de passe (Laisser vide pour ne pas modifier)</label>
                     <input type="password" id="form-password" class="form-input" autocomplete="new-password"/>
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-preferences">Configuration / Préférences (JSON)</label>
+                    <textarea id="form-preferences" class="form-input" rows="3" placeholder='{"unit": "metric"}' style="font-family: monospace; font-size: 0.85rem; resize: vertical;"></textarea>
+                </div>
                 <div class="checkbox-group">
                     <input type="checkbox" id="form-is-admin" style="accent-color: var(--accent); width: 16px; height: 16px;"/>
                     <label for="form-is-admin" style="font-size: 0.85rem; cursor: pointer; font-weight: 500;">Définir comme Administrateur</label>
@@ -1527,6 +1567,7 @@ def dashboard():
         function initDashboard() {
             switchTab(activeTab);
             startIntervals();
+            initDragAndDrop();
         }
 
         // --- INTERVALS ---
@@ -1783,7 +1824,8 @@ def dashboard():
         }
 
         async function deleteUser(fullName) {
-            if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?`)) return;
+            if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?
+(Cela supprimera également ses identifiants MyGES et ses photos de visage)`)) return;
             try {
                 const res = await fetch(`/accounts/${encodeURIComponent(fullName)}`, {
                     method: 'DELETE',
@@ -1811,6 +1853,7 @@ def dashboard():
             document.getElementById('form-email').value = '';
             document.getElementById('form-phone').value = '';
             document.getElementById('form-password').value = '';
+            document.getElementById('form-preferences').value = '{}';
             document.getElementById('form-is-admin').checked = false;
             
             document.getElementById('userModal').classList.add('active');
@@ -1830,6 +1873,7 @@ def dashboard():
             document.getElementById('form-email').value = u.email || '';
             document.getElementById('form-phone').value = u.phone || '';
             document.getElementById('form-password').value = '';
+            document.getElementById('form-preferences').value = JSON.stringify(u.preferences || {}, null, 2);
             document.getElementById('form-is-admin').checked = u.is_admin || false;
 
             document.getElementById('userModal').classList.add('active');
@@ -1854,6 +1898,17 @@ def dashboard():
             const password = document.getElementById('form-password').value;
             const isAdmin = document.getElementById('form-is-admin').checked;
 
+            let preferences = {};
+            const prefVal = document.getElementById('form-preferences').value.trim();
+            if (prefVal) {
+                try {
+                    preferences = JSON.parse(prefVal);
+                } catch (err) {
+                    alert("Format JSON invalide pour les préférences.");
+                    return;
+                }
+            }
+
             const payload = {
                 first_name: firstName,
                 last_name: lastName,
@@ -1861,7 +1916,7 @@ def dashboard():
                 email: email,
                 phone: phone,
                 is_admin: isAdmin,
-                preferences: {}
+                preferences: preferences
             };
 
             if (password) {
@@ -1974,7 +2029,7 @@ def dashboard():
                                 <span>${name}</span>
                                 <span style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500;">${userFaces.length} / 8 photos</span>
                             </div>
-                            <div class="faces-grid" id="faces-grid-${name.replace(/\s+/g, '_')}"></div>
+                            <div class="faces-grid"></div>
                         `;
                         
                         container.appendChild(section);
@@ -2040,6 +2095,36 @@ def dashboard():
             
             // Open modal to choose user
             openFaceUploadUserModal();
+        }
+
+        function initDragAndDrop() {
+            const uploadBox = document.querySelector('.upload-box');
+            if (uploadBox) {
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    uploadBox.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        uploadBox.style.borderColor = 'var(--accent)';
+                        uploadBox.style.backgroundColor = 'rgba(99, 102, 241, 0.08)';
+                    }, false);
+                });
+                ['dragleave', 'drop'].forEach(eventName => {
+                    uploadBox.addEventListener(eventName, (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        uploadBox.style.borderColor = 'var(--border-color)';
+                        uploadBox.style.backgroundColor = 'rgba(24, 24, 27, 0.3)';
+                    }, false);
+                });
+                uploadBox.addEventListener('drop', (e) => {
+                    const dt = e.dataTransfer;
+                    const files = dt.files;
+                    if (files && files.length > 0) {
+                        currentUploadFile = files[0];
+                        openFaceUploadUserModal();
+                    }
+                }, false);
+            }
         }
 
         async function openFaceUploadUserModal() {
@@ -2202,6 +2287,7 @@ def dashboard():
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
 
 
 
