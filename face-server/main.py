@@ -31,6 +31,8 @@ META_FILE = FACES_DIR / "meta.json"
 MYGES_FILE = DATA_DIR / "myges.json"
 STATE_FILE = DATA_DIR / "core_state.json"
 USERS_FILE = DATA_DIR / "users.json"
+latest_diagnostics = {}
+
 
 FACES_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -252,6 +254,16 @@ async def websocket_robot(websocket: WebSocket, token: Optional[str] = Query(Non
             except Exception as e:
                 print(f"Erreur injection contexte : {e}")
                 
+            # Cache the latest telemetry diagnostics
+            try:
+                import json
+                msg_json = json.loads(data)
+                if msg_json.get("type") == "telemetry_diagnostics":
+                    global latest_diagnostics
+                    latest_diagnostics = msg_json
+            except Exception:
+                pass
+            
             # Routage automatique du robot vers le noeud et l'app
             await manager.broadcast(data, "node")
             await manager.broadcast(data, "app")
@@ -439,6 +451,21 @@ def delete_account(full_name: str):
         return {"status": "deleted", "user": full_name}
     raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
+
+CALIBRATION_FILE = DATA_DIR / "calibration.json"
+
+@app.post("/core/calibration", tags=["CORE State"], summary="Sauvegarder les offsets de calibration", dependencies=[Depends(verify_token)])
+def save_calibration(data: dict):
+    save_json(CALIBRATION_FILE, data)
+    return {"status": "saved"}
+
+@app.get("/core/calibration", tags=["CORE State"], summary="Récupérer les offsets de calibration", dependencies=[Depends(verify_token)])
+def get_calibration():
+    return load_json(CALIBRATION_FILE, default={"offsets": [0]*12})
+
+@app.get("/core/diagnostics", tags=["CORE State"], summary="Récupérer les diagnostics temps-réel", dependencies=[Depends(verify_token)])
+def get_diagnostics():
+    return latest_diagnostics
 
 @app.get("/", response_class=HTMLResponse, tags=["Dashboard"])
 def dashboard():
@@ -1205,13 +1232,13 @@ def dashboard():
             font-weight: 600;
         }
         
-        #chat-messages-box::-webkit-scrollbar {
+        #chat-messages-box::-webkit-scrollbar, #json-traffic-console::-webkit-scrollbar, #chat-tab-messages::-webkit-scrollbar {
             width: 4px;
         }
-        #chat-messages-box::-webkit-scrollbar-track {
+        #chat-messages-box::-webkit-scrollbar-track, #json-traffic-console::-webkit-scrollbar-track, #chat-tab-messages::-webkit-scrollbar-track {
             background: transparent;
         }
-        #chat-messages-box::-webkit-scrollbar-thumb {
+        #chat-messages-box::-webkit-scrollbar-thumb, #json-traffic-console::-webkit-scrollbar-thumb, #chat-tab-messages::-webkit-scrollbar-thumb {
             background: var(--border-color);
             border-radius: 999px;
         }
@@ -1308,6 +1335,24 @@ def dashboard():
         @keyframes slideIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Custom calibration & control CSS */
+        .joint-group-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .btn-secondary.active-control {
+            background-color: var(--accent) !important;
+            color: white !important;
+            border-color: var(--accent) !important;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         /* ─── RESPONSIVE DESIGN ─────────────────────────────────────────────── */
@@ -1502,6 +1547,24 @@ def dashboard():
                 </svg>
                 <span>Système & Updates</span>
             </li>
+            <li class="nav-item" onclick="switchTab('chat')" id="nav-chat">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Chat & Contrôle IA</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('diagnostics')" id="nav-diagnostics">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                <span>Arduino & Calib</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('map')" id="nav-map">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                <span>SLAM & Map</span>
+            </li>
         </ul>
         <div style="margin-top: auto; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
@@ -1669,14 +1732,12 @@ def dashboard():
 
         <!-- ─────────────────── TAB 3: FACES GALLERY ─────────────────── -->
         <div id="tab-faces-content" class="tab-content">
-            <!-- Folders List View -->
             <div id="faces-folders-view">
                 <div class="folders-grid" id="folders-container">
                     <!-- User folders will be loaded here dynamically -->
                 </div>
             </div>
 
-            <!-- Single Folder Detailed View -->
             <div id="faces-details-view" class="folder-open-view">
                 <div class="back-btn-wrapper">
                     <button class="btn btn-secondary" onclick="closeFolderDetails()">
@@ -1747,7 +1808,6 @@ def dashboard():
                 <div class="card">
                     <div class="card-title">Mise à jour — Robot Pi & Arduino</div>
                     
-                    <!-- Partie 1 : Raspberry Pi 5 -->
                     <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Système Principal (Pi 5)</h4>
                     <div style="margin: 1rem 0;">
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
@@ -1831,6 +1891,442 @@ def dashboard():
                 </div>
             </div>
         </div>
+
+        <!-- ─────────────────── TAB 5: CHAT & CONTROL IA ─────────────────── -->
+        <div id="tab-chat-content" class="tab-content">
+            <div class="card-grid">
+                <!-- Live Conversation Box -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 450px;">
+                    <div class="card-title">
+                        <span>Discussion en Direct avec le LLM</span>
+                        <span class="status-badge active" id="llm-status-badge">Prêt</span>
+                    </div>
+                    <div id="chat-tab-messages" style="flex: 1; overflow-y: auto; padding: 1rem; background-color: #0c0c0e; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 250px; max-height: 300px;">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;">Aucun message échangé. Saisissez un texte ci-dessous pour démarrer.</div>
+                    </div>
+                    <form onsubmit="sendChatMessage(event)" style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="chat-tab-input" class="form-input" placeholder="Parlez à Bastet..." autocomplete="off"/>
+                        <button type="submit" class="btn btn-primary">Envoyer</button>
+                    </form>
+                </div>
+
+                <!-- AI Modules Control -->
+                <div class="card">
+                    <div class="card-title">Contrôle des Modules d'IA</div>
+                    <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem;">
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Contrôle de la Parole (TTS)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="tts-ctrl-robot" onclick="setAIControl('tts', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="tts-ctrl-node" onclick="setAIControl('tts', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="tts-ctrl-off" onclick="setAIControl('tts', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Écoute Vocale (STT)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="stt-ctrl-robot" onclick="setAIControl('stt', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="stt-ctrl-node" onclick="setAIControl('stt', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="stt-ctrl-off" onclick="setAIControl('stt', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Moteur de Chat (LLM)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary" id="chat-ctrl-robot" onclick="setAIControl('chat', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary active-control" id="chat-ctrl-node" onclick="setAIControl('chat', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="chat-ctrl-off" onclick="setAIControl('chat', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Détection d'Objets (YOLO)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="yolo-ctrl-enabled" onclick="setAIControl('yolo', 'enabled')">Activé</button>
+                                <button class="btn btn-secondary" id="yolo-ctrl-disabled" onclick="setAIControl('yolo', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WebSocket debug live JSON traffic -->
+            <div class="card" style="margin-top: 1.5rem;">
+                <div class="card-title">
+                    <span>Console de Flux de Données WebSocket (Live JSON)</span>
+                    <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="clearJSONConsole()">Effacer</button>
+                </div>
+                <div id="json-traffic-console" style="height: 250px; overflow-y: auto; background-color: #050507; border: 1px solid var(--border-color); border-radius: 8px; font-family: monospace; font-size: 0.8rem; padding: 1rem; color: #34d399; white-space: pre-wrap; margin-top: 1rem;">
+[Console démarrée - En attente de trafic WebSocket...]
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 6: ARDUINO & CALIBRATION ─────────────────── -->
+        <div id="tab-diagnostics-content" class="tab-content">
+            <div class="card-grid">
+                <!-- 12 Servomotor Angles -->
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-title">Angles en Direct des 12 Servomoteurs (Arduino Mega)</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.5rem;">
+                        <!-- FR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte FR (Avant Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad (Hanche)</span><span id="joint-val-0">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-0" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper (Cuisse)</span><span id="joint-val-1">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-1" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower (Tibia)</span><span id="joint-val-2">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-2" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- FL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte FL (Avant Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad (Hanche)</span><span id="joint-val-3">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-3" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper (Cuisse)</span><span id="joint-val-4">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-4" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower (Tibia)</span><span id="joint-val-5">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-5" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte BR (Arrière Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad (Hanche)</span><span id="joint-val-6">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-6" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper (Cuisse)</span><span id="joint-val-7">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-7" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower (Tibia)</span><span id="joint-val-8">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-8" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte BL (Arrière Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad (Hanche)</span><span id="joint-val-9">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-9" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper (Cuisse)</span><span id="joint-val-10">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-10" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower (Tibia)</span><span id="joint-val-11">90°</span></div>
+                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-11" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- IMU Gyro -->
+                <div class="card">
+                    <div class="card-title">Gyroscope & Orientation IMU</div>
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height: 180px; position:relative;">
+                        <div id="imu-visual-cube" style="width: 80px; height: 80px; transform-style: preserve-3d; transition: transform 0.1s linear; transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);">
+                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.4); border: 2px solid var(--accent); transform: translateZ(40px); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">AVANT</div>
+                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.2); border: 2px solid var(--accent); transform: rotateY(180deg) translateZ(40px);"></div>
+                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.2); border: 2px solid var(--accent); transform: rotateY(90deg) translateZ(40px);"></div>
+                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.2); border: 2px solid var(--accent); transform: rotateY(-90deg) translateZ(40px);"></div>
+                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.2); border: 2px solid var(--accent); transform: rotateX(90deg) translateZ(40px); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">HAUT</div>
+                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.2); border: 2px solid var(--accent); transform: rotateX(-90deg) translateZ(40px);"></div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                        <div><div style="font-size:0.75rem; color:var(--text-secondary);">Roulis</div><span id="imu-val-roll" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
+                        <div><div style="font-size:0.75rem; color:var(--text-secondary);">Tangage</div><span id="imu-val-pitch" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
+                        <div><div style="font-size:0.75rem; color:var(--text-secondary);">Lacet</div><span id="imu-val-yaw" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
+                    </div>
+                </div>
+
+                <!-- ROS 2 Topics -->
+                <div class="card" style="display:flex; flex-direction:column; max-height: 310px;">
+                    <div class="card-title">Flux de Topics ROS 2 Actifs</div>
+                    <div style="flex:1; overflow-y:auto; margin-top: 0.5rem;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left;">
+                            <thead>
+                                <tr style="color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 600;">
+                                    <th style="padding: 0.4rem 0;">Nom du Topic</th>
+                                    <th style="padding: 0.4rem 0;">Type</th>
+                                    <th style="padding: 0.4rem 0; text-align: right;">Hz</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ros2-topics-list">
+                                <tr><td colspan="3" style="text-align: center; padding: 2rem 0; color: var(--text-secondary);">Aucun topic actif reporté.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calibration Section Overview -->
+            <div class="card" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <div>
+                    <h3 class="font-outfit" style="font-size: 1.15rem; margin-bottom: 0.25rem;">Section Calibration & Configuration WiFi</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Ajuster les angles des moteurs, configurer le WiFi et observer la minimap.</p>
+                </div>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button class="btn btn-secondary" onclick="openWifiModal()">
+                        📶 Configuration WiFi
+                    </button>
+                    <button class="btn btn-primary" onclick="openCalibrationOverlay()">
+                        ⚙️ Ouvrir la Calibration
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 7: SLAM & MAP ─────────────────── -->
+        <div id="tab-map-content" class="tab-content">
+            <div class="card-grid" style="grid-template-columns: 2.5fr 1fr;">
+                <!-- SLAM Visualizer -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 500px;">
+                    <div class="card-title">
+                        <span>Visualiseur SLAM & Nuage de Points</span>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetSLAMMap()">Réinitialiser Pose</button>
+                    </div>
+                    <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: #07070a; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-top: 1rem;">
+                        <canvas id="slam-map-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                        <div style="position: absolute; top: 0.75rem; right: 0.75rem; background: rgba(24,24,27,0.85); padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; display:flex; flex-direction:column; gap:0.25rem; pointer-events:none;">
+                            <div style="display:flex; justify-content:space-between; gap:1rem;"><span style="color:var(--text-secondary);">Résolution :</span><span id="slam-res-label">0.05 m/px</span></div>
+                            <div style="display:flex; justify-content:space-between; gap:1rem;"><span style="color:var(--text-secondary);">Nuage de points :</span><span id="slam-cloud-count-label">0 pts</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SLAM Options -->
+                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                    <div class="card" style="margin: 0;">
+                        <div class="card-title" style="font-size: 1rem;">Calques d'Affichage</div>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem;">
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:16px; height:16px;" id="layer-grid" onchange="drawSLAMMap()"/>
+                                Grille d'occupation 2D
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:16px; height:16px;" id="layer-trajectory" onchange="drawSLAMMap()"/>
+                                Trajectoire du Robot (Path)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:16px; height:16px;" id="layer-points" onchange="drawSLAMMap()"/>
+                                Nuage de points laser
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" style="accent-color: var(--accent); width:16px; height:16px;" id="layer-sonar" onchange="drawSLAMMap()"/>
+                                Cônes Sonars & Obstacles
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin: 0; flex:1;">
+                        <div class="card-title" style="font-size: 1rem;">Paramètres SLAM</div>
+                        <div style="display:flex; flex-direction:column; gap:1rem; margin-top: 1rem;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.25rem;">
+                                    <span>Résolution de la Carte</span>
+                                    <span id="param-val-resolution">0.05m</span>
+                                </div>
+                                <input type="range" min="1" max="20" value="5" class="form-input" style="padding:0; height:4px;" id="param-slider-resolution" oninput="updateSLAMParam('resolution')"/>
+                            </div>
+                            
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.25rem;">
+                                    <span>Rayon d'Évitement</span>
+                                    <span id="param-val-inflation">0.30m</span>
+                                </div>
+                                <input type="range" min="10" max="100" value="30" class="form-input" style="padding:0; height:4px;" id="param-slider-inflation" oninput="updateSLAMParam('inflation')"/>
+                            </div>
+
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.25rem;">
+                                    <span>Seuil Détection Laser</span>
+                                    <span id="param-val-laser-threshold">85%</span>
+                                </div>
+                                <input type="range" min="50" max="100" value="85" class="form-input" style="padding:0; height:4px;" id="param-slider-laser-threshold" oninput="updateSLAMParam('laser-threshold')"/>
+                            </div>
+                            
+                            <button class="btn btn-primary" onclick="saveSLAMParameters()" style="width: 100%; margin-top: 0.5rem;">
+                                Appliquer Paramètres
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full page Calibration Overlay -->
+    <div id="calibration-overlay" class="modal-overlay" style="display: none; justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 95vw; height: 95vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: #121214;">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.5rem; color: var(--text-primary);">Console de Calibration Système</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Ajustez les offsets des moteurs, testez les caméras et observez la minimap.</p>
+                </div>
+                <button class="btn btn-secondary" onclick="closeCalibrationOverlay()">&times; Fermer la Console</button>
+            </div>
+            
+            <div style="flex: 1; display: grid; grid-template-columns: 1.5fr 1fr; overflow: hidden;">
+                <!-- Offsets sliders -->
+                <div style="padding: 1.5rem; overflow-y: auto; border-right: 1px solid var(--border-color);">
+                    <h3 class="font-outfit" style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Offsets des Angles Moteurs (-30° à +30°)</span>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetMotorCalibration()">Réinitialiser</button>
+                    </h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <!-- FR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">FR (Avant Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad Offset</span><span id="calib-val-0">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper Offset</span><span id="calib-val-1">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower Offset</span><span id="calib-val-2">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)"/>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- FL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">FL (Avant Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad Offset</span><span id="calib-val-3">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper Offset</span><span id="calib-val-4">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower Offset</span><span id="calib-val-5">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">BR (Arrière Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad Offset</span><span id="calib-val-6">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper Offset</span><span id="calib-val-7">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower Offset</span><span id="calib-val-8">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">BL (Arrière Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad Offset</span><span id="calib-val-9">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper Offset</span><span id="calib-val-10">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower Offset</span><span id="calib-val-11">0</span></div>
+                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                        <button class="btn btn-primary" onclick="saveCalibrationOffsets()" style="flex:1;">
+                            💾 Sauvegarder & Transmettre les Offsets
+                        </button>
+                        <button class="btn btn-secondary" onclick="sendCalibrationOffsets()" style="flex:1;">
+                            ⚡ Tester Directement
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Camera and Minimap -->
+                <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto;">
+                    <div class="card" style="margin: 0; background-color: rgba(255,255,255,0.01);">
+                        <div class="card-title" style="font-size:0.95rem;">Configuration des Caméras</div>
+                        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.5rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra 1 (Avant)</span>
+                                    <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
+                                </div>
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
+                            </div>
+                            
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                                <div>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra 2 (Arrière)</span>
+                                    <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
+                                </div>
+                                <input type="checkbox" style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-2" onchange="toggleCalibCamera(2)"/>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin: 0; flex: 1; display: flex; flex-direction: column; background-color: rgba(255,255,255,0.01); min-height: 280px;">
+                        <div class="card-title" style="font-size:0.95rem;">Minimap de Localisation (Position XY)</div>
+                        <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: #050507; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <canvas id="minimap-canvas" style="width:100%; height:100%; min-height:200px; display:block;"></canvas>
+                            <div style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.7); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                Pose: <span id="minimap-pose-text">x: 0.00, y: 0.00, θ: 0°</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal : Ajouter / Éditer un utilisateur -->
@@ -1903,7 +2399,43 @@ def dashboard():
         </div>
     </div>
 
-    <!-- Screen lightbox overlay for viewing images -->
+    <!-- Modal : WiFi -->
+    <div id="wifiModal" class="modal-overlay" onclick="closeWifiModalOnClick(event)">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">Réseaux WiFi aux Alentours</h3>
+                <button class="modal-close" onclick="closeWifiModal()">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--text-secondary);">Sélectionnez un réseau à configurer sur le robot.</span>
+                <button class="btn btn-secondary" onclick="scanWifiNetworks()" id="btn-wifi-scan">
+                    🔄 Rafraîchir
+                </button>
+            </div>
+            
+            <div id="wifi-list-container" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: #0c0c0e; padding: 0.5rem; margin-bottom: 1.5rem;">
+                <div style="text-align: center; color: var(--text-secondary); padding: 2rem 0; font-size: 0.85rem;">Aucun réseau scanné. Cliquez sur Rafraîchir.</div>
+            </div>
+            
+            <form id="wifi-connect-form" onsubmit="handleWifiConnectSubmit(event)" style="display: none; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <input type="hidden" id="form-wifi-ssid"/>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 600;">Se connecter à : <span id="wifi-selected-ssid-label" style="color:var(--accent);">SSID</span></label>
+                </div>
+                <div class="form-group" id="wifi-password-group">
+                    <label class="form-label" for="form-wifi-password">Mot de passe du réseau</label>
+                    <input type="password" id="form-wifi-password" class="form-input" placeholder="••••••••" autocomplete="current-password"/>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button type="submit" class="btn btn-primary" style="flex:1;">Se connecter au WiFi</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelWifiConnection()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Screen lightbox overlay -->
     <div id="lightbox" class="modal-overlay" onclick="closeLightbox()" style="background-color: rgba(0,0,0,0.95); cursor: zoom-out;">
         <img id="lightbox-img" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);"/>
     </div>
@@ -1916,7 +2448,14 @@ def dashboard():
         let accountsCached = {};
         let activeFolderName = null;
         let facesCached = [];
-        window.camWebsockets = { 1: null, 2: null };
+        let appWs = null;
+        window.activeStreams = { 1: false, 2: false };
+        
+        // SLAM / Map variables
+        window.slamGrid = null;
+        window.slamPath = [];
+        window.slamPoints = [];
+        window.robotPose = {x: 0, y: 0, theta: 0};
 
         // ─── INIT ─────────────────────────────────────────────────────────────
         
@@ -1926,7 +2465,6 @@ def dashboard():
                 return;
             }
             try {
-                // Try fetching accounts to verify X-API-Token validity
                 const res = await fetch('/accounts', { headers: { 'X-API-Token': apiToken } });
                 if (res.status === 200) {
                     hideLogin();
@@ -1958,10 +2496,11 @@ def dashboard():
         function logout() {
             // Close active streams
             for (let id of [1, 2]) {
-                if (window.camWebsockets[id]) {
-                    window.camWebsockets[id].send(JSON.stringify({type: "release_camera", camera: id}));
-                    window.camWebsockets[id].close();
-                }
+                stopStreamUI(id);
+            }
+            if (appWs) {
+                appWs.close();
+                appWs = null;
             }
             apiToken = '';
             localStorage.removeItem('bastet_api_token');
@@ -1972,6 +2511,7 @@ def dashboard():
             switchTab(activeTab);
             startIntervals();
             initDragAndDrop();
+            connectGlobalWebSocket();
         }
 
         // --- INTERVALS ---
@@ -1987,6 +2527,668 @@ def dashboard():
             if (telemetryInterval) clearInterval(telemetryInterval);
             if (updateInterval) clearInterval(updateInterval);
         }
+
+        // ─── WEBSOCKET CLIENT ─────────────────────────────────────────────────
+        
+        function connectGlobalWebSocket() {
+            if (appWs && (appWs.readyState === WebSocket.OPEN || appWs.readyState === WebSocket.CONNECTING)) return;
+            
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/app?token=${apiToken}`;
+            appWs = new WebSocket(wsUrl);
+            
+            appWs.onopen = () => {
+                console.log("Global WebSocket connecté.");
+                const consoleEl = document.getElementById('json-traffic-console');
+                if (consoleEl) consoleEl.textContent = '[WebSocket connecté - En attente de trafic...]';
+            };
+            
+            appWs.onmessage = (event) => {
+                handleIncomingWebSocketMessage(event.data);
+            };
+            
+            appWs.onclose = () => {
+                console.log("Global WebSocket déconnecté. Reconnexion...");
+                setTimeout(connectGlobalWebSocket, 3000);
+            };
+            
+            appWs.onerror = (e) => {
+                console.error("Global WebSocket erreur:", e);
+            };
+        }
+
+        function logToJSONConsole(data) {
+            const consoleEl = document.getElementById('json-traffic-console');
+            if (!consoleEl) return;
+            
+            if (consoleEl.textContent.length > 20000) {
+                consoleEl.textContent = consoleEl.textContent.slice(-10000);
+            }
+            
+            const timeStr = new Date().toLocaleTimeString();
+            consoleEl.textContent += `\n[${timeStr}] ${data}`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function handleIncomingWebSocketMessage(data) {
+            try {
+                const payload = JSON.parse(data);
+                
+                // Print all JSON traffic to the Console
+                logToJSONConsole(JSON.stringify(payload, null, 2));
+                
+                if (payload.type === "telemetry_diagnostics") {
+                    // Update joint angles (0 to 11)
+                    if (payload.joints && payload.joints.length === 12) {
+                        for (let i = 0; i < 12; i++) {
+                            const angle = payload.joints[i];
+                            const valEl = document.getElementById(`joint-val-${i}`);
+                            const barEl = document.getElementById(`joint-bar-${i}`);
+                            if (valEl) valEl.textContent = `${Math.round(angle)}°`;
+                            if (barEl) barEl.style.width = `${(angle / 180) * 100}%`;
+                        }
+                    }
+                    
+                    // Update IMU
+                    if (payload.imu) {
+                        const roll = payload.imu.roll || 0;
+                        const pitch = payload.imu.pitch || 0;
+                        const yaw = payload.imu.yaw || 0;
+                        
+                        document.getElementById('imu-val-roll').textContent = `${roll.toFixed(1)}°`;
+                        document.getElementById('imu-val-pitch').textContent = `${pitch.toFixed(1)}°`;
+                        document.getElementById('imu-val-yaw').textContent = `${yaw.toFixed(1)}°`;
+                        
+                        // Rotate 3D IMU CSS Cube
+                        const cube = document.getElementById('imu-visual-cube');
+                        if (cube) {
+                            cube.style.transform = `rotateX(${pitch}deg) rotateY(${roll}deg) rotateZ(${-yaw}deg)`;
+                        }
+                    }
+                    
+                    // Update Active ROS 2 Topics
+                    if (payload.topics) {
+                        const tbody = document.getElementById('ros2-topics-list');
+                        if (tbody) {
+                            tbody.innerHTML = '';
+                            payload.topics.forEach(t => {
+                                const tr = document.createElement('tr');
+                                tr.style.borderBottom = '1px solid var(--border-color)';
+                                tr.innerHTML = `
+                                    <td style="padding: 0.4rem 0; font-family:monospace; color:var(--accent);">${t.name}</td>
+                                    <td style="padding: 0.4rem 0; color:var(--text-secondary);">${t.type}</td>
+                                    <td style="padding: 0.4rem 0; text-align:right; font-weight:bold;">${t.hz.toFixed(1)}</td>
+                                `;
+                                tbody.appendChild(tr);
+                            });
+                        }
+                    }
+                    
+                    // Update path & pose from diagnostics if present
+                    if (payload.pose) {
+                        window.robotPose = payload.pose;
+                        const rx = payload.pose.x || 0;
+                        const ry = payload.pose.y || 0;
+                        const rtheta = payload.pose.theta || 0;
+                        document.getElementById('minimap-pose-text').textContent = `x: ${rx.toFixed(2)}, y: ${ry.toFixed(2)}, θ: ${Math.round(rtheta * 180 / Math.PI)}°`;
+                    }
+                    if (payload.path) {
+                        window.slamPath = payload.path;
+                    }
+                } 
+                else if (payload.type === "wifi_list") {
+                    displayWifiNetworks(payload.networks);
+                } 
+                else if (payload.type === "wifi_connect_result") {
+                    handleWifiConnectResult(payload);
+                } 
+                else if (payload.type === "chat_response" || payload.type === "chat") {
+                    appendLLMMessage(payload.sender || 'LLM', payload.text || '');
+                }
+            } catch(e) {
+                // not json or parsing error
+            }
+        }
+
+        // ─── CHAT TAB IA FUNCTIONS ────────────────────────────────────────────
+        
+        function sendChatMessage(e) {
+            e.preventDefault();
+            const input = document.getElementById('chat-tab-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            appendLLMMessage('Moi', text);
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "chat", text: text }));
+            } else {
+                appendLLMMessage('Système', 'Erreur : WebSocket déconnecté.');
+            }
+            
+            input.value = '';
+        }
+
+        function appendLLMMessage(sender, text) {
+            const box = document.getElementById('chat-tab-messages');
+            if (!box) return;
+            
+            if (box.textContent.includes("Aucun message échangé")) {
+                box.innerHTML = '';
+            }
+            
+            const msgEl = document.createElement('div');
+            msgEl.style.padding = '0.5rem 0.75rem';
+            msgEl.style.borderRadius = '6px';
+            msgEl.style.fontSize = '0.9rem';
+            msgEl.style.maxWidth = '80%';
+            msgEl.style.marginBottom = '0.25rem';
+            
+            if (sender === 'Moi') {
+                msgEl.style.alignSelf = 'flex-end';
+                msgEl.style.backgroundColor = 'rgba(99, 102, 241, 0.2)';
+                msgEl.style.border = '1px solid var(--accent)';
+                msgEl.innerHTML = `<span style="font-weight:bold;color:#a5b4fc;display:block;font-size:0.75rem;">Moi</span>${text}`;
+            } else if (sender === 'Système') {
+                msgEl.style.alignSelf = 'center';
+                msgEl.style.backgroundColor = 'rgba(225, 29, 72, 0.1)';
+                msgEl.style.border = '1px solid var(--danger)';
+                msgEl.innerHTML = `<span style="font-style:italic;color:#f87171;font-size:0.8rem;">${text}</span>`;
+            } else {
+                msgEl.style.alignSelf = 'flex-start';
+                msgEl.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                msgEl.style.border = '1px solid var(--border-color)';
+                msgEl.innerHTML = `<span style="font-weight:bold;color:var(--text-primary);display:block;font-size:0.75rem;">${sender}</span>${text}`;
+            }
+            
+            box.appendChild(msgEl);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function clearJSONConsole() {
+            const consoleEl = document.getElementById('json-traffic-console');
+            if (consoleEl) consoleEl.textContent = '[Console effacée]';
+        }
+
+        function setAIControl(feature, target) {
+            const buttons = {
+                'tts': ['robot', 'node', 'disabled'],
+                'stt': ['robot', 'node', 'disabled'],
+                'chat': ['robot', 'node', 'disabled'],
+                'yolo': ['enabled', 'disabled']
+            };
+            
+            buttons[feature].forEach(t => {
+                const btnId = `${feature}-ctrl-${t}`;
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    if (t === target) {
+                        btn.classList.add('active-control');
+                    } else {
+                        btn.classList.remove('active-control');
+                    }
+                }
+            });
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "ai_control", feature: feature, target: target }));
+            }
+        }
+
+        // ─── CALIBRATION WINDOW FUNCTIONS ──────────────────────────────────────
+        
+        function openCalibrationOverlay() {
+            document.getElementById('calibration-overlay').style.display = 'flex';
+            setTimeout(drawMinimap, 100);
+        }
+
+        function closeCalibrationOverlay() {
+            document.getElementById('calibration-overlay').style.display = 'none';
+        }
+
+        function updateCalibSliderVal(index) {
+            const slider = document.getElementById(`calib-slider-${index}`);
+            const label = document.getElementById(`calib-val-${index}`);
+            if (slider && label) {
+                label.textContent = slider.value >= 0 ? `+${slider.value}` : slider.value;
+            }
+        }
+
+        function resetMotorCalibration() {
+            for (let i = 0; i < 12; i++) {
+                const slider = document.getElementById(`calib-slider-${i}`);
+                if (slider) {
+                    slider.value = 0;
+                    updateCalibSliderVal(i);
+                }
+            }
+        }
+
+        async function sendCalibrationOffsets() {
+            const offsets = [];
+            for (let i = 0; i < 12; i++) {
+                const slider = document.getElementById(`calib-slider-${i}`);
+                offsets.push(slider ? parseInt(slider.value) : 0);
+            }
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+            } else {
+                alert("WebSocket déconnecté.");
+            }
+        }
+
+        async function saveCalibrationOffsets() {
+            const offsets = [];
+            for (let i = 0; i < 12; i++) {
+                const slider = document.getElementById(`calib-slider-${i}`);
+                offsets.push(slider ? parseInt(slider.value) : 0);
+            }
+            
+            try {
+                const res = await fetch('/core/calibration', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Token': apiToken
+                    },
+                    body: JSON.stringify({ offsets: offsets })
+                });
+                if (res.ok) {
+                    alert("Offsets sauvegardés avec succès sur la Gateway.");
+                    if (appWs && appWs.readyState === WebSocket.OPEN) {
+                        appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+                    }
+                } else {
+                    alert("Erreur lors de la sauvegarde.");
+                }
+            } catch(e) {
+                alert("Erreur réseau.");
+            }
+        }
+
+        function toggleCalibCamera(camId) {
+            const checkbox = document.getElementById(`calib-cam-enable-${camId}`);
+            const statusEl = document.getElementById(`calib-cam-status-${camId}`);
+            if (checkbox && statusEl) {
+                statusEl.textContent = checkbox.checked ? 'Activée' : 'Désactivée';
+                statusEl.style.color = checkbox.checked ? 'var(--success)' : 'var(--text-secondary)';
+            }
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "camera_setup", camera: camId, enable: checkbox.checked }));
+            }
+        }
+
+        // ─── WIFI POPUP FUNCTIONS ─────────────────────────────────────────────
+        
+        function openWifiModal() {
+            document.getElementById('wifiModal').classList.add('active');
+            scanWifiNetworks();
+        }
+
+        function closeWifiModal() {
+            document.getElementById('wifiModal').classList.remove('active');
+            cancelWifiConnection();
+        }
+
+        function closeWifiModalOnClick(e) {
+            if (e.target === document.getElementById('wifiModal')) closeWifiModal();
+        }
+
+        function scanWifiNetworks() {
+            const container = document.getElementById('wifi-list-container');
+            container.innerHTML = `
+                <div style="text-align: center; color: var(--text-secondary); padding: 2.5rem 0; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
+                    <div style="width: 24px; height: 24px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <span>Recherche des réseaux à proximité (nmcli)...</span>
+                </div>`;
+                
+            const btn = document.getElementById('btn-wifi-scan');
+            if (btn) btn.disabled = true;
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "scan_wifi" }));
+            } else {
+                container.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem;">Erreur : WebSocket déconnecté.</div>`;
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function displayWifiNetworks(networks) {
+            const container = document.getElementById('wifi-list-container');
+            const btn = document.getElementById('btn-wifi-scan');
+            if (btn) btn.disabled = false;
+            
+            container.innerHTML = '';
+            if (!networks || networks.length === 0) {
+                container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem 0; font-size: 0.85rem;">Aucun réseau WiFi détecté.</div>`;
+                return;
+            }
+            
+            networks.forEach(net => {
+                const item = document.createElement('div');
+                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease;';
+                
+                const isSecure = net.security && net.security.trim() !== "" && net.security !== "--";
+                const lockIcon = isSecure ? '🔒' : '🔓';
+                
+                item.innerHTML = `
+                    <div>
+                        <span style="font-weight: 600; font-size: 0.9rem; display: block;">${net.ssid}</span>
+                        <span style="font-size: 0.7rem; color: var(--text-secondary);">${net.bssid} • ${net.security}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <span style="font-size: 0.8rem;">${lockIcon}</span>
+                        <span style="font-size: 0.85rem; font-weight: bold; color: var(--accent);">${net.signal}%</span>
+                    </div>
+                `;
+                
+                item.onclick = () => selectWifiNetwork(net.ssid, isSecure);
+                container.appendChild(item);
+            });
+        }
+
+        function selectWifiNetwork(ssid, isSecure) {
+            document.getElementById('form-wifi-ssid').value = ssid;
+            document.getElementById('wifi-selected-ssid-label').textContent = ssid;
+            
+            const pwdGroup = document.getElementById('wifi-password-group');
+            if (isSecure) {
+                pwdGroup.style.display = 'block';
+            } else {
+                pwdGroup.style.display = 'none';
+            }
+            
+            document.getElementById('form-wifi-password').value = '';
+            document.getElementById('wifi-connect-form').style.display = 'block';
+        }
+
+        function cancelWifiConnection() {
+            document.getElementById('wifi-connect-form').style.display = 'none';
+        }
+
+        function handleWifiConnectSubmit(e) {
+            e.preventDefault();
+            const ssid = document.getElementById('form-wifi-ssid').value;
+            const password = document.getElementById('form-wifi-password').value;
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Connexion en cours...';
+            }
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({
+                    type: "connect_wifi",
+                    ssid: ssid,
+                    password: password
+                }));
+            } else {
+                alert("WebSocket déconnecté.");
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Se connecter au WiFi';
+                }
+            }
+        }
+
+        function handleWifiConnectResult(res) {
+            const submitBtn = document.querySelector('#wifi-connect-form button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Se connecter au WiFi';
+            }
+            
+            if (res.status === 'success') {
+                alert("Succès : " + res.message);
+                closeWifiModal();
+            } else {
+                alert("Erreur de connexion : " + res.message);
+            }
+        }
+
+        // ─── CANVASES RENDER CODES ───────────────────────────────────────────
+        
+        function drawMinimap() {
+            const canvas = document.getElementById('minimap-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const w = rect.width;
+            const h = rect.height;
+            
+            ctx.clearRect(0, 0, w, h);
+            
+            ctx.strokeStyle = '#18181b';
+            ctx.lineWidth = 1;
+            const step = 20;
+            for (let x = 0; x < w; x += step) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            }
+            for (let y = 0; y < h; y += step) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            }
+            
+            ctx.strokeStyle = '#27272a';
+            ctx.beginPath();
+            ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h);
+            ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
+            ctx.stroke();
+            
+            const scale = 30; // px/m
+            const cx = w / 2;
+            const cy = h / 2;
+            
+            // Path
+            if (window.slamPath && window.slamPath.length > 0) {
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                window.slamPath.forEach((pt, idx) => {
+                    const px = cx + pt.x * scale;
+                    const py = cy - pt.y * scale;
+                    if (idx === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                });
+                ctx.stroke();
+            }
+            
+            // Robot
+            const rx = cx + window.robotPose.x * scale;
+            const ry = cy - window.robotPose.y * scale;
+            const rtheta = -window.robotPose.theta;
+            
+            ctx.save();
+            ctx.translate(rx, ry);
+            ctx.rotate(rtheta);
+            
+            ctx.fillStyle = '#6366f1';
+            ctx.beginPath();
+            ctx.moveTo(12, 0);
+            ctx.lineTo(-8, -8);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-8, 8);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, 10 + (Date.now() % 1000) / 100, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        function drawSLAMMap() {
+            const canvas = document.getElementById('slam-map-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const w = rect.width;
+            const h = rect.height;
+            
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#07070a';
+            ctx.fillRect(0, 0, w, h);
+            
+            const scale = 40;
+            const cx = w / 2;
+            const cy = h / 2;
+            
+            // Grid
+            if (document.getElementById('layer-grid').checked) {
+                ctx.strokeStyle = '#101015';
+                ctx.lineWidth = 0.5;
+                const gridStep = scale * 0.5;
+                for (let x = cx % gridStep; x < w; x += gridStep) {
+                    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+                }
+                for (let y = cy % gridStep; y < h; y += gridStep) {
+                    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+                }
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                const walls = [
+                    {x: -1.5, y: -2, w: 3, h: 0.1},
+                    {x: -1.5, y: 2, w: 3, h: 0.1},
+                    {x: -1.5, y: -2, w: 0.1, h: 4},
+                    {x: 1.5, y: -2, w: 0.1, h: 4},
+                    {x: 0.5, y: -0.5, w: 0.5, h: 1}
+                ];
+                walls.forEach(wall => {
+                    ctx.fillRect(cx + wall.x * scale, cy - (wall.y + wall.h) * scale, wall.w * scale, wall.h * scale);
+                });
+            }
+            
+            // Points (laser)
+            if (document.getElementById('layer-points').checked) {
+                ctx.fillStyle = '#10b981';
+                if (window.slamPoints && window.slamPoints.length > 0) {
+                    window.slamPoints.forEach(pt => {
+                        ctx.beginPath();
+                        ctx.arc(cx + pt.x * scale, cy - pt.y * scale, 1.5, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                } else {
+                    for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
+                        const dist = 1.8 + Math.sin(angle * 4) * 0.1;
+                        const px = cx + Math.cos(angle) * dist * scale;
+                        const py = cy - Math.sin(angle) * dist * scale;
+                        ctx.beginPath();
+                        ctx.arc(px, py, 1.5, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            // Sonar
+            if (document.getElementById('layer-sonar').checked) {
+                ctx.fillStyle = 'rgba(245, 158, 11, 0.15)';
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 1;
+                
+                const rx = cx + window.robotPose.x * scale;
+                const ry = cy - window.robotPose.y * scale;
+                const rtheta = -window.robotPose.theta;
+                
+                ctx.save();
+                ctx.translate(rx, ry);
+                ctx.rotate(rtheta);
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, 1.2 * scale, -Math.PI / 12, Math.PI / 12);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+            
+            // Trajectory Path
+            if (document.getElementById('layer-trajectory').checked && window.slamPath && window.slamPath.length > 0) {
+                ctx.strokeStyle = '#6366f1';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                window.slamPath.forEach((pt, idx) => {
+                    const px = cx + pt.x * scale;
+                    const py = cy - pt.y * scale;
+                    if (idx === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                });
+                ctx.stroke();
+            }
+            
+            // Robot Outline
+            const rx = cx + window.robotPose.x * scale;
+            const ry = cy - window.robotPose.y * scale;
+            const rtheta = -window.robotPose.theta;
+            
+            ctx.save();
+            ctx.translate(rx, ry);
+            ctx.rotate(rtheta);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-12, -8, 24, 16);
+            
+            ctx.fillStyle = '#6366f1';
+            ctx.beginPath();
+            ctx.moveTo(12, 0);
+            ctx.lineTo(6, -5);
+            ctx.lineTo(6, 5);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function resetSLAMMap() {
+            window.robotPose = {x: 0, y: 0, theta: 0};
+            window.slamPath = [];
+            window.slamPoints = [];
+            drawSLAMMap();
+        }
+
+        function updateSLAMParam(param) {
+            const slider = document.getElementById(`param-slider-${param}`);
+            const label = document.getElementById(`param-val-${param}`);
+            if (slider && label) {
+                if (param === 'resolution') {
+                    label.textContent = `${(slider.value / 100).toFixed(2)}m`;
+                } else if (param === 'inflation') {
+                    label.textContent = `${(slider.value / 100).toFixed(2)}m`;
+                } else {
+                    label.textContent = `${slider.value}%`;
+                }
+            }
+        }
+
+        function saveSLAMParameters() {
+            alert("Paramètres SLAM appliqués temporairement au visualiseur.");
+            drawSLAMMap();
+        }
+
+        // Periodic drawing loop
+        setInterval(() => {
+            if (activeTab === 'diagnostics') {
+                drawMinimap();
+            } else if (activeTab === 'map') {
+                drawSLAMMap();
+            }
+        }, 250);
 
         // ─── MOBILE SIDEBAR ACTIONS ───────────────────────────────────────────
 
@@ -2028,7 +3230,10 @@ def dashboard():
                 'dashboard': { title: "Vue d'ensemble", subtitle: "Statistiques en direct et flux caméras du robot Bastet." },
                 'users': { title: "Comptes & MyGES", subtitle: "Gérer les profils utilisateurs et leurs identifiants d'agenda." },
                 'faces': { title: "Galerie Visages", subtitle: "Gérer les visages enregistrés pour la reconnaissance faciale." },
-                'system': { title: "Système & Updates", subtitle: "Suivi des mises à jour logicielles et des services ROS." }
+                'system': { title: "Système & Updates", subtitle: "Suivi des mises à jour logicielles et des services ROS." },
+                'chat': { title: "Chat & Contrôle IA", subtitle: "Dialogue temps réel avec le robot et supervision de l'IA." },
+                'diagnostics': { title: "Arduino & Calib", subtitle: "Télémétrie des moteurs, gyroscope de l'IMU et calibrages." },
+                'map': { title: "SLAM & Map", subtitle: "Navigation cartographique, nuage de points et paramètres d'évitement." }
             };
 
             const headerInfo = titles[tabId] || titles['dashboard'];
@@ -2040,6 +3245,10 @@ def dashboard():
             } else if (tabId === 'faces') {
                 closeFolderDetails();
                 loadFacesGallery();
+            } else if (tabId === 'diagnostics') {
+                setTimeout(drawMinimap, 100);
+            } else if (tabId === 'map') {
+                setTimeout(drawSLAMMap, 100);
             }
         }
 
@@ -2052,7 +3261,6 @@ def dashboard():
                 if (res.ok) {
                     const state = await res.json();
                     
-                    // Update robot online badge
                     const robotBadge = document.getElementById('robot-status-badge');
                     const robotStatus = state.robot_status || 'offline';
                     
@@ -2067,7 +3275,6 @@ def dashboard():
                         robotBadge.textContent = 'Hors-ligne';
                     }
 
-                    // Update Gauges
                     const sensors = state.sensors || {};
                     const cpu = sensors.cpu_percent || 0;
                     const ram = sensors.ram_percent || 0;
@@ -2079,10 +3286,9 @@ def dashboard():
                     updateGaugeCircle('gauge-ram', ram);
                     document.getElementById('gauge-ram-val').textContent = `${Math.round(ram)}%`;
 
-                    updateGaugeCircle('gauge-temp', (temp / 100) * 100); // assume max temp 100C for percentage representation
+                    updateGaugeCircle('gauge-temp', (temp / 100) * 100);
                     document.getElementById('gauge-temp-val').textContent = `${Math.round(temp)}°C`;
 
-                    // Other sensors metadata
                     document.getElementById('sensor-seen-person').textContent = state.seen_person || 'Personne';
                     document.getElementById('sensor-seen-objects').textContent = (state.seen_objects && state.seen_objects.length > 0) ? state.seen_objects.join(', ') : 'Aucun';
                     document.getElementById('sensor-version').textContent = state.robot_version || 'v0.0.0';
@@ -2094,7 +3300,6 @@ def dashboard():
                         document.getElementById('sensor-last-seen').textContent = '--';
                     }
 
-                    // ROS service badge
                     const serviceBadge = document.getElementById('spotbot-service-badge');
                     const isSpotbotActive = sensors.spotbot_service_active;
                     const btnStart = document.getElementById('btn-start-spotbot');
@@ -2116,55 +3321,6 @@ def dashboard():
                     } else {
                         serviceBadge.textContent = 'Inconnu';
                         serviceBadge.className = 'status-badge';
-                        if (btnStart) btnStart.style.display = '';
-                        if (btnStop) btnStop.style.display = '';
-                        if (btnRestart) btnRestart.style.display = '';
-                    }
-                    
-                    // Live Chat messages display
-                    const chatContainer = document.getElementById('chat-messages-box');
-                    if (chatContainer && state.last_chat) {
-                        const chatHash = JSON.stringify(state.last_chat);
-                        if (chatContainer.dataset.lastHash !== chatHash) {
-                            chatContainer.dataset.lastHash = chatHash;
-                            chatContainer.innerHTML = '';
-                            if (state.last_chat.length === 0) {
-                                chatContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;">Aucune conversation en cours.</div>`;
-                            } else {
-                                state.last_chat.forEach(msg => {
-                                    const role = msg.role || msg.sender || 'user';
-                                    const text = msg.content || msg.text || '';
-                                    
-                                    const isRobot = role.toLowerCase() === 'assistant' || role.toLowerCase() === 'bot' || role.toLowerCase() === 'robot';
-                                    
-                                    const bubble = document.createElement('div');
-                                    bubble.style.display = 'flex';
-                                    bubble.style.flexDirection = 'column';
-                                    bubble.style.alignItems = isRobot ? 'flex-start' : 'flex-end';
-                                    bubble.style.marginBottom = '0.75rem';
-                                    
-                                    const senderName = isRobot ? 'Bastet' : 'Utilisateur';
-                                    const senderColor = isRobot ? '#a5b4fc' : 'var(--text-secondary)';
-                                    
-                                    bubble.innerHTML = `
-                                        <span style="font-size: 0.7rem; color: ${senderColor}; margin-bottom: 0.15rem; font-weight: 600; padding: 0 0.25rem;">${senderName}</span>
-                                        <div style="background-color: ${isRobot ? 'rgba(99, 102, 241, 0.15)' : 'var(--border-color)'}; 
-                                                    border: 1px solid ${isRobot ? 'rgba(99, 102, 241, 0.3)' : 'transparent'};
-                                                    color: var(--text-primary);
-                                                    padding: 0.6rem 0.85rem;
-                                                    border-radius: 12px;
-                                                    max-width: 85%;
-                                                    font-size: 0.85rem;
-                                                    line-height: 1.4;
-                                                    word-break: break-word;
-                                                    white-space: pre-wrap;">${text}</div>
-                                    `;
-                                    chatContainer.appendChild(bubble);
-                                });
-                                // Scroll to bottom
-                                chatContainer.scrollTop = chatContainer.scrollHeight;
-                            }
-                        }
                     }
                 }
             } catch (e) {
@@ -2174,22 +3330,19 @@ def dashboard():
 
         function updateGaugeCircle(id, val) {
             const el = document.getElementById(id);
-            if (el) {
-                const percent = Math.min(Math.max(val, 0), 100);
-                el.setAttribute('stroke-dasharray', `${percent}, 100`);
-            }
+            if (!el) return;
+            const cappedVal = Math.max(0, Math.min(100, val));
+            el.setAttribute('stroke-dasharray', `${cappedVal}, 100`);
         }
 
         // ─── CAMERA STREAM ON-DEMAND ─────────────────────────────────────────
 
         function stopStreamUI(camId) {
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
-            const iframe = document.getElementById(`stream-iframe-${camId}`);
             const statusEl = document.getElementById(`stream-status-${camId}`);
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
             const videoEl = document.getElementById(`stream-video-${camId}`);
 
-            if (iframe) { iframe.style.display = 'none'; iframe.src = ''; }
             if (videoEl) {
                 if (window.camHls && window.camHls[camId]) {
                     window.camHls[camId].destroy();
@@ -2203,7 +3356,7 @@ def dashboard():
             statusEl.textContent = 'Inactif';
             statusEl.className = 'status-badge';
             btnText.textContent = 'Démarrer le flux';
-            window.camWebsockets[camId] = null;
+            window.activeStreams[camId] = false;
         }
 
         async function startStreamHLS(camId) {
@@ -2212,9 +3365,9 @@ def dashboard():
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
 
             const streamProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+            // MediaMTX HLS proxyed through HTTPS port 48888 or local hostname
             const hlsUrl = `${streamProtocol}//${window.location.hostname}:48888/robot/cam${camId}/index.m3u8`;
 
-            // Créer/récupérer l'élément vidéo
             let videoEl = document.getElementById(`stream-video-${camId}`);
             if (!videoEl) {
                 videoEl = document.createElement('video');
@@ -2227,10 +3380,9 @@ def dashboard():
                 placeholder.parentNode.insertBefore(videoEl, placeholder);
             }
 
-            // Attendre max 12s que le flux soit prêt
             let ready = false;
             const deadline = Date.now() + 12000;
-            while (Date.now() < deadline && window.camWebsockets[camId]) {
+            while (Date.now() < deadline && window.activeStreams[camId]) {
                 try {
                     const r = await fetch(hlsUrl, { method: 'HEAD' });
                     if (r.ok) { ready = true; break; }
@@ -2239,7 +3391,7 @@ def dashboard():
                 statusEl.textContent = `Démarrage… (${Math.ceil((deadline - Date.now()) / 1000)}s)`;
             }
 
-            if (!window.camWebsockets[camId]) return; // Annulé pendant l'attente
+            if (!window.activeStreams[camId]) return;
 
             if (!ready) {
                 statusEl.textContent = 'Flux indisponible';
@@ -2247,13 +3399,11 @@ def dashboard():
                 btnText.textContent = 'Démarrer le flux';
                 placeholder.style.display = 'flex';
                 videoEl.style.display = 'none';
-                // Libérer le WS
-                try { window.camWebsockets[camId].close(); } catch(e) {}
-                window.camWebsockets[camId] = null;
+                try { appWs.send(JSON.stringify({type: "release_camera", camera: camId})); } catch(e) {}
+                window.activeStreams[camId] = false;
                 return;
             }
 
-            // Charger HLS
             placeholder.style.display = 'none';
             videoEl.style.display = 'block';
             statusEl.textContent = 'En direct';
@@ -2267,7 +3417,6 @@ def dashboard():
                 hls.attachMedia(videoEl);
                 hls.on(Hls.Events.ERROR, (event, data) => {
                     if (data.fatal) {
-                        console.error('[HLS fatal]', data);
                         statusEl.textContent = 'Erreur flux';
                         statusEl.className = 'status-badge error';
                     }
@@ -2285,35 +3434,28 @@ def dashboard():
         }
 
         function toggleStream(camId) {
-            const placeholder = document.getElementById(`stream-placeholder-${camId}`);
-            const statusEl = document.getElementById(`stream-status-${camId}`);
-            const btnText = document.getElementById(`stream-btn-text-${camId}`);
-
-            if (!window.camWebsockets[camId]) {
-                // Ouvrir WS pour signaler au robot
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const wsUrl = `${protocol}//${window.location.host}/ws/app?token=${apiToken}`;
-                const ws = new WebSocket(wsUrl);
-
-                statusEl.textContent = 'Connexion…';
-                statusEl.className = 'status-badge';
-                btnText.textContent = 'Couper Caméra';
-
-                ws.onopen = () => {
-                    ws.send(JSON.stringify({type: "request_camera", camera: camId}));
-                    window.camWebsockets[camId] = ws;
+            if (!window.activeStreams) window.activeStreams = { 1: false, 2: false };
+            
+            if (!window.activeStreams[camId]) {
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({type: "request_camera", camera: camId}));
+                    window.activeStreams[camId] = true;
+                    
+                    const statusEl = document.getElementById(`stream-status-${camId}`);
+                    const btnText = document.getElementById(`stream-btn-text-${camId}`);
+                    statusEl.textContent = 'Démarrage…';
+                    statusEl.className = 'status-badge';
+                    btnText.textContent = 'Couper Caméra';
+                    
                     startStreamHLS(camId);
-                };
-
-                ws.onclose = () => stopStreamUI(camId);
-                ws.onerror = () => { ws.close(); stopStreamUI(camId); };
-
-                // Stocker temporairement pour permettre annulation
-                window.camWebsockets[camId] = ws;
+                } else {
+                    alert("WebSocket déconnecté. Impossible d'activer la caméra.");
+                }
             } else {
-                // Couper
-                try { window.camWebsockets[camId].send(JSON.stringify({type: "release_camera", camera: camId})); } catch(e) {}
-                try { window.camWebsockets[camId].close(); } catch(e) {}
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({type: "release_camera", camera: camId}));
+                }
+                window.activeStreams[camId] = false;
                 stopStreamUI(camId);
             }
         }
@@ -2400,8 +3542,7 @@ def dashboard():
         }
 
         async function deleteUser(fullName) {
-            if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?
-(Cela supprimera également ses identifiants MyGES et ses photos de visage)`)) return;
+            if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?\n(Cela supprimera également ses identifiants MyGES et ses photos de visage)`)) return;
             try {
                 const res = await fetch(`/accounts/${encodeURIComponent(fullName)}`, {
                     method: 'DELETE',
@@ -2443,8 +3584,8 @@ def dashboard():
             document.getElementById('form-old-fullname').value = fullName;
             document.getElementById('form-firstname').value = u.first_name || '';
             document.getElementById('form-lastname').value = u.last_name || '';
-            document.getElementById('form-firstname').disabled = true; // Key index part
-            document.getElementById('form-lastname').disabled = true; // Key index part
+            document.getElementById('form-firstname').disabled = true;
+            document.getElementById('form-lastname').disabled = true;
             document.getElementById('form-pseudo').value = u.pseudo || '';
             document.getElementById('form-email').value = u.email || '';
             document.getElementById('form-phone').value = u.phone || '';
@@ -2465,7 +3606,6 @@ def dashboard():
 
         async function handleUserSubmit(e) {
             e.preventDefault();
-            const oldFullName = document.getElementById('form-old-fullname').value;
             const firstName = document.getElementById('form-firstname').value.trim();
             const lastName = document.getElementById('form-lastname').value.trim();
             const pseudo = document.getElementById('form-pseudo').value.trim();
@@ -2500,7 +3640,6 @@ def dashboard():
             }
 
             try {
-                // Save user
                 const res = await fetch('/accounts', {
                     method: 'POST',
                     headers: {
@@ -2581,10 +3720,7 @@ def dashboard():
                     const faces = data.faces || [];
                     facesCached = faces;
                     
-                    // Gather all distinct user names
                     const usersList = Object.keys(accounts);
-                    
-                    // Group faces by user name
                     const grouped = {};
                     usersList.forEach(name => {
                         grouped[name] = [];
@@ -2596,7 +3732,6 @@ def dashboard():
                         grouped[matchedName].push(f);
                     });
 
-                    // Render folders container
                     const foldersContainer = document.getElementById('folders-container');
                     foldersContainer.innerHTML = '';
 
@@ -2631,7 +3766,6 @@ def dashboard():
                         foldersContainer.appendChild(card);
                     });
 
-                    // If a folder is currently open, refresh its contents
                     if (activeFolderName) {
                         const activeUserFaces = grouped[activeFolderName] || [];
                         renderFolderDetails(activeFolderName, activeUserFaces);
@@ -2644,12 +3778,9 @@ def dashboard():
 
         function openFolderDetails(name, userFaces) {
             activeFolderName = name;
-            
             document.getElementById('faces-folders-view').style.display = 'none';
             document.getElementById('faces-details-view').classList.add('active');
-            
             document.getElementById('current-folder-username-label').textContent = name;
-            
             renderFolderDetails(name, userFaces);
         }
 
@@ -2688,7 +3819,6 @@ def dashboard():
                 `;
                 grid.appendChild(card);
                 
-                // Load image with Authorization Headers
                 fetch(`/faces/${f.id}/image`, { headers: { 'X-API-Token': apiToken } })
                     .then(res => res.blob())
                     .then(blob => {
@@ -2716,7 +3846,6 @@ def dashboard():
             }
         }
 
-        // Upload faces
         let currentUploadFile = null;
         
         function triggerFaceUpload() {
@@ -2817,7 +3946,6 @@ def dashboard():
                     const gw = await gatewayRes.json();
                     const gwUpToDate = gw.current_version && gw.latest_version && gw.current_version === gw.latest_version;
                     const gwStatusLower = (gw.status || '').toLowerCase();
-                    // Corriger l'affichage si failed mais déjà à jour
                     let gwDisplayStatus = gw.status || 'Prêt';
                     if (gwStatusLower.includes('failed') && gwUpToDate) gwDisplayStatus = 'À jour';
 
@@ -2830,10 +3958,8 @@ def dashboard():
                     const gwInProgress = gw.status &&
                         !gwStatusLower.includes('idle') &&
                         !gwStatusLower.includes('prêt') &&
-                        !gwStatusLower.includes('pret') &&
                         !gwStatusLower.includes('done') &&
                         !gwStatusLower.includes('failed') &&
-                        !gwStatusLower.includes('error') &&
                         gw.percent < 100;
 
                     const gwBtn = document.getElementById('btn-update-gateway');
@@ -2841,7 +3967,6 @@ def dashboard():
                     if (gwBtn) {
                         gwBtn.disabled = gwInProgress;
                         gwBtn.style.opacity = gwInProgress ? '0.5' : '1';
-                        gwBtn.style.pointerEvents = gwInProgress ? 'none' : 'auto';
                     }
                     if (gwBtnText) {
                         gwBtnText.textContent = gwUpToDate ? 'Réinstaller la Gateway' : 'Lancer la mise à jour Gateway';
@@ -2852,7 +3977,6 @@ def dashboard():
                     const rb = await robotRes.json();
                     const rbUpToDate = rb.current_version && rb.latest_version && rb.current_version === rb.latest_version;
                     const rbStatusLower = (rb.status || '').toLowerCase();
-                    // Corriger l'affichage si failed mais déjà à jour
                     let rbDisplayStatus = rb.status || 'Prêt';
                     if (rbStatusLower.includes('failed') && rbUpToDate) rbDisplayStatus = 'À jour';
 
@@ -2865,10 +3989,8 @@ def dashboard():
                     const rbInProgress = rb.status &&
                         !rbStatusLower.includes('idle') &&
                         !rbStatusLower.includes('prêt') &&
-                        !rbStatusLower.includes('pret') &&
                         !rbStatusLower.includes('done') &&
                         !rbStatusLower.includes('failed') &&
-                        !rbStatusLower.includes('error') &&
                         rb.percent < 100;
 
                     const rbBtn = document.getElementById('btn-update-robot');
@@ -2876,7 +3998,6 @@ def dashboard():
                     if (rbBtn) {
                         rbBtn.disabled = rbInProgress;
                         rbBtn.style.opacity = rbInProgress ? '0.5' : '1';
-                        rbBtn.style.pointerEvents = rbInProgress ? 'none' : 'auto';
                     }
                     if (rbBtnText) {
                         rbBtnText.textContent = rbUpToDate ? 'Réinstaller le Robot' : 'Lancer la mise à jour Robot';
@@ -2899,10 +4020,8 @@ def dashboard():
                     const ardInProgress = ard.status &&
                         !ardStatusLower.includes('idle') &&
                         !ardStatusLower.includes('prêt') &&
-                        !ardStatusLower.includes('pret') &&
                         !ardStatusLower.includes('done') &&
                         !ardStatusLower.includes('failed') &&
-                        !ardStatusLower.includes('error') &&
                         ard.percent < 100;
 
                     const ardBtn = document.getElementById('btn-update-arduino');
@@ -2910,7 +4029,6 @@ def dashboard():
                     if (ardBtn) {
                         ardBtn.disabled = ardInProgress;
                         ardBtn.style.opacity = ardInProgress ? '0.5' : '1';
-                        ardBtn.style.pointerEvents = ardInProgress ? 'none' : 'auto';
                     }
                     if (ardBtnText) {
                         ardBtnText.textContent = ardUpToDate ? "Réinstaller le Code Arduino" : "Reflasher l'Arduino";
@@ -2945,37 +4063,23 @@ def dashboard():
         async function controlRobotService(action) {
             if (!confirm(`Confirmer l'opération '${action}' sur le service spotbot ?`)) return;
             try {
-                // Sent as a websocket action or general command through app gateway route to robot
-                // Spotbot agent triggers this when receiving commands from ws. We send a ws command
-                const ws = window.camWebsockets[1] || window.camWebsockets[2];
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "service_control", service: "spotbot", action: action }));
-                    alert(`Commande '${action}' envoyée au robot.`);
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "service_control", service: "spotbot", action: action }));
+                    alert(`Commande '${action}' envoyée.`);
                 } else {
-                    // Open a temporary websocket to send the command
-                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    const wsUrl = `${protocol}//${window.location.host}/ws/app?token=${apiToken}`;
-                    const tmpWs = new WebSocket(wsUrl);
-                    tmpWs.onopen = () => {
-                        tmpWs.send(JSON.stringify({ type: "service_control", service: "spotbot", action: action }));
-                        alert(`Commande '${action}' envoyée.`);
-                        setTimeout(() => tmpWs.close(), 500);
-                    };
-                    tmpWs.onerror = () => {
-                        alert("Erreur de connexion WebSocket temporaire pour la commande.");
-                    };
+                    alert("WebSocket déconnecté. Impossible d'envoyer la commande.");
                 }
             } catch (e) {
                 alert('Erreur lors du contrôle.');
             }
         }
 
-        // Start checking auth on load
         checkAuth();
     </script>
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
 
 
 
