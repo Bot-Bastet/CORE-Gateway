@@ -138,13 +138,22 @@ class PreferencesUpdate(BaseModel):
 
 def load_json(path: Path, default=None):
     if path.exists():
-        with open(path, "r") as f:
-            return json.load(f)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[load_json] Error loading {path}: {e}")
     return default if default is not None else []
 
 def save_json(path: Path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        import os
+        os.replace(tmp_path, path)
+    except Exception as e:
+        print(f"[save_json] Error saving {path}: {e}")
 
 def find_entry(face_id: str) -> Optional[dict]:
     return next((e for e in load_json(META_FILE) if e["id"] == face_id), None)
@@ -255,9 +264,7 @@ async def websocket_robot(websocket: WebSocket, token: Optional[str] = Query(Non
             except Exception as e:
                 print(f"Erreur injection contexte : {e}")
                 
-            # Cache the latest telemetry diagnostics
             try:
-                import json
                 msg_json = json.loads(data)
                 if msg_json.get("type") == "telemetry_diagnostics":
                     global latest_diagnostics
@@ -2529,9 +2536,9 @@ def dashboard():
         function startIntervals() {
             clearIntervals();
             fetchTelemetry();
-            fetchUpdatesProgress();
+            fetchUpdatesProgress(true);
             telemetryInterval = setInterval(fetchTelemetry, 2000);
-            updateInterval = setInterval(fetchUpdatesProgress, 2000);
+            updateInterval = setInterval(() => fetchUpdatesProgress(false), 2000);
         }
 
         function clearIntervals() {
@@ -3430,16 +3437,11 @@ def dashboard():
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
             const statusEl = document.getElementById(`stream-status-${camId}`);
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
-            const videoEl = document.getElementById(`stream-video-${camId}`);
+            const iframeEl = document.getElementById(`stream-iframe-${camId}`);
 
-            if (videoEl) {
-                if (window.camHls && window.camHls[camId]) {
-                    window.camHls[camId].destroy();
-                    window.camHls[camId] = null;
-                }
-                videoEl.pause();
-                videoEl.src = '';
-                videoEl.style.display = 'none';
+            if (iframeEl) {
+                iframeEl.src = '';
+                iframeEl.style.display = 'none';
             }
             placeholder.style.display = 'flex';
             statusEl.textContent = 'Inactif';
@@ -3448,78 +3450,30 @@ def dashboard():
             window.activeStreams[camId] = false;
         }
 
-        async function startStreamHLS(camId) {
+        function startStreamWebRTC(camId) {
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
             const statusEl = document.getElementById(`stream-status-${camId}`);
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
+            const iframeEl = document.getElementById(`stream-iframe-${camId}`);
 
             const streamProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-            // MediaMTX HLS proxyed through HTTPS port 48888 or local hostname
-            const hlsUrl = `${streamProtocol}//${window.location.hostname}:48888/robot/cam${camId}/index.m3u8`;
+            // WebRTC Signaling and Player proxied through port 48889 via HTTPS
+            const webrtcUrl = `${streamProtocol}//${window.location.hostname}:48889/robot/cam${camId}`;
 
-            let videoEl = document.getElementById(`stream-video-${camId}`);
-            if (!videoEl) {
-                videoEl = document.createElement('video');
-                videoEl.id = `stream-video-${camId}`;
-                videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:none;border-radius:0;';
-                videoEl.muted = true;
-                videoEl.autoplay = true;
-                videoEl.controls = true;
-                videoEl.playsInline = true;
-                placeholder.parentNode.insertBefore(videoEl, placeholder);
-            }
+            statusEl.textContent = 'Démarrage…';
+            statusEl.className = 'status-badge';
 
-            let ready = false;
-            const deadline = Date.now() + 12000;
-            while (Date.now() < deadline && window.activeStreams[camId]) {
-                try {
-                    const r = await fetch(hlsUrl, { method: 'HEAD' });
-                    if (r.ok) { ready = true; break; }
-                } catch(e) {}
-                await new Promise(res => setTimeout(res, 1500));
-                statusEl.textContent = `Démarrage… (${Math.ceil((deadline - Date.now()) / 1000)}s)`;
-            }
-
-            if (!window.activeStreams[camId]) return;
-
-            if (!ready) {
-                statusEl.textContent = 'Flux indisponible';
-                statusEl.className = 'status-badge error';
-                btnText.textContent = 'Démarrer le flux';
-                placeholder.style.display = 'flex';
-                videoEl.style.display = 'none';
-                try { appWs.send(JSON.stringify({type: "release_camera", camera: camId})); } catch(e) {}
-                window.activeStreams[camId] = false;
-                return;
-            }
-
-            placeholder.style.display = 'none';
-            videoEl.style.display = 'block';
-            statusEl.textContent = 'En direct';
-            statusEl.className = 'status-badge active';
-            btnText.textContent = 'Couper Caméra';
-
-            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-                if (window.camHls && window.camHls[camId]) window.camHls[camId].destroy();
-                const hls = new Hls({ lowLatencyMode: true, backBufferLength: 5 });
-                hls.loadSource(hlsUrl);
-                hls.attachMedia(videoEl);
-                hls.on(Hls.Events.ERROR, (event, data) => {
-                    if (data.fatal) {
-                        statusEl.textContent = 'Erreur flux';
-                        statusEl.className = 'status-badge error';
-                    }
-                });
-                window.camHls = window.camHls || {};
-                window.camHls[camId] = hls;
-                videoEl.play().catch(e => console.warn('Autoplay blocked:', e));
-            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                videoEl.src = hlsUrl;
-                videoEl.play().catch(e => console.warn('Autoplay blocked:', e));
-            } else {
-                statusEl.textContent = 'Navigateur non supporté';
-                statusEl.className = 'status-badge error';
-            }
+            setTimeout(() => {
+                if (!window.activeStreams[camId]) return;
+                if (iframeEl) {
+                    iframeEl.src = webrtcUrl;
+                    iframeEl.style.display = 'block';
+                }
+                placeholder.style.display = 'none';
+                statusEl.textContent = 'En direct';
+                statusEl.className = 'status-badge active';
+                btnText.textContent = 'Couper Caméra';
+            }, 3500);
         }
 
         function toggleStream(camId) {
@@ -3536,7 +3490,7 @@ def dashboard():
                     statusEl.className = 'status-badge';
                     btnText.textContent = 'Couper Caméra';
                     
-                    startStreamHLS(camId);
+                    startStreamWebRTC(camId);
                 } else {
                     alert("WebSocket déconnecté. Impossible d'activer la caméra.");
                 }
@@ -4025,13 +3979,14 @@ def dashboard():
 
         // ─── UPDATER & SERVICES ───────────────────────────────────────────────
 
-        async function fetchUpdatesProgress() {
+        async function fetchUpdatesProgress(force = false) {
             let rbInProgress = false;
             let ardInProgress = false;
             try {
-                const gatewayRes = await fetch('/system/update/gateway/progress', { headers: { 'X-API-Token': apiToken } });
-                const robotRes = await fetch('/system/update/robot/progress', { headers: { 'X-API-Token': apiToken } });
-                const arduinoRes = await fetch('/system/update/arduino/progress', { headers: { 'X-API-Token': apiToken } });
+                const forceParam = force ? '?force=true' : '';
+                const gatewayRes = await fetch(`/system/update/gateway/progress${forceParam}`, { headers: { 'X-API-Token': apiToken } });
+                const robotRes = await fetch(`/system/update/robot/progress${forceParam}`, { headers: { 'X-API-Token': apiToken } });
+                const arduinoRes = await fetch(`/system/update/arduino/progress${forceParam}`, { headers: { 'X-API-Token': apiToken } });
 
                 if (gatewayRes.ok) {
                     const gw = await gatewayRes.json();
@@ -4185,7 +4140,7 @@ def dashboard():
                     headers: { 'X-API-Token': apiToken }
                 });
                 if (res.ok) {
-                    fetchUpdatesProgress();
+                    fetchUpdatesProgress(true);
                 } else {
                     alert('Impossible de démarrer la mise à jour.');
                 }
@@ -4394,16 +4349,20 @@ def get_state():
 # ─── System Updates API ───────────────────────────────────────────────────────
 GITHUB_RELEASES_CACHE = {} # repo_name -> (tag_name, timestamp)
 
-def get_cached_latest_release(repo: str) -> str:
+def get_cached_latest_release(repo: str, force: bool = False) -> str:
     now = time.time()
-    if repo in GITHUB_RELEASES_CACHE:
+    if not force and repo in GITHUB_RELEASES_CACHE:
         tag, cached_time = GITHUB_RELEASES_CACHE[repo]
         if now - cached_time < 300: # 5 minutes cache
             return tag
             
     try:
         url = f"https://api.github.com/repos/{repo}/releases/latest"
-        resp = requests.get(url, timeout=3, headers={"Accept": "application/vnd.github+json"})
+        headers = {"Accept": "application/vnd.github+json"}
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            headers["Authorization"] = f"token {token}"
+        resp = requests.get(url, timeout=3, headers=headers)
         if resp.status_code == 200:
             tag = resp.json().get("tag_name", "v0.0.0")
             GITHUB_RELEASES_CACHE[repo] = (tag, now)
@@ -4441,7 +4400,7 @@ async def trigger_gateway_update():
     return {"status": "triggered"}
 
 @app.get("/system/update/gateway/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Gateway", dependencies=[Depends(verify_token)])
-def get_gateway_update_progress():
+def get_gateway_update_progress(force: bool = False):
     progress = load_json(GATEWAY_UPDATE_FILE, default={"status": "idle", "percent": 100})
     if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and GATEWAY_UPDATE_FILE.exists():
         mtime = GATEWAY_UPDATE_FILE.stat().st_mtime
@@ -4450,7 +4409,7 @@ def get_gateway_update_progress():
             save_json(GATEWAY_UPDATE_FILE, progress)
     from updater import get_current_version
     progress["current_version"] = get_current_version()
-    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE-Gateway")
+    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE-Gateway", force=force)
     return progress
 
 @app.post("/system/update/gateway/progress", tags=["System Update"], summary="Mettre à jour le progrès Gateway", dependencies=[Depends(verify_token)])
@@ -4476,7 +4435,7 @@ async def update_robot_progress(progress: UpdateProgress):
     return {"status": "ok"}
 
 @app.get("/system/update/robot/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour robot", dependencies=[Depends(verify_token)])
-def get_robot_update_progress():
+def get_robot_update_progress(force: bool = False):
     progress = load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
     if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and ROBOT_UPDATE_FILE.exists():
         mtime = ROBOT_UPDATE_FILE.stat().st_mtime
@@ -4485,7 +4444,7 @@ def get_robot_update_progress():
             save_json(ROBOT_UPDATE_FILE, progress)
     state = load_json(STATE_FILE, default={})
     progress["current_version"] = state.get("robot_version", "v0.0.0")
-    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")
+    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE", force=force)
     return progress
 
 @app.post("/system/update/arduino", tags=["System Update"], summary="Lancer la mise à jour de l'Arduino", dependencies=[Depends(verify_token)])
@@ -4504,7 +4463,7 @@ async def update_arduino_progress(progress: UpdateProgress):
     return {"status": "ok"}
 
 @app.get("/system/update/arduino/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Arduino", dependencies=[Depends(verify_token)])
-def get_arduino_update_progress():
+def get_arduino_update_progress(force: bool = False):
     progress = load_json(ARDUINO_UPDATE_FILE, default={"status": "idle", "percent": 100})
     if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and ARDUINO_UPDATE_FILE.exists():
         mtime = ARDUINO_UPDATE_FILE.stat().st_mtime
@@ -4513,7 +4472,7 @@ def get_arduino_update_progress():
             save_json(ARDUINO_UPDATE_FILE, progress)
     state = load_json(STATE_FILE, default={})
     progress["current_version"] = state.get("arduino_version", "v0.0.0")
-    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")
+    progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE", force=force)
     return progress
 
 # ─── System ───────────────────────────────────────────────────────────────────
