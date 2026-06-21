@@ -119,19 +119,28 @@ Permet de suivre en temps réel ce que voit et fait le robot.
   "seen_objects": ["liste", "objets", "detectes"],
   "last_chat": [{"role": "user", "content": "..."}],
   "robot_status": "online / hibernating / offline",
-  "robot_version": "v0.1.6",
+  "active_streams": {
+    "1": true,
+    "2": false
+  },
+  "robot_version": "v0.2.1",
+  "arduino_version": "v0.0.0",
   "sensors": {
-    "system": {
-      "cpu_temp": 45.2,
-      "cpu_load_1m": 0.8,
-      "ram_total_mb": 8192,
-      "ram_used_mb": 2048,
-      "ram_percent": 25.0
-    },
+    "cpu_percent": 45,
+    "ram_percent": 25.0,
+    "temp_c": 65.0,
+    "spotbot_service_active": true,
     "spotbot_service": "active / inactive",
     "cam1_connected": true,
     "cam2_connected": false,
-    "arduino_connected": true
+    "arduino_connected": true,
+    "system": {
+      "cpu_temp": 65.0,
+      "cpu_load_1m": 1.8,
+      "ram_total_mb": 8062,
+      "ram_used_mb": 2048,
+      "ram_percent": 25.0
+    }
   },
   "ai_state": {
     "tts": "robot / node / disabled",
@@ -154,6 +163,7 @@ Lance la mise à jour sur la Gateway (redémarre le conteneur).
 
 ### **GET `/system/update/gateway/progress`**
 Récupère le statut de progression de la Gateway.
+- **Query Parameter (facultatif)** : `?force=true` (force le contournement du cache local et interroge l'API GitHub directement pour actualiser la version).
 ```json
 {
   "status": "idle / downloading / extracting / done / failed",
@@ -169,6 +179,7 @@ Déclenche la mise à jour du robot via WebSocket.
 
 ### **GET `/system/update/robot/progress`**
 Récupère la progression de la mise à jour du robot (compilation `colcon build`).
+- **Query Parameter (facultatif)** : `?force=true` (force le contournement du cache local et interroge l'API GitHub directement).
 
 ### **POST `/system/update/robot/progress`**
 Permet au robot de notifier son état et sa progression de mise à jour.
@@ -178,6 +189,7 @@ Déclenche le flashage du code sur l'Arduino Mega (uniquement si le robot est en
 
 ### **GET `/system/update/arduino/progress`**
 Récupère le statut et la progression du flashage Arduino.
+- **Query Parameter (facultatif)** : `?force=true` (force le contournement du cache local).
 
 ### **POST `/system/update/arduino/progress`**
 Permet au robot de notifier l'avancement du flash de l'Arduino.

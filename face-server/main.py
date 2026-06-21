@@ -201,13 +201,38 @@ active_camera_listeners = {
     2: set()
 }
 
+stream_active = {
+    1: False,
+    2: False
+}
+
+stream_v_slam = {
+    1: False,
+    2: False
+}
+
+camera_stop_timers = {
+    1: None,
+    2: None
+}
+
+async def stop_camera_delayed(cam_id: int):
+    await asyncio.sleep(30)
+    if len(active_camera_listeners[cam_id]) == 0:
+        stream_active[cam_id] = False
+        await manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot")
+        await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": False}), "app")
+        print(f"[Gateway] Camera {cam_id} stopped after 30 seconds of inactivity.")
+
 def cleanup_camera_listeners(websocket: WebSocket):
     import asyncio
     for cam_id in [1, 2]:
         if websocket in active_camera_listeners[cam_id]:
             active_camera_listeners[cam_id].remove(websocket)
             if len(active_camera_listeners[cam_id]) == 0:
-                asyncio.create_task(manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot"))
+                if camera_stop_timers[cam_id] is not None:
+                    camera_stop_timers[cam_id].cancel()
+                camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id))
 
 class ConnectionManager:
     def __init__(self):
@@ -296,15 +321,25 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
                 msg_type = msg_json.get("type")
                 if msg_type == "request_camera":
                     cam_id = msg_json.get("camera", 1)
+                    v_slam = msg_json.get("v_slam", False)
                     active_camera_listeners[cam_id].add(websocket)
-                    if len(active_camera_listeners[cam_id]) == 1:
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id}), "robot")
+                    if camera_stop_timers[cam_id] is not None:
+                        camera_stop_timers[cam_id].cancel()
+                        camera_stop_timers[cam_id] = None
+                    v_slam_changed = (stream_v_slam[cam_id] != v_slam)
+                    stream_v_slam[cam_id] = v_slam
+                    if not stream_active[cam_id] or v_slam_changed:
+                        stream_active[cam_id] = True
+                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
+                        await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
                 elif msg_type == "release_camera":
                     cam_id = msg_json.get("camera", 1)
                     if websocket in active_camera_listeners[cam_id]:
                         active_camera_listeners[cam_id].remove(websocket)
                         if len(active_camera_listeners[cam_id]) == 0:
-                            await manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot")
+                            if camera_stop_timers[cam_id] is not None:
+                                camera_stop_timers[cam_id].cancel()
+                            camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id))
             except Exception:
                 pass
                 
@@ -322,6 +357,10 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
         return
 
     await manager.connect(websocket, "app")
+    # Envoi de l'état initial des caméras au client qui se connecte
+    for cam_id in [1, 2]:
+        is_active = len(active_camera_listeners[cam_id]) > 0 or stream_active[cam_id]
+        await websocket.send_json({"type": "stream_status", "camera": cam_id, "active": is_active})
     try:
         while True:
             data = await websocket.receive_text()
@@ -332,15 +371,25 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                 msg_type = msg_json.get("type")
                 if msg_type == "request_camera":
                     cam_id = msg_json.get("camera", 1)
+                    v_slam = msg_json.get("v_slam", False)
                     active_camera_listeners[cam_id].add(websocket)
-                    if len(active_camera_listeners[cam_id]) == 1:
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id}), "robot")
+                    if camera_stop_timers[cam_id] is not None:
+                        camera_stop_timers[cam_id].cancel()
+                        camera_stop_timers[cam_id] = None
+                    v_slam_changed = (stream_v_slam[cam_id] != v_slam)
+                    stream_v_slam[cam_id] = v_slam
+                    if not stream_active[cam_id] or v_slam_changed:
+                        stream_active[cam_id] = True
+                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
+                        await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
                 elif msg_type == "release_camera":
                     cam_id = msg_json.get("camera", 1)
                     if websocket in active_camera_listeners[cam_id]:
                         active_camera_listeners[cam_id].remove(websocket)
                         if len(active_camera_listeners[cam_id]) == 0:
-                            await manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot")
+                            if camera_stop_timers[cam_id] is not None:
+                                camera_stop_timers[cam_id].cancel()
+                            camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id))
             except Exception:
                 pass
                 
@@ -759,12 +808,102 @@ def dashboard():
             transform: scale(1.1);
         }
 
-        .stream-iframe {
+        .video-container {
             width: 100%;
             height: 280px;
-            border: none;
             background-color: #000;
+            position: relative;
             display: none;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+
+        .video-container:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #000;
+        }
+
+        .video-container:fullscreen .stream-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .stream-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .stream-loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(9, 9, 11, 0.85);
+            color: var(--text-primary);
+            gap: 12px;
+            z-index: 10;
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .video-fs-btn {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            width: 36px;
+            height: 36px;
+            background-color: rgba(24, 24, 27, 0.6);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 12;
+            transition: all 0.2s ease;
+            opacity: 0.8;
+        }
+
+        .video-fs-btn:hover {
+            opacity: 1;
+            transform: scale(1.05);
+            background-color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .video-fs-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .stream-controls {
@@ -1681,18 +1820,35 @@ def dashboard():
             </div>
             <div class="stream-grid">
                 <!-- Caméra 1 -->
-                <div class="stream-card">
+                <div id="stream-card-1" class="stream-card">
                     <div id="stream-placeholder-1" class="stream-placeholder" onclick="toggleStream(1)">
                         <svg viewBox="0 0 24 24">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
-                        <span>Cliquer pour activer Caméra 1 (Avant)</span>
+                        <span>Cliquer pour activer Caméra Gauche</span>
                     </div>
-                    <iframe id="stream-iframe-1" class="stream-iframe"></iframe>
+                    <div id="video-container-1" class="video-container">
+                        <video id="video-cam-1" class="stream-video" autoplay playsinline muted></video>
+                        <div id="stream-loader-1" class="stream-loader">
+                            <div class="spinner"></div>
+                            <span style="font-size: 0.9rem; font-weight: 500;">Connexion au flux WebRTC...</span>
+                        </div>
+                        <button id="video-fs-btn-1" class="video-fs-btn" onclick="toggleFullscreen(1)" title="Plein écran">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                            </svg>
+                        </button>
+                    </div>
                     <div class="stream-controls">
-                        <div>
-                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra 1 — Avant</h4>
-                            <span id="stream-status-1" class="status-badge">Inactif</span>
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra Gauche</h4>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span id="stream-status-1" class="status-badge">Inactif</span>
+                                <label class="vslam-toggle" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                                    <input type="checkbox" id="stream-v-slam-1" style="accent-color: var(--accent); width:14px; height:14px;" onchange="handleVSlamToggleChange()">
+                                    <span id="vslam-text-mode">Superposer V-SLAM Mono</span>
+                                </label>
+                            </div>
                         </div>
                         <button class="btn btn-secondary" onclick="toggleStream(1)">
                             <span id="stream-btn-text-1">Démarrer le flux</span>
@@ -1701,17 +1857,28 @@ def dashboard():
                 </div>
 
                 <!-- Caméra 2 -->
-                <div class="stream-card">
+                <div id="stream-card-2" class="stream-card">
                     <div id="stream-placeholder-2" class="stream-placeholder" onclick="toggleStream(2)">
                         <svg viewBox="0 0 24 24">
                             <polygon points="5 3 19 12 5 21 5 3"/>
                         </svg>
-                        <span>Cliquer pour activer Caméra 2 (Arrière)</span>
+                        <span>Cliquer pour activer Caméra Droite</span>
                     </div>
-                    <iframe id="stream-iframe-2" class="stream-iframe"></iframe>
+                    <div id="video-container-2" class="video-container">
+                        <video id="video-cam-2" class="stream-video" autoplay playsinline muted></video>
+                        <div id="stream-loader-2" class="stream-loader">
+                            <div class="spinner"></div>
+                            <span style="font-size: 0.9rem; font-weight: 500;">Connexion au flux WebRTC...</span>
+                        </div>
+                        <button id="video-fs-btn-2" class="video-fs-btn" onclick="toggleFullscreen(2)" title="Plein écran">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                            </svg>
+                        </button>
+                    </div>
                     <div class="stream-controls">
                         <div>
-                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra 2 — Autre angle</h4>
+                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra Droite</h4>
                             <span id="stream-status-2" class="status-badge">Inactif</span>
                         </div>
                         <button class="btn btn-secondary" onclick="toggleStream(2)">
@@ -2315,17 +2482,17 @@ def dashboard():
                     <div class="card" style="margin: 0; background-color: rgba(255,255,255,0.01);">
                         <div class="card-title" style="font-size:0.95rem;">Configuration des Caméras</div>
                         <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.5rem;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div id="calib-cam-container-1" style="display:flex; justify-content:space-between; align-items:center;">
                                 <div>
-                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra 1 (Avant)</span>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
                                     <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
                                 </div>
                                 <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
                             </div>
                             
-                            <div style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                            <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                                 <div>
-                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra 2 (Arrière)</span>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Droite</span>
                                     <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
                                 </div>
                                 <input type="checkbox" style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-2" onchange="toggleCalibCamera(2)"/>
@@ -2468,6 +2635,9 @@ def dashboard():
         let facesCached = [];
         let appWs = null;
         window.activeStreams = { 1: false, 2: false };
+        window.localViewing = { 1: false, 2: false };
+        window.userClosedStream = { 1: false, 2: false };
+        let peerConnections = { 1: null, 2: null };
         
         // SLAM / Map variables
         window.slamGrid = null;
@@ -2596,6 +2766,9 @@ def dashboard():
                 logToJSONConsole(JSON.stringify(payload, null, 2));
                 
                 if (payload.type === "telemetry_diagnostics") {
+                    if (payload.cameras) {
+                        updateCameraModularity(payload.cameras.cam1 === true, payload.cameras.cam2 === true);
+                    }
                     if (payload.ai_state) {
                         updateAIControlUI('tts', payload.ai_state.tts);
                         updateAIControlUI('stt', payload.ai_state.stt);
@@ -2661,7 +2834,42 @@ def dashboard():
                     if (payload.path) {
                         window.slamPath = payload.path;
                     }
-                } 
+                }
+                else if (payload.type === "stream_status") {
+                    const camId = parseInt(payload.camera);
+                    const isActive = payload.active === true;
+                    if (!window.activeStreams) window.activeStreams = { 1: false, 2: false };
+                    
+                    const wasActive = window.activeStreams[camId];
+                    window.activeStreams[camId] = isActive;
+                    
+                    if (isActive && !wasActive) {
+                        if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
+                        window.userClosedStream[camId] = false;
+                    }
+                    
+                    const statusEl = document.getElementById(`stream-status-${camId}`);
+                    const btnText = document.getElementById(`stream-btn-text-${camId}`);
+                    
+                    if (!isActive && window.localViewing && window.localViewing[camId]) {
+                        window.localViewing[camId] = false;
+                        stopStreamUI(camId);
+                    }
+                    
+                    if (!window.localViewing || !window.localViewing[camId]) {
+                        if (statusEl) {
+                            statusEl.textContent = isActive ? 'En direct' : 'Inactif';
+                            statusEl.className = isActive ? 'status-badge active' : 'status-badge';
+                        }
+                        if (btnText) {
+                            btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
+                        }
+                        
+                        if (isActive && (!window.userClosedStream || !window.userClosedStream[camId])) {
+                            toggleStream(camId);
+                        }
+                    }
+                }
                 else if (payload.type === "wifi_list") {
                     displayWifiNetworks(payload.networks);
                 } 
@@ -3358,8 +3566,46 @@ def dashboard():
                     const cam2Status = document.getElementById('calib-cam-status-2');
                     const cam2Enable = document.getElementById('calib-cam-enable-2');
 
+                    const activeStreams = state.active_streams || { "1": false, "2": false };
+                    for (let camId of [1, 2]) {
+                        const isActive = activeStreams[camId] === true;
+                        
+                        const wasActive = window.activeStreams ? window.activeStreams[camId] : false;
+                        if (!window.activeStreams) window.activeStreams = { 1: false, 2: false };
+                        window.activeStreams[camId] = isActive;
+                        
+                        if (isActive && !wasActive) {
+                            if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
+                            window.userClosedStream[camId] = false;
+                        }
+
+                        const statusEl = document.getElementById(`stream-status-${camId}`);
+                        const btnText = document.getElementById(`stream-btn-text-${camId}`);
+                        
+                        if (!isActive && window.localViewing && window.localViewing[camId]) {
+                            window.localViewing[camId] = false;
+                            stopStreamUI(camId);
+                        }
+                        
+                        if (!window.localViewing || !window.localViewing[camId]) {
+                            if (statusEl) {
+                                statusEl.textContent = isActive ? 'En direct' : 'Inactif';
+                                statusEl.className = isActive ? 'status-badge active' : 'status-badge';
+                            }
+                            if (btnText) {
+                                btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
+                            }
+                            
+                            if (isActive && (!window.userClosedStream || !window.userClosedStream[camId])) {
+                                toggleStream(camId);
+                            }
+                        }
+                    }
+
                     const cam1Connected = sensors.cam1_connected === true;
                     const cam2Connected = sensors.cam2_connected === true;
+
+                    updateCameraModularity(cam1Connected, cam2Connected);
 
                     if (cam1Status) {
                         cam1Status.textContent = cam1Connected ? 'Connectée' : 'Déconnectée';
@@ -3433,56 +3679,169 @@ def dashboard():
 
         // ─── CAMERA STREAM ON-DEMAND ─────────────────────────────────────────
 
+        function updateCameraModularity(cam1Connected, cam2Connected) {
+            const card1 = document.getElementById('stream-card-1');
+            const card2 = document.getElementById('stream-card-2');
+            if (card1) card1.style.display = cam1Connected ? 'flex' : 'none';
+            if (card2) card2.style.display = cam2Connected ? 'flex' : 'none';
+            
+            const calibCam1Container = document.getElementById('calib-cam-container-1');
+            const calibCam2Container = document.getElementById('calib-cam-container-2');
+            if (calibCam1Container) calibCam1Container.style.display = cam1Connected ? 'flex' : 'none';
+            if (calibCam2Container) calibCam2Container.style.display = cam2Connected ? 'flex' : 'none';
+            
+            const vslamSpan = document.getElementById('vslam-text-mode');
+            if (vslamSpan) {
+                vslamSpan.textContent = cam2Connected ? 'Superposer V-SLAM Stéréo' : 'Superposer V-SLAM Mono';
+            }
+        }
+
         function stopStreamUI(camId) {
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
             const statusEl = document.getElementById(`stream-status-${camId}`);
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
-            const iframeEl = document.getElementById(`stream-iframe-${camId}`);
+            const videoContainer = document.getElementById(`video-container-${camId}`);
+            const videoEl = document.getElementById(`video-cam-${camId}`);
+            const loaderEl = document.getElementById(`stream-loader-${camId}`);
+            const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
 
-            if (iframeEl) {
-                iframeEl.src = '';
-                iframeEl.style.display = 'none';
+            if (peerConnections[camId]) {
+                try {
+                    peerConnections[camId].close();
+                } catch(e) {}
+                peerConnections[camId] = null;
             }
+
+            if (videoEl) {
+                videoEl.srcObject = null;
+                videoEl.style.display = 'none';
+            }
+            if (videoContainer) {
+                videoContainer.style.display = 'none';
+            }
+            if (loaderEl) {
+                loaderEl.style.display = 'none';
+            }
+            if (fsBtn) {
+                fsBtn.style.display = 'none';
+            }
+
             placeholder.style.display = 'flex';
-            statusEl.textContent = 'Inactif';
-            statusEl.className = 'status-badge';
-            btnText.textContent = 'Démarrer le flux';
-            window.activeStreams[camId] = false;
+            const isActive = window.activeStreams && window.activeStreams[camId];
+            statusEl.textContent = isActive ? 'En direct' : 'Inactif';
+            statusEl.className = isActive ? 'status-badge active' : 'status-badge';
+            btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
+            window.localViewing[camId] = false;
         }
 
-        function startStreamWebRTC(camId) {
+        async function startStreamWebRTC(camId) {
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
             const statusEl = document.getElementById(`stream-status-${camId}`);
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
-            const iframeEl = document.getElementById(`stream-iframe-${camId}`);
+            const videoContainer = document.getElementById(`video-container-${camId}`);
+            const videoEl = document.getElementById(`video-cam-${camId}`);
+            const loaderEl = document.getElementById(`stream-loader-${camId}`);
+            const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
 
-            const streamProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-            // WebRTC Signaling and Player proxied through port 48889 via HTTPS
-            const webrtcUrl = `${streamProtocol}//${window.location.hostname}:48889/robot/cam${camId}`;
+            if (peerConnections[camId]) {
+                try {
+                    peerConnections[camId].close();
+                } catch(e) {}
+                peerConnections[camId] = null;
+            }
 
             statusEl.textContent = 'Démarrage…';
             statusEl.className = 'status-badge';
+            placeholder.style.display = 'none';
+            videoContainer.style.display = 'block';
+            videoEl.style.display = 'none';
+            fsBtn.style.display = 'none';
+            loaderEl.style.display = 'flex';
 
-            setTimeout(() => {
-                if (!window.activeStreams[camId]) return;
-                if (iframeEl) {
-                    iframeEl.src = webrtcUrl;
-                    iframeEl.style.display = 'block';
+            try {
+                const pc = new RTCPeerConnection({
+                    iceServers: []
+                });
+                peerConnections[camId] = pc;
+
+                pc.addTransceiver('video', { direction: 'recvonly' });
+
+                pc.ontrack = (event) => {
+                    if (event.streams && event.streams[0]) {
+                        videoEl.srcObject = event.streams[0];
+                    } else {
+                        const inboundStream = new MediaStream();
+                        inboundStream.addTrack(event.track);
+                        videoEl.srcObject = inboundStream;
+                    }
+                    videoEl.play().catch(e => console.warn("Video play failed:", e));
+                    
+                    loaderEl.style.display = 'none';
+                    videoEl.style.display = 'block';
+                    fsBtn.style.display = 'block';
+                    statusEl.textContent = 'En direct';
+                    statusEl.className = 'status-badge active';
+                };
+
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+
+                const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
+                
+                let response = null;
+                let retries = 15;
+                while (retries > 0 && window.localViewing[camId]) {
+                    try {
+                        response = await fetch(webrtcUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/sdp' },
+                            body: pc.localDescription.sdp
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(`Signaling failed: ${e.message}`);
+                    }
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 200));
+                    }
                 }
-                placeholder.style.display = 'none';
-                statusEl.textContent = 'En direct';
-                statusEl.className = 'status-badge active';
-                btnText.textContent = 'Couper Caméra';
-            }, 3500);
+
+                if (!response || !response.ok) {
+                    throw new Error(`MediaMTX WHEP stream cam${camId} not ready/reachable.`);
+                }
+
+                const answerSdp = await response.text();
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                }));
+
+            } catch (err) {
+                console.error("WHEP error:", err);
+                loaderEl.style.display = 'none';
+                statusEl.textContent = 'Erreur connexion';
+                statusEl.className = 'status-badge error';
+                btnText.textContent = 'Réessayer';
+                window.activeStreams[camId] = false;
+                placeholder.style.display = 'flex';
+                videoContainer.style.display = 'none';
+            }
         }
 
         function toggleStream(camId) {
             if (!window.activeStreams) window.activeStreams = { 1: false, 2: false };
+            if (!window.localViewing) window.localViewing = { 1: false, 2: false };
             
-            if (!window.activeStreams[camId]) {
+            if (!window.localViewing[camId]) {
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
-                    appWs.send(JSON.stringify({type: "request_camera", camera: camId}));
-                    window.activeStreams[camId] = true;
+                    let vSlamVal = false;
+                    if (camId === 1) {
+                        const vSlamCheck = document.getElementById('stream-v-slam-1');
+                        if (vSlamCheck) vSlamVal = vSlamCheck.checked;
+                    }
+                    appWs.send(JSON.stringify({type: "request_camera", camera: camId, v_slam: vSlamVal}));
+                    window.localViewing[camId] = true;
                     
                     const statusEl = document.getElementById(`stream-status-${camId}`);
                     const btnText = document.getElementById(`stream-btn-text-${camId}`);
@@ -3498,8 +3857,53 @@ def dashboard():
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     appWs.send(JSON.stringify({type: "release_camera", camera: camId}));
                 }
-                window.activeStreams[camId] = false;
+                window.localViewing[camId] = false;
+                if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
+                window.userClosedStream[camId] = true;
                 stopStreamUI(camId);
+            }
+        }
+
+        function toggleFullscreen(camId) {
+            const container = document.getElementById(`video-container-${camId}`);
+            if (!container) return;
+            if (!document.fullscreenElement) {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen();
+                } else if (container.webkitRequestFullscreen) {
+                    container.webkitRequestFullscreen();
+                } else if (container.msRequestFullscreen) {
+                    container.msRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        function handleVSlamToggleChange() {
+            if (window.localViewing && window.localViewing[1]) {
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    const vSlamCheck = document.getElementById('stream-v-slam-1');
+                    const vSlamVal = vSlamCheck ? vSlamCheck.checked : false;
+                    
+                    const loaderEl = document.getElementById('stream-loader-1');
+                    const videoEl = document.getElementById('video-cam-1');
+                    const fsBtn = document.getElementById('video-fs-btn-1');
+                    const statusEl = document.getElementById('stream-status-1');
+                    
+                    if (loaderEl) loaderEl.style.display = 'flex';
+                    if (videoEl) videoEl.style.display = 'none';
+                    if (fsBtn) fsBtn.style.display = 'none';
+                    if (statusEl) {
+                        statusEl.textContent = 'Reconfiguration…';
+                        statusEl.className = 'status-badge';
+                    }
+                    
+                    appWs.send(JSON.stringify({type: "request_camera", camera: 1, v_slam: vSlamVal}));
+                    startStreamWebRTC(1);
+                }
             }
         }
 
@@ -4344,7 +4748,12 @@ def update_state(state: CoreState):
 @app.get("/core/state", tags=["CORE State"], summary="Récupérer l'état du robot", dependencies=[Depends(verify_token)])
 def get_state():
     """L'app mobile appelle ceci pour afficher ce que fait/voit le robot."""
-    return load_json(STATE_FILE, default={"robot_status": "offline"})
+    state = load_json(STATE_FILE, default={"robot_status": "offline"})
+    state["active_streams"] = {
+        "1": stream_active[1],
+        "2": stream_active[2]
+    }
+    return state
 
 # ─── System Updates API ───────────────────────────────────────────────────────
 GITHUB_RELEASES_CACHE = {} # repo_name -> (tag_name, timestamp)
