@@ -1809,37 +1809,39 @@ def dashboard():
                 <div class="card">
                     <div class="card-title">Mise à jour — Robot Pi & Arduino</div>
                     
-                    <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Système Principal (Pi 5)</h4>
-                    <div style="margin: 1rem 0;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                            <span>Version actuelle :</span>
-                            <span id="robot-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                    <div id="update-zone-robot" style="margin: 1rem 0; transition: opacity 0.3s ease;">
+                        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Système Principal (Pi 5)</h4>
+                        <div style="margin: 1rem 0;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                <span>Version actuelle :</span>
+                                <span id="robot-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                <span>Dernière version dispo :</span>
+                                <span id="robot-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
+                                <span>Statut de l'agent :</span>
+                                <span id="robot-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="robot-update-bar" class="progress-bar-value progress-bar-fill"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
+                                <span>Progression</span>
+                                <span id="robot-update-percent">0%</span>
+                            </div>
                         </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
-                            <span>Dernière version dispo :</span>
-                            <span id="robot-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
-                            <span>Statut de l'agent :</span>
-                            <span id="robot-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
-                        </div>
-                        <div class="progress-bar-container">
-                            <div id="robot-update-bar" class="progress-bar-value progress-bar-fill"></div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
-                            <span>Progression</span>
-                            <span id="robot-update-percent">0%</span>
-                        </div>
+                        <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            <span id="btn-update-robot-text">Lancer la mise à jour Robot</span>
+                        </button>
                     </div>
-                    <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem; margin-bottom: 1.5rem;">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-                        </svg>
-                        <span id="btn-update-robot-text">Lancer la mise à jour Robot</span>
-                    </button>
 
                     <!-- Partie 2 : Arduino Mega -->
-                    <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <div id="update-zone-arduino" style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; transition: opacity 0.3s ease;">
                         <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Microcontrôleur (Arduino Mega)</h4>
                         <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
                             <span>Version actuelle flashée :</span>
@@ -2081,7 +2083,7 @@ def dashboard():
                 <!-- ROS 2 Topics -->
                 <div class="card" style="display:flex; flex-direction:column; max-height: 310px; min-width: 0; overflow: hidden;">
                     <div class="card-title">Flux de Topics ROS 2 Actifs</div>
-                    <div style="flex:1; overflow:auto; margin-top: 0.5rem; max-width: 100%;">
+                    <div style="flex:1; overflow-x: auto; margin-top: 0.5rem; max-width: 100%; width: 100%;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left; min-width: 450px;">
                             <thead>
                                 <tr style="color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 600;">
@@ -2899,6 +2901,13 @@ def dashboard():
                 return;
             }
             
+            // Sort by signal strength (highest first)
+            networks.sort((a, b) => {
+                const sigA = parseInt(a.signal) || 0;
+                const sigB = parseInt(b.signal) || 0;
+                return sigB - sigA;
+            });
+            
             networks.forEach(net => {
                 const item = document.createElement('div');
                 item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease;';
@@ -3294,6 +3303,7 @@ def dashboard():
                 if (res.status === 403) { logout(); return; }
                 if (res.ok) {
                     const state = await res.json();
+                    window.lastTelemetryState = state;
                     
                     const robotBadge = document.getElementById('robot-status-badge');
                     const robotStatus = state.robot_status || 'offline';
@@ -3334,6 +3344,43 @@ def dashboard():
                         updateAIControlUI('yolo', state.ai_state.yolo);
                         updateAIControlUI('face_rec', state.ai_state.face_rec);
                     }
+
+                    // Cameras connection & auto-enable
+                    const cam1Status = document.getElementById('calib-cam-status-1');
+                    const cam1Enable = document.getElementById('calib-cam-enable-1');
+                    const cam2Status = document.getElementById('calib-cam-status-2');
+                    const cam2Enable = document.getElementById('calib-cam-enable-2');
+
+                    const cam1Connected = sensors.cam1_connected === true;
+                    const cam2Connected = sensors.cam2_connected === true;
+
+                    if (cam1Status) {
+                        cam1Status.textContent = cam1Connected ? 'Connectée' : 'Déconnectée';
+                        cam1Status.style.color = cam1Connected ? 'var(--success)' : 'var(--text-secondary)';
+                    }
+                    if (cam2Status) {
+                        cam2Status.textContent = cam2Connected ? 'Connectée' : 'Déconnectée';
+                        cam2Status.style.color = cam2Connected ? 'var(--success)' : 'var(--text-secondary)';
+                    }
+
+                    if (window.lastCam1Connected === undefined) window.lastCam1Connected = false;
+                    if (window.lastCam2Connected === undefined) window.lastCam2Connected = false;
+
+                    if (cam1Connected && !window.lastCam1Connected) {
+                        if (cam1Enable && !cam1Enable.checked) {
+                            cam1Enable.checked = true;
+                            toggleCalibCamera(1);
+                        }
+                    }
+                    if (cam2Connected && !window.lastCam2Connected) {
+                        if (cam2Enable && !cam2Enable.checked) {
+                            cam2Enable.checked = true;
+                            toggleCalibCamera(2);
+                        }
+                    }
+
+                    window.lastCam1Connected = cam1Connected;
+                    window.lastCam2Connected = cam2Connected;
                     
                     if (state.updated_at) {
                         const date = new Date(state.updated_at * 1000);
@@ -3979,6 +4026,8 @@ def dashboard():
         // ─── UPDATER & SERVICES ───────────────────────────────────────────────
 
         async function fetchUpdatesProgress() {
+            let rbInProgress = false;
+            let ardInProgress = false;
             try {
                 const gatewayRes = await fetch('/system/update/gateway/progress', { headers: { 'X-API-Token': apiToken } });
                 const robotRes = await fetch('/system/update/robot/progress', { headers: { 'X-API-Token': apiToken } });
@@ -4028,7 +4077,7 @@ def dashboard():
                     document.getElementById('robot-current-version').textContent = rb.current_version || 'Inconnu';
                     document.getElementById('robot-latest-version').textContent = rb.latest_version || 'Inconnu';
 
-                    const rbInProgress = rb.status &&
+                    rbInProgress = rb.status &&
                         !rbStatusLower.includes('idle') &&
                         !rbStatusLower.includes('prêt') &&
                         !rbStatusLower.includes('done') &&
@@ -4059,21 +4108,64 @@ def dashboard():
                     document.getElementById('arduino-current-version').textContent = ard.current_version || 'Inconnu';
                     document.getElementById('arduino-latest-version').textContent = ard.latest_version || 'Inconnu';
 
-                    const ardInProgress = ard.status &&
+                    ardInProgress = ard.status &&
                         !ardStatusLower.includes('idle') &&
                         !ardStatusLower.includes('prêt') &&
                         !ardStatusLower.includes('done') &&
                         !ardStatusLower.includes('failed') &&
                         ard.percent < 100;
 
+                    const telemetryState = window.lastTelemetryState || {};
+                    const robotOnline = telemetryState.robot_status === 'online';
+                    const telemetrySensors = telemetryState.sensors || {};
+                    const arduinoConnected = telemetrySensors.arduino_connected === true;
+
                     const ardBtn = document.getElementById('btn-update-arduino');
                     const ardBtnText = document.getElementById('btn-update-arduino-text');
                     if (ardBtn) {
-                        ardBtn.disabled = ardInProgress;
-                        ardBtn.style.opacity = ardInProgress ? '0.5' : '1';
+                        if (!robotOnline) {
+                            ardBtn.disabled = true;
+                            ardBtn.style.opacity = '0.5';
+                            if (ardBtnText) ardBtnText.textContent = "Robot Hors-ligne";
+                        } else if (!arduinoConnected) {
+                            ardBtn.disabled = true;
+                            ardBtn.style.opacity = '0.5';
+                            if (ardBtnText) ardBtnText.textContent = "Arduino non connecté";
+                        } else {
+                            ardBtn.disabled = ardInProgress;
+                            ardBtn.style.opacity = ardInProgress ? '0.5' : '1';
+                            if (ardBtnText) {
+                                ardBtnText.textContent = ardUpToDate ? "Réinstaller le Code Arduino" : "Reflasher l'Arduino";
+                            }
+                        }
                     }
-                    if (ardBtnText) {
-                        ardBtnText.textContent = ardUpToDate ? "Réinstaller le Code Arduino" : "Reflasher l'Arduino";
+                }
+
+                // Update zone opacity & interaction based on connection status
+                const telemetryState = window.lastTelemetryState || {};
+                const robotOnline = telemetryState.robot_status === 'online';
+                const telemetrySensors = telemetryState.sensors || {};
+                const arduinoConnected = telemetrySensors.arduino_connected === true;
+
+                const robotZone = document.getElementById('update-zone-robot');
+                if (robotZone) {
+                    if (!robotOnline && !rbInProgress) {
+                        robotZone.style.opacity = '0.4';
+                        robotZone.style.pointerEvents = 'none';
+                    } else {
+                        robotZone.style.opacity = '1';
+                        robotZone.style.pointerEvents = 'auto';
+                    }
+                }
+
+                const arduinoZone = document.getElementById('update-zone-arduino');
+                if (arduinoZone) {
+                    if ((!robotOnline || !arduinoConnected) && !ardInProgress) {
+                        arduinoZone.style.opacity = '0.4';
+                        arduinoZone.style.pointerEvents = 'none';
+                    } else {
+                        arduinoZone.style.opacity = '1';
+                        arduinoZone.style.pointerEvents = 'auto';
                     }
                 }
             } catch (e) {
@@ -4351,6 +4443,11 @@ async def trigger_gateway_update():
 @app.get("/system/update/gateway/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Gateway", dependencies=[Depends(verify_token)])
 def get_gateway_update_progress():
     progress = load_json(GATEWAY_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and GATEWAY_UPDATE_FILE.exists():
+        mtime = GATEWAY_UPDATE_FILE.stat().st_mtime
+        if time.time() - mtime > 600:
+            progress = {"status": "failed", "percent": 0, "error": "Timeout (10 min sans réponse)"}
+            save_json(GATEWAY_UPDATE_FILE, progress)
     from updater import get_current_version
     progress["current_version"] = get_current_version()
     progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE-Gateway")
@@ -4381,6 +4478,11 @@ async def update_robot_progress(progress: UpdateProgress):
 @app.get("/system/update/robot/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour robot", dependencies=[Depends(verify_token)])
 def get_robot_update_progress():
     progress = load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and ROBOT_UPDATE_FILE.exists():
+        mtime = ROBOT_UPDATE_FILE.stat().st_mtime
+        if time.time() - mtime > 600:
+            progress = {"status": "failed", "percent": 0, "error": "Timeout (10 min sans réponse)"}
+            save_json(ROBOT_UPDATE_FILE, progress)
     state = load_json(STATE_FILE, default={})
     progress["current_version"] = state.get("robot_version", "v0.0.0")
     progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")
@@ -4404,6 +4506,11 @@ async def update_arduino_progress(progress: UpdateProgress):
 @app.get("/system/update/arduino/progress", tags=["System Update"], summary="Récupérer le progrès de mise à jour Arduino", dependencies=[Depends(verify_token)])
 def get_arduino_update_progress():
     progress = load_json(ARDUINO_UPDATE_FILE, default={"status": "idle", "percent": 100})
+    if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and ARDUINO_UPDATE_FILE.exists():
+        mtime = ARDUINO_UPDATE_FILE.stat().st_mtime
+        if time.time() - mtime > 600:
+            progress = {"status": "failed", "percent": 0, "error": "Timeout (10 min sans réponse)"}
+            save_json(ARDUINO_UPDATE_FILE, progress)
     state = load_json(STATE_FILE, default={})
     progress["current_version"] = state.get("arduino_version", "v0.0.0")
     progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE")

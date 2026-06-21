@@ -30,11 +30,22 @@ Canal bidirectionnel exclusif pour le serveur de calcul.
 ### `wss://ha.arthonetwork.fr:44888/ws/app` (Connexion Application Mobile)
 Canal pour l'utilisateur (État du robot, télécommande).
 
+#### Messages WebSockets Importants
+- **`telemetry_diagnostics`** : Envoyé périodiquement par le robot. Contient :
+  - `joints` : Liste des 12 angles de servomoteurs (de 0 à 11).
+  - `imu` : Données gyroscopiques (`roll`, `pitch`, `yaw`).
+  - `topics` : Liste des topics ROS 2 actifs (`name`, `type`, `hz`).
+  - `pose` & `path` : Coordonnées de localisation SLAM.
+  - `ai_state` : État actif des modules IA.
+- **`scan_wifi`** : Envoyé par l'App pour demander la recherche des réseaux à proximité.
+- **`wifi_list`** : Renvoyé par le robot avec les réseaux triés par force de signal décroissante.
+- **`camera_setup`** : Active ou désactive un flux caméra sur le robot (`camera`: 1 ou 2, `enable`: true/false).
+
 ---
 
 ## 2. Authentification & Comptes (REST)
 
-L'API utilise maintenant des endpoints dédiés pour l'authentification, tout en conservant la gestion des profils.
+L'API utilise des endpoints dédiés pour l'authentification, tout en conservant la gestion des profils.
 
 ### **POST `/auth/register`** (ou `/accounts`)
 Crée ou met à jour un compte utilisateur.
@@ -87,10 +98,10 @@ L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
 
 ## 5. Flux Vidéos (RTSP / WebRTC)
 
-Géré par MediaMTX (intégré à la Gateway).
+Géré par MediaMTX (intégré à la Gateway). L'encodage vidéo H.264 utilise obligatoirement le profil standard `yuv420p` pour assurer une compatibilité totale avec les navigateurs web récents.
 - **RTSP (Publication/Lecture)** : `rtsp://GATEWAY_IP:48554/robot/cam1` (Basse latence, pour le Node/IA)
-- **HLS** : `http://GATEWAY_IP:48888/robot/cam1` (Streaming web)
-- **WebRTC** : `http://GATEWAY_IP:48889/robot/cam1` (Ultra-basse latence pour l'App Mobile)
+- **HLS** : `https://ha.arthonetwork.fr:48888/robot/cam1/` (Streaming web via lecteur intégré Caddy)
+- **WebRTC** : `https://ha.arthonetwork.fr:48889/robot/cam1` (Ultra-basse latence pour l'App Mobile)
 
 ---
 
@@ -117,7 +128,17 @@ Permet de suivre en temps réel ce que voit et fait le robot.
       "ram_used_mb": 2048,
       "ram_percent": 25.0
     },
-    "spotbot_service": "active / inactive"
+    "spotbot_service": "active / inactive",
+    "cam1_connected": true,
+    "cam2_connected": false,
+    "arduino_connected": true
+  },
+  "ai_state": {
+    "tts": "robot / node / disabled",
+    "stt": "robot / node / disabled",
+    "chat": "robot / node / disabled",
+    "yolo": "enabled / disabled",
+    "face_rec": "enabled / disabled"
   }
 }
 ```
@@ -126,33 +147,37 @@ Permet de suivre en temps réel ce que voit et fait le robot.
 
 ## 7. Mises à Jour & Télémétrie (REST + WebSockets)
 
-Permet de contrôler et surveiller les mises à jour de la Gateway et du Robot.
+Permet de contrôler et surveiller les mises à jour de la Gateway, du Robot et de l'Arduino. Un mécanisme de sécurité réinitialise le statut à `failed` en cas d'absence de progression pendant plus de 10 minutes (anti-blocage).
 
 ### **POST `/system/update/gateway`**
-Lance instantanément la recherche et l'application de mise à jour sur la Gateway (redémarre le conteneur si une mise à jour est installée).
+Lance la mise à jour sur la Gateway (redémarre le conteneur).
 
 ### **GET `/system/update/gateway/progress`**
-Récupère le statut de progression de l'update de la Gateway.
+Récupère le statut de progression de la Gateway.
 ```json
 {
-  "status": "idle / downloading / extracting / done",
+  "status": "idle / downloading / extracting / done / failed",
   "percent": 100
 }
 ```
 
+### **POST `/system/update/gateway/progress`**
+Permet de mettre à jour la progression de la mise à jour de la Gateway.
+
 ### **POST `/system/update/robot`**
-Envoie un signal de mise à jour instantanée au robot via WebSocket (`{"type": "trigger_update"}`).
+Déclenche la mise à jour du robot via WebSocket.
 
 ### **GET `/system/update/robot/progress`**
-Récupère le statut de progression de l'update du robot (reconstruit de manière réelle pendant le `colcon build`).
-```json
-{
-  "status": "idle / downloading / extracting / compiling / done / failed",
-  "percent": 45
-}
-```
+Récupère la progression de la mise à jour du robot (compilation `colcon build`).
 
-### Télémétrie en temps réel (WebSockets App)
-Lorsqu'un processus de mise à jour est en cours, la Gateway diffuse ces messages en direct sur le canal mobile `/ws/app` :
-- `{"type": "gateway_update_progress", "status": "...", "percent": ...}`
-- `{"type": "robot_update_progress", "status": "...", "percent": ...}`
+### **POST `/system/update/robot/progress`**
+Permet au robot de notifier son état et sa progression de mise à jour.
+
+### **POST `/system/update/arduino`**
+Déclenche le flashage du code sur l'Arduino Mega (uniquement si le robot est en ligne et l'Arduino connecté).
+
+### **GET `/system/update/arduino/progress`**
+Récupère le statut et la progression du flashage Arduino.
+
+### **POST `/system/update/arduino/progress`**
+Permet au robot de notifier l'avancement du flash de l'Arduino.

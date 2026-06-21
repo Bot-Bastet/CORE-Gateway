@@ -7,7 +7,11 @@ import os
 import subprocess
 import requests
 import logging
+import socket
 from pathlib import Path
+
+# Set global socket timeout to prevent hangs
+socket.setdefaulttimeout(30.0)
 
 logger = logging.getLogger("auto_updater")
 
