@@ -123,7 +123,7 @@ Permet de suivre en temps réel ce que voit et fait le robot.
     "1": true,
     "2": false
   },
-  "robot_version": "v0.2.2",
+  "robot_version": "v0.2.3",
   "arduino_version": "v0.0.0",
   "sensors": {
     "cpu_percent": 45,
