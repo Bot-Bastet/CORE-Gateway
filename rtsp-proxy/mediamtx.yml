@@ -24,7 +24,6 @@ hlsSegmentDuration: 1s
 webrtc: yes
 webrtcIPsFromInterfaces: false
 webrtcAdditionalHosts:
-  - 79.94.238.213
   - ha.arthonetwork.fr
 webrtcLocalUDPAddress: :48189
 webrtcLocalTCPAddress: :48189

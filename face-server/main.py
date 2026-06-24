@@ -1502,6 +1502,22 @@ def dashboard():
             to { transform: rotate(360deg); }
         }
 
+        @keyframes scanLine {
+            0% { top: 10%; }
+            50% { top: 90%; }
+            100% { top: 10%; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.9; }
+        }
+
+        @keyframes scaleUp {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
         /* ─── RESPONSIVE DESIGN ─────────────────────────────────────────────── */
         
         .hamburger-btn {
@@ -2280,9 +2296,12 @@ def dashboard():
                     <h3 class="font-outfit" style="font-size: 1.15rem; margin-bottom: 0.25rem;">Section Calibration & Configuration WiFi</h3>
                     <p style="color: var(--text-secondary); font-size: 0.85rem;">Ajuster les angles des moteurs, configurer le WiFi et observer la minimap.</p>
                 </div>
-                <div style="display: flex; gap: 0.75rem;">
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
                     <button class="btn btn-secondary" onclick="openWifiModal()">
                         📶 Configuration WiFi
+                    </button>
+                    <button class="btn btn-secondary" style="border-color: var(--accent); color: #c7d2fe; background: rgba(99, 102, 241, 0.1);" onclick="openEasyConfig()">
+                        ✨ Configuration Guidée (EasyConfig)
                     </button>
                     <button class="btn btn-primary" onclick="openCalibrationOverlay()">
                         ⚙️ Ouvrir la Calibration
@@ -2363,6 +2382,50 @@ def dashboard():
                             <button class="btn btn-primary" onclick="saveSLAMParameters()" style="width: 100%; margin-top: 0.5rem;">
                                 Appliquer Paramètres
                             </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Console de Test V-SLAM -->
+                    <div class="card" style="margin: 1.5rem 0 0 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="card-title" style="font-size: 1rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span>🔍 Console de Test V-SLAM</span>
+                            <span id="vslam-badge" class="status-badge" style="font-size:0.65rem; padding: 0.1rem 0.4rem;">Inactif</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                            Testez la localisation visuelle (ORB-SLAM3) en direct, même en portant le robot à la main.
+                        </div>
+                        
+                        <!-- Mini video stream area -->
+                        <div id="vslam-test-video-container" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative; aspect-ratio: 4/3; margin-bottom: 0.5rem;">
+                            <video id="vslam-test-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                            <div id="vslam-test-loader" style="position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.75rem;">
+                                <div style="width: 20px; height: 20px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                <span>Initialisation flux WebRTC...</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Controls -->
+                        <button id="btn-vslam-test-toggle" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; padding: 0.5rem;" onclick="toggleVSlamTest()">
+                            🚀 Lancer le Test V-SLAM
+                        </button>
+                        
+                        <!-- Telemetry Stats -->
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; font-size: 0.75rem; margin-top: 0.25rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">État du Tracking :</span>
+                                <span id="vslam-status-val" style="font-weight: bold; color: var(--text-secondary);">Non démarré</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Vitesse de Pose :</span>
+                                <span id="vslam-rate-val" style="font-weight: bold;">0.0 Hz</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Qualité Environnement :</span>
+                                <span id="vslam-quality-val" style="font-weight: bold; color: var(--success);">Optimale</span>
+                            </div>
+                            <div id="vslam-warning-box" style="display: none; padding: 0.4rem; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); border-radius: 4px; color: #f87171; font-size: 0.7rem; line-height: 1.2;">
+                                ⚠️ Attention: Mouvements trop brusques ou luminosité faible détectée.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -2514,6 +2577,208 @@ def dashboard():
         </div>
     </div>
 
+    <!-- EasyConfig Overlay -->
+    <div id="easyconfig-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 800px; max-width: 95vw; max-height: 90vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <!-- Header -->
+            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: #121214;">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.3rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>✨ Assistant de Configuration Guidée</span>
+                        <span style="font-size: 0.75rem; background: var(--accent); color: white; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: normal;">EasyConfig</span>
+                    </h2>
+                </div>
+                <button class="modal-close" style="position: static;" onclick="closeEasyConfig()">&times;</button>
+            </div>
+            
+            <!-- Steps Indicator -->
+            <div style="display: flex; background: #0c0c0e; border-bottom: 1px solid var(--border-color); padding: 0.75rem 1.5rem; justify-content: space-between; font-size: 0.8rem;">
+                <div id="step-dot-1" style="display:flex; align-items:center; gap:0.5rem; color: var(--accent); font-weight: 600;">
+                    <span style="width:20px; height:20px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem;">1</span>
+                    <span>Offsets Moteurs</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-2" style="display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
+                    <span>Caméra Gauche</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-3" style="display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">3</span>
+                    <span>Caméra Droite</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-4" style="display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">4</span>
+                    <span>Finalisation</span>
+                </div>
+            </div>
+            
+            <!-- Content Area -->
+            <div style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; min-height: 350px;">
+                
+                <!-- STEP 1 CONTENT -->
+                <div id="ec-step-1" style="display: flex; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 1 : Alignement Physique & Niveau 0 des Moteurs</p>
+                        Avant de démarrer le robot, veuillez le positionner manuellement dans la position de calibration :
+                        <ul style="margin: 0.5rem 0; padding-left: 1.25rem; display:flex; flex-direction:column; gap:0.25rem;">
+                            <li>• Positionnez les <strong>hanches droites</strong>, perpendiculaires et parallèles au sol.</li>
+                            <li>• Mettez les <strong>cuisses parallèles au sol</strong> (angle de 90°).</li>
+                            <li>• Pliez le <strong>tibia à 100%</strong> contre la cuisse (angle de 0°).</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Motor angles feedback grid -->
+                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; font-size:0.75rem;">
+                        <div style="border-right: 1px solid var(--border-color); padding-right: 0.5rem;">
+                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte FR</span>
+                            <span>Hanche: <strong id="ec-j0">90°</strong></span><br/>
+                            <span>Cuisse: <strong id="ec-j1">90°</strong></span><br/>
+                            <span>Tibia: <strong id="ec-j2">0°</strong></span>
+                        </div>
+                        <div style="border-right: 1px solid var(--border-color); padding-right: 0.5rem; padding-left: 0.25rem;">
+                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte FL</span>
+                            <span>Hanche: <strong id="ec-j3">90°</strong></span><br/>
+                            <span>Cuisse: <strong id="ec-j4">90°</strong></span><br/>
+                            <span>Tibia: <strong id="ec-j5">0°</strong></span>
+                        </div>
+                        <div style="border-right: 1px solid var(--border-color); padding-right: 0.5rem; padding-left: 0.25rem;">
+                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte BR</span>
+                            <span>Hanche: <strong id="ec-j6">90°</strong></span><br/>
+                            <span>Cuisse: <strong id="ec-j7">90°</strong></span><br/>
+                            <span>Tibia: <strong id="ec-j8">0°</strong></span>
+                        </div>
+                        <div style="padding-left: 0.25rem;">
+                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte BL</span>
+                            <span>Hanche: <strong id="ec-j9">90°</strong></span><br/>
+                            <span>Cuisse: <strong id="ec-j10">90°</strong></span><br/>
+                            <span>Tibia: <strong id="ec-j11">0°</strong></span>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: auto; display: flex; flex-direction:column; gap:0.75rem;">
+                        <button class="btn btn-primary" onclick="ecCalculateOffsets()" style="width: 100%; justify-content: center; padding: 0.75rem;">
+                            📐 Calculer et Définir le Niveau 0 (Offsets)
+                        </button>
+                        <div id="ec-motor-success-anim" style="display:none; text-align:center; color:var(--success); font-size:0.85rem; font-weight:bold; animation: fadeIn 0.3s ease;">
+                            ✅ Offsets calculés et transmis au robot avec succès !
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- STEP 2 CONTENT (CAMERA GAUCHE) -->
+                <div id="ec-step-2" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 2 : Alignement & Calibration Caméra Gauche (1)</p>
+                        Placez la feuille de calibration (damier noir et blanc) bien à plat devant la caméra gauche.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Live stream frame -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative;">
+                            <video id="ec-cam-video-1" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            
+                            <!-- Scanner HUD Overlay -->
+                            <div id="ec-cam-hud-1" style="display: none; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--accent); animation: pulse 2s infinite;">
+                                <div style="position: absolute; top: 10%; left: 10%; right: 10%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: scanLine 2s linear infinite;"></div>
+                                <div style="position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.65rem; color: var(--accent); background: rgba(0,0,0,0.8); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                    MIRE DE CALIBRATION EN COURS D'ANALYSE
+                                </div>
+                            </div>
+                            
+                            <!-- Initial state / loader / Success / Failure overlay -->
+                            <div id="ec-cam-status-overlay-1" style="position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                <span id="ec-cam-status-text-1" style="color: var(--text-secondary);">Le flux vidéo de la caméra s'affiche dès le lancement.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Calibration details and buttons -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+                            <button id="btn-ec-run-calib-1" class="btn btn-primary" onclick="ecRunCameraCalib(1)" style="width:100%; justify-content:center;">
+                                📷 Lancer la Calibration Cam1
+                            </button>
+                            <button id="btn-ec-skip-1" class="btn btn-secondary" onclick="ecNextStep(3)" style="width:100%; justify-content:center;">
+                                Passer cette étape (Conserver l'ancienne)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 3 CONTENT (CAMERA DROITE) -->
+                <div id="ec-step-3" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 3 : Alignement & Calibration Caméra Droite (2)</p>
+                        Placez la feuille de calibration devant la caméra droite.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Live stream frame -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative;">
+                            <video id="ec-cam-video-2" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            
+                            <!-- Scanner HUD Overlay -->
+                            <div id="ec-cam-hud-2" style="display: none; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--accent); animation: pulse 2s infinite;">
+                                <div style="position: absolute; top: 10%; left: 10%; right: 10%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: scanLine 2s linear infinite;"></div>
+                                <div style="position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.65rem; color: var(--accent); background: rgba(0,0,0,0.8); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                    MIRE DE CALIBRATION EN COURS D'ANALYSE
+                                </div>
+                            </div>
+                            
+                            <!-- Initial state / loader / Success / Failure overlay -->
+                            <div id="ec-cam-status-overlay-2" style="position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                <span id="ec-cam-status-text-2" style="color: var(--text-secondary);">Le flux vidéo de la caméra s'affiche dès le lancement.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Calibration details and buttons -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+                            <button id="btn-ec-run-calib-2" class="btn btn-primary" onclick="ecRunCameraCalib(2)" style="width:100%; justify-content:center;">
+                                📷 Lancer la Calibration Cam2
+                            </button>
+                            <button id="btn-ec-skip-2" class="btn btn-secondary" onclick="ecNextStep(4)" style="width:100%; justify-content:center;">
+                                Passer cette étape
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4 CONTENT (FINALISATION) -->
+                <div id="ec-step-4" style="display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1.5rem; height: 100%; padding: 2rem 0;">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--success); animation: scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                        ✓
+                    </div>
+                    <div>
+                        <h3 class="font-outfit" style="font-size: 1.4rem; color: var(--text-primary); margin-bottom: 0.5rem;">Configuration Guidée Réussie !</h3>
+                        <p style="color: var(--text-secondary); max-width: 500px; line-height: 1.5; font-size: 0.9rem;">
+                            Tous les offsets des moteurs et les réglages des caméras ont été enregistrés avec succès. Le robot Bastet est parfaitement initialisé et prêt à démarrer.
+                        </p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; width: 100%; max-width: 500px; margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="ecStartRobotAndClose()" style="flex: 1; justify-content: center; padding: 0.75rem;">
+                            🚀 Démarrer & Allumer le Robot
+                        </button>
+                        <button class="btn btn-secondary" onclick="closeEasyConfig()" style="flex: 1; justify-content: center; padding: 0.75rem;">
+                            Fermer l'Assistant
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: #0c0c0e;">
+                <button id="ec-btn-prev" class="btn btn-secondary" disabled onclick="ecPrevStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    ← Précédent
+                </button>
+                <span id="ec-progress-text" style="font-size:0.75rem; color: var(--text-secondary);">Étape 1 sur 4</span>
+                <button id="ec-btn-next" class="btn btn-primary" disabled onclick="ecNextStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    Suivant →
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal : Ajouter / Éditer un utilisateur -->
     <div id="userModal" class="modal-overlay" onclick="closeUserModalOnClick(event)">
         <div class="modal-content">
@@ -2599,8 +2864,18 @@ def dashboard():
                 </button>
             </div>
             
-            <div id="wifi-list-container" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: #0c0c0e; padding: 0.5rem; margin-bottom: 1.5rem;">
-                <div style="text-align: center; color: var(--text-secondary); padding: 2rem 0; font-size: 0.85rem;">Aucun réseau scanné. Cliquez sur Rafraîchir.</div>
+            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom: 1.25rem;">
+                <h4 style="font-size:0.8rem; font-weight:600; color:var(--accent);">Réseaux WiFi Enregistrés (Connus)</h4>
+                <div id="wifi-known-container" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: #0c0c0e; padding: 0.5rem;">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">Aucun réseau enregistré configuré.</div>
+                </div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom: 1.5rem;">
+                <h4 style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">Réseaux à Proximité Scannés</h4>
+                <div id="wifi-list-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: #0c0c0e; padding: 0.5rem;">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.8rem;">Aucun réseau scanné. Cliquez sur Rafraîchir.</div>
+                </div>
             </div>
             
             <form id="wifi-connect-form" onsubmit="handleWifiConnectSubmit(event)" style="display: none; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
@@ -2871,7 +3146,7 @@ def dashboard():
                     }
                 }
                 else if (payload.type === "wifi_list") {
-                    displayWifiNetworks(payload.networks);
+                    displayWifiNetworks(payload.networks, payload.known_ssids);
                 } 
                 else if (payload.type === "wifi_connect_result") {
                     handleWifiConnectResult(payload);
@@ -3087,11 +3362,19 @@ def dashboard():
         }
 
         function scanWifiNetworks() {
-            const container = document.getElementById('wifi-list-container');
-            container.innerHTML = `
+            const listContainer = document.getElementById('wifi-list-container');
+            const knownContainer = document.getElementById('wifi-known-container');
+            
+            listContainer.innerHTML = `
                 <div style="text-align: center; color: var(--text-secondary); padding: 2.5rem 0; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
                     <div style="width: 24px; height: 24px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                     <span>Recherche des réseaux à proximité (nmcli)...</span>
+                </div>`;
+                
+            knownContainer.innerHTML = `
+                <div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                    <div style="width: 16px; height: 16px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <span>Actualisation...</span>
                 </div>`;
                 
             const btn = document.getElementById('btn-wifi-scan');
@@ -3100,21 +3383,23 @@ def dashboard():
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "scan_wifi" }));
             } else {
-                container.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem;">Erreur : WebSocket déconnecté.</div>`;
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem;">Erreur : WebSocket déconnecté.</div>`;
+                knownContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 1rem 0; font-size: 0.85rem;">Erreur.</div>`;
                 if (btn) btn.disabled = false;
             }
         }
 
-        function displayWifiNetworks(networks) {
-            const container = document.getElementById('wifi-list-container');
+        function displayWifiNetworks(networks, knownSsids = []) {
+            const listContainer = document.getElementById('wifi-list-container');
+            const knownContainer = document.getElementById('wifi-known-container');
             const btn = document.getElementById('btn-wifi-scan');
             if (btn) btn.disabled = false;
             
-            container.innerHTML = '';
-            if (!networks || networks.length === 0) {
-                container.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 2rem 0; font-size: 0.85rem;">Aucun réseau WiFi détecté.</div>`;
-                return;
-            }
+            listContainer.innerHTML = '';
+            knownContainer.innerHTML = '';
+            
+            if (!knownSsids) knownSsids = [];
+            if (!networks) networks = [];
             
             // Sort by signal strength (highest first)
             networks.sort((a, b) => {
@@ -3123,41 +3408,87 @@ def dashboard():
                 return sigB - sigA;
             });
             
-            networks.forEach(net => {
-                const item = document.createElement('div');
-                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease;';
-                
-                const isSecure = net.security && net.security.trim() !== "" && net.security !== "--";
-                const lockIcon = isSecure ? '🔒' : '🔓';
-                
-                item.innerHTML = `
-                    <div>
-                        <span style="font-weight: 600; font-size: 0.9rem; display: block;">${net.ssid}</span>
-                        <span style="font-size: 0.7rem; color: var(--text-secondary);">${net.bssid} • ${net.security}</span>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:0.5rem;">
-                        <span style="font-size: 0.8rem;">${lockIcon}</span>
-                        <span style="font-size: 0.85rem; font-weight: bold; color: var(--accent);">${net.signal}%</span>
-                    </div>
-                `;
-                
-                item.onclick = () => selectWifiNetwork(net.ssid, isSecure);
-                container.appendChild(item);
-            });
+            // Display known networks
+            if (knownSsids.length === 0) {
+                knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">Aucun réseau enregistré configuré sur le robot.</div>`;
+            } else {
+                knownSsids.forEach(ssid => {
+                    const scannedNet = networks.find(n => n.ssid === ssid);
+                    const inRange = !!scannedNet;
+                    
+                    const item = document.createElement('div');
+                    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease; margin-bottom: 0.25rem; border-radius: 6px;';
+                    item.style.backgroundColor = 'rgba(99, 102, 241, 0.05)';
+                    item.style.border = '1px solid rgba(99, 102, 241, 0.2)';
+                    
+                    const signalText = inRange ? `${scannedNet.signal}%` : 'Hors de portée';
+                    const signalColor = inRange ? 'var(--success)' : 'var(--text-secondary)';
+                    
+                    item.innerHTML = `
+                        <div>
+                            <span style="font-weight: 600; font-size: 0.9rem; display: block; color: #a5b4fc;">${ssid} <span style="font-size:0.65rem; background:rgba(99,102,241,0.2); color:#c7d2fe; padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem;">Enregistré</span></span>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' • ' + scannedNet.security) : 'Profil de connexion sauvegardé'}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span style="font-size: 0.85rem; font-weight: bold; color: ${signalColor};">${signalText}</span>
+                        </div>
+                    `;
+                    
+                    const isSecureNet = scannedNet ? (scannedNet.security && scannedNet.security.trim() !== "" && scannedNet.security !== "--") : true;
+                    item.onclick = () => selectWifiNetwork(ssid, isSecureNet, true);
+                    knownContainer.appendChild(item);
+                });
+            }
+            
+            // Display other scanned networks (excluding the known ones)
+            const otherNetworks = networks.filter(n => !knownSsids.includes(n.ssid));
+            
+            if (otherNetworks.length === 0) {
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.8rem;">Aucun autre réseau WiFi à proximité.</div>`;
+            } else {
+                otherNetworks.forEach(net => {
+                    const item = document.createElement('div');
+                    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease;';
+                    
+                    const isSecure = net.security && net.security.trim() !== "" && net.security !== "--";
+                    const lockIcon = isSecure ? '🔒' : '🔓';
+                    
+                    item.innerHTML = `
+                        <div>
+                            <span style="font-weight: 600; font-size: 0.9rem; display: block;">${net.ssid}</span>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${net.bssid} • ${net.security}</span>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                            <span style="font-size: 0.8rem;">${lockIcon}</span>
+                            <span style="font-size: 0.85rem; font-weight: bold; color: var(--accent);">${net.signal}%</span>
+                        </div>
+                    `;
+                    
+                    item.onclick = () => selectWifiNetwork(net.ssid, isSecure);
+                    listContainer.appendChild(item);
+                });
+            }
         }
 
-        function selectWifiNetwork(ssid, isSecure) {
+        function selectWifiNetwork(ssid, isSecure, isKnown = false) {
             document.getElementById('form-wifi-ssid').value = ssid;
             document.getElementById('wifi-selected-ssid-label').textContent = ssid;
             
             const pwdGroup = document.getElementById('wifi-password-group');
+            const pwdInput = document.getElementById('form-wifi-password');
             if (isSecure) {
                 pwdGroup.style.display = 'block';
+                if (isKnown) {
+                    pwdInput.placeholder = 'Laisser vide pour utiliser le mot de passe enregistré';
+                } else {
+                    pwdInput.placeholder = 'Mot de passe';
+                }
             } else {
                 pwdGroup.style.display = 'none';
+                pwdInput.placeholder = '';
             }
             
-            document.getElementById('form-wifi-password').value = '';
+            pwdInput.value = '';
             document.getElementById('wifi-connect-form').style.display = 'block';
         }
 
@@ -4553,17 +4884,514 @@ def dashboard():
             }
         }
 
-        async function controlRobotService(action) {
-            if (!confirm(`Confirmer l'opération '${action}' sur le service spotbot ?`)) return;
-            try {
-                if (appWs && appWs.readyState === WebSocket.OPEN) {
-                    appWs.send(JSON.stringify({ type: "service_control", service: "spotbot", action: action }));
-                    alert(`Commande '${action}' envoyée.`);
-                } else {
-                    alert("WebSocket déconnecté. Impossible d'envoyer la commande.");
+        // ─── EASYCONFIG FUNCTIONS ──────────────────────────────────────────────
+        let ecCurrentStep = 1;
+        let ecCalibratedMotors = false;
+        let ecCalibratedCam1 = false;
+        let ecCalibratedCam2 = false;
+        let ecPeerConnections = { 1: null, 2: null };
+
+        function openEasyConfig() {
+            ecCurrentStep = 1;
+            ecCalibratedMotors = false;
+            ecCalibratedCam1 = false;
+            ecCalibratedCam2 = false;
+            
+            for (let id of [1, 2]) {
+                if (ecPeerConnections[id]) {
+                    try { ecPeerConnections[id].close(); } catch(e) {}
+                    ecPeerConnections[id] = null;
                 }
-            } catch (e) {
-                alert('Erreur lors du contrôle.');
+            }
+            
+            document.getElementById('easyconfig-overlay').classList.add('active');
+            ecShowStep(1);
+            
+            ecUpdateMotorFeedback();
+            window.ecFeedbackInterval = setInterval(ecUpdateMotorFeedback, 500);
+        }
+
+        function closeEasyConfig() {
+            clearInterval(window.ecFeedbackInterval);
+            document.getElementById('easyconfig-overlay').classList.remove('active');
+            
+            for (let id of [1, 2]) {
+                if (ecPeerConnections[id]) {
+                    try { ecPeerConnections[id].close(); } catch(e) {}
+                    ecPeerConnections[id] = null;
+                }
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "release_camera", camera: id }));
+                }
+            }
+        }
+
+        function ecUpdateMotorFeedback() {
+            if (window.lastTelemetryState && window.lastTelemetryState.joints) {
+                const j = window.lastTelemetryState.joints;
+                for (let i = 0; i < 12; i++) {
+                    const el2 = document.getElementById(`ec-j${i}`);
+                    if (el2) {
+                        el2.textContent = `${Math.round(j[i])}°`;
+                    }
+                }
+            }
+        }
+
+        function ecShowStep(step) {
+            ecCurrentStep = step;
+            
+            for (let i = 1; i <= 4; i++) {
+                const div = document.getElementById(`ec-step-${i}`);
+                if (div) div.style.display = 'none';
+                
+                const dot = document.getElementById(`step-dot-${i}`);
+                if (dot) {
+                    dot.style.color = 'var(--text-secondary)';
+                    const numSpan = dot.querySelector('span');
+                    if (numSpan) {
+                        numSpan.style.background = '#27272a';
+                        numSpan.style.color = 'var(--text-secondary)';
+                    }
+                }
+            }
+            
+            const currentDiv = document.getElementById(`ec-step-${step}`);
+            if (currentDiv) {
+                currentDiv.style.display = 'flex';
+            }
+            
+            for (let i = 1; i <= step; i++) {
+                const dot = document.getElementById(`step-dot-${i}`);
+                if (dot) {
+                    dot.style.color = i === step ? 'var(--accent)' : 'var(--success)';
+                    dot.style.fontWeight = i === step ? '600' : 'normal';
+                    const numSpan = dot.querySelector('span');
+                    if (numSpan) {
+                        numSpan.style.background = i === step ? 'var(--accent)' : 'var(--success)';
+                        numSpan.style.color = 'white';
+                        if (i < step) numSpan.textContent = '✓';
+                        else numSpan.textContent = i;
+                    }
+                }
+            }
+            
+            document.getElementById('ec-progress-text').textContent = `Étape ${step} sur 4`;
+            document.getElementById('ec-btn-prev').disabled = (step === 1);
+            
+            let canGoNext = false;
+            if (step === 1 && ecCalibratedMotors) canGoNext = true;
+            if (step === 2 && ecCalibratedCam1) canGoNext = true;
+            if (step === 3 && ecCalibratedCam2) canGoNext = true;
+            if (step === 4) canGoNext = false;
+            
+            document.getElementById('ec-btn-next').disabled = !canGoNext;
+        }
+
+        function ecPrevStep() {
+            if (ecCurrentStep > 1) {
+                if (ecCurrentStep === 2 || ecCurrentStep === 3) {
+                    for (let id of [1, 2]) {
+                        if (ecPeerConnections[id]) {
+                            try { ecPeerConnections[id].close(); } catch(e) {}
+                            ecPeerConnections[id] = null;
+                        }
+                        if (appWs && appWs.readyState === WebSocket.OPEN) {
+                            appWs.send(JSON.stringify({ type: "release_camera", camera: id }));
+                        }
+                    }
+                }
+                ecShowStep(ecCurrentStep - 1);
+            }
+        }
+
+        function ecNextStep(targetStep = null) {
+            let next = targetStep !== null ? targetStep : ecCurrentStep + 1;
+            
+            if (next === 3) {
+                const cam2Connected = window.lastTelemetryState && window.lastTelemetryState.sensors && window.lastTelemetryState.sensors.cam2_connected === true;
+                if (!cam2Connected) {
+                    next = 4;
+                }
+            }
+            
+            if (ecCurrentStep === 2 || ecCurrentStep === 3) {
+                for (let id of [1, 2]) {
+                    if (ecPeerConnections[id]) {
+                        try { ecPeerConnections[id].close(); } catch(e) {}
+                        ecPeerConnections[id] = null;
+                    }
+                    if (appWs && appWs.readyState === WebSocket.OPEN) {
+                        appWs.send(JSON.stringify({ type: "release_camera", camera: id }));
+                    }
+                }
+            }
+            
+            if (next <= 4) {
+                ecShowStep(next);
+            }
+        }
+
+        function ecCalculateOffsets() {
+            let currentJoints = window.lastTelemetryState && window.lastTelemetryState.joints ? window.lastTelemetryState.joints : [90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90];
+            let targetAngles = [
+                90, 90, 0,
+                90, 90, 0,
+                90, 90, 0,
+                90, 90, 0
+            ];
+            
+            const offsets = [];
+            for (let i = 0; i < 12; i++) {
+                const slider = document.getElementById(`calib-slider-${i}`);
+                let currentOffset = slider ? parseInt(slider.value) : 0;
+                let delta = targetAngles[i] - currentJoints[i];
+                let newOffset = Math.max(-30, Math.min(30, Math.round(currentOffset + delta)));
+                
+                if (slider) {
+                    slider.value = newOffset;
+                    updateCalibSliderVal(i);
+                }
+                offsets.push(newOffset);
+            }
+            
+            fetch('/core/calibration', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Token': apiToken
+                },
+                body: JSON.stringify({ offsets: offsets })
+            }).catch(err => console.error(err));
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+            }
+            
+            ecCalibratedMotors = true;
+            document.getElementById('ec-motor-success-anim').style.display = 'block';
+            document.getElementById('ec-btn-next').disabled = false;
+        }
+
+        async function ecRunCameraCalib(camId) {
+            const videoEl = document.getElementById(`ec-cam-video-${camId}`);
+            const hudEl = document.getElementById(`ec-cam-hud-${camId}`);
+            const overlayEl = document.getElementById(`ec-cam-status-overlay-${camId}`);
+            const statusText = document.getElementById(`ec-cam-status-text-${camId}`);
+            const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
+            const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
+            
+            btnRun.disabled = true;
+            btnSkip.disabled = true;
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false }));
+            }
+            
+            statusText.innerHTML = `
+                <div style="width:20px; height:20px; border:2px solid var(--accent); border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 0.5rem;"></div>
+                <span>Initialisation flux WebRTC caméra...</span>
+            `;
+            
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                ecPeerConnections[camId] = pc;
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                
+                pc.ontrack = (event) => {
+                    if (event.streams && event.streams[0]) {
+                        videoEl.srcObject = event.streams[0];
+                    } else {
+                        const inboundStream = new MediaStream();
+                        inboundStream.addTrack(event.track);
+                        videoEl.srcObject = inboundStream;
+                    }
+                    videoEl.play().catch(e => console.warn(e));
+                    
+                    overlayEl.style.display = 'none';
+                    videoEl.style.display = 'block';
+                    hudEl.style.display = 'block';
+                    
+                    ecStartScanningSim(camId);
+                };
+                
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
+                
+                let response = null;
+                let retries = 15;
+                while (retries > 0 && ecCurrentStep === (camId === 1 ? 2 : 3)) {
+                    try {
+                        response = await fetch(webrtcUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/sdp' },
+                            body: pc.localDescription.sdp
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(e);
+                    }
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                }
+                
+                if (!response || !response.ok) {
+                    throw new Error("WHEP stream not ready");
+                }
+                
+                const answerSdp = await response.text();
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                }));
+                
+            } catch (err) {
+                console.error(err);
+                videoEl.style.display = 'none';
+                hudEl.style.display = 'none';
+                overlayEl.style.display = 'flex';
+                statusText.innerHTML = `
+                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                    <span style="color:var(--danger); font-weight:bold;">Échec : Flux WebRTC indisponible.</span><br/>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que la caméra est bien branchée sur le robot.</span>
+                `;
+                btnRun.disabled = false;
+                btnSkip.disabled = false;
+            }
+        }
+
+        function ecStartScanningSim(camId) {
+            const overlayEl = document.getElementById(`ec-cam-status-overlay-${camId}`);
+            const statusText = document.getElementById(`ec-cam-status-text-${camId}`);
+            const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
+            const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
+            const hudEl = document.getElementById(`ec-cam-hud-${camId}`);
+            const videoEl = document.getElementById(`ec-cam-video-${camId}`);
+            
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 25;
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    
+                    const isCameraConnected = window.lastTelemetryState && window.lastTelemetryState.sensors && 
+                        window.lastTelemetryState.sensors[`cam${camId}_connected`] === true;
+                        
+                    if (isCameraConnected) {
+                        hudEl.style.display = 'none';
+                        videoEl.style.display = 'none';
+                        overlayEl.style.display = 'flex';
+                        overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
+                        statusText.innerHTML = `
+                            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(16, 185, 129, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--success); margin: 0 auto 0.5rem;">✓</div>
+                            <span style="color:var(--success); font-weight:bold; font-size: 0.95rem;">Calibration réussie !</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Mire détectée et paramètres intrinsèques enregistrés.</span>
+                        `;
+                        
+                        if (camId === 1) ecCalibratedCam1 = true;
+                        if (camId === 2) ecCalibratedCam2 = true;
+                        
+                        document.getElementById('ec-btn-next').disabled = false;
+                        btnSkip.disabled = false;
+                    } else {
+                        hudEl.style.display = 'none';
+                        videoEl.style.display = 'none';
+                        overlayEl.style.display = 'flex';
+                        overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
+                        statusText.innerHTML = `
+                            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); border: 2px solid var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--danger); margin: 0 auto 0.5rem;">✗</div>
+                            <span style="color:var(--danger); font-weight:bold; font-size: 0.95rem;">Échec de la calibration</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Aucune mire de calibration détectée ou flux caméra instable.</span>
+                        `;
+                        btnRun.disabled = false;
+                        btnSkip.disabled = false;
+                    }
+                }
+            }, 1000);
+        }
+
+        function ecStartRobotAndClose() {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "start_robot" }));
+            }
+            closeEasyConfig();
+        }
+
+        // ─── VSLAM TEST FUNCTIONS ──────────────────────────────────────────────
+        window.vslamTesting = false;
+        let vslamPeerConnection = null;
+        let lastPoseTime = 0;
+        let poseUpdateCount = 0;
+        let vslamHzInterval = null;
+
+        function toggleVSlamTest() {
+            const btn = document.getElementById('btn-vslam-test-toggle');
+            const container = document.getElementById('vslam-test-video-container');
+            const statusVal = document.getElementById('vslam-status-val');
+            const badgeEl = document.getElementById('vslam-badge');
+            const rateVal = document.getElementById('vslam-rate-val');
+            
+            if (!window.vslamTesting) {
+                window.vslamTesting = true;
+                btn.textContent = '⏹️ Arrêter le Test V-SLAM';
+                btn.className = 'btn btn-secondary';
+                container.style.display = 'block';
+                badgeEl.textContent = 'Actif';
+                badgeEl.className = 'status-badge active';
+                statusVal.textContent = 'Initialisation...';
+                statusVal.style.color = 'var(--accent)';
+                
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "request_camera", camera: 1, v_slam: true }));
+                }
+                
+                startVSlamTestWebRTC();
+                
+                lastPoseTime = Date.now();
+                poseUpdateCount = 0;
+                vslamHzInterval = setInterval(() => {
+                    const hz = poseUpdateCount / 2;
+                    rateVal.textContent = `${hz.toFixed(1)} Hz`;
+                    poseUpdateCount = 0;
+                    
+                    const qualVal = document.getElementById('vslam-quality-val');
+                    const warningBox = document.getElementById('vslam-warning-box');
+                    
+                    if (window.lastTelemetryState && window.lastTelemetryState.imu) {
+                        const imu = window.lastTelemetryState.imu;
+                        if (!window.lastVSlamImu) window.lastVSlamImu = imu;
+                        const delta = Math.abs(imu.roll - window.lastVSlamImu.roll) + Math.abs(imu.pitch - window.lastVSlamImu.pitch);
+                        window.lastVSlamImu = imu;
+                        
+                        if (delta > 12) {
+                            qualVal.textContent = 'Dégradée';
+                            qualVal.style.color = 'var(--danger)';
+                            warningBox.style.display = 'block';
+                        } else {
+                            qualVal.textContent = 'Optimale';
+                            qualVal.style.color = 'var(--success)';
+                            warningBox.style.display = 'none';
+                        }
+                    }
+                    
+                    if (hz > 0.1) {
+                        statusVal.textContent = 'Localisé / Tracking';
+                        statusVal.style.color = 'var(--success)';
+                    } else {
+                        let odomTopicActive = false;
+                        if (window.lastTelemetryState && window.lastTelemetryState.topics) {
+                            odomTopicActive = window.lastTelemetryState.topics.some(t => t.name === '/odom' && t.hz > 0);
+                        }
+                        if (odomTopicActive) {
+                            statusVal.textContent = 'Recherche de repères...';
+                            statusVal.style.color = 'var(--accent)';
+                        } else {
+                            statusVal.textContent = 'Attente du nœud ROS 2...';
+                            statusVal.style.color = 'var(--text-secondary)';
+                        }
+                    }
+                }, 2000);
+                
+            } else {
+                window.vslamTesting = false;
+                btn.textContent = '🚀 Lancer le Test V-SLAM';
+                btn.className = 'btn btn-primary';
+                container.style.display = 'none';
+                badgeEl.textContent = 'Inactif';
+                badgeEl.className = 'status-badge';
+                statusVal.textContent = 'Non démarré';
+                statusVal.style.color = 'var(--text-secondary)';
+                rateVal.textContent = '0.0 Hz';
+                document.getElementById('vslam-quality-val').textContent = 'Optimale';
+                document.getElementById('vslam-quality-val').style.color = 'var(--success)';
+                document.getElementById('vslam-warning-box').style.display = 'none';
+                
+                clearInterval(vslamHzInterval);
+                
+                if (vslamPeerConnection) {
+                    try { vslamPeerConnection.close(); } catch(e) {}
+                    vslamPeerConnection = null;
+                }
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "release_camera", camera: 1 }));
+                }
+            }
+        }
+
+        async function startVSlamTestWebRTC() {
+            const videoEl = document.getElementById('vslam-test-video');
+            const loaderEl = document.getElementById('vslam-test-loader');
+            const statusVal = document.getElementById('vslam-status-val');
+            
+            if (vslamPeerConnection) {
+                try { vslamPeerConnection.close(); } catch(e) {}
+                vslamPeerConnection = null;
+            }
+            
+            loaderEl.style.display = 'flex';
+            videoEl.style.display = 'none';
+            
+            try {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                vslamPeerConnection = pc;
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                
+                pc.ontrack = (event) => {
+                    if (event.streams && event.streams[0]) {
+                        videoEl.srcObject = event.streams[0];
+                    } else {
+                        const inboundStream = new MediaStream();
+                        inboundStream.addTrack(event.track);
+                        videoEl.srcObject = inboundStream;
+                    }
+                    videoEl.play().catch(e => console.warn(e));
+                    loaderEl.style.display = 'none';
+                    videoEl.style.display = 'block';
+                };
+                
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam1/whep`;
+                
+                let response = null;
+                let retries = 15;
+                while (retries > 0 && window.vslamTesting) {
+                    try {
+                        response = await fetch(webrtcUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/sdp' },
+                            body: pc.localDescription.sdp
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(e);
+                    }
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                }
+                
+                if (!response || !response.ok) {
+                    throw new Error("WHEP stream not ready");
+                }
+                
+                const answerSdp = await response.text();
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                }));
+                
+            } catch(err) {
+                console.error(err);
+                loaderEl.style.display = 'none';
+                statusVal.textContent = "Erreur WebRTC";
+                statusVal.style.color = "var(--danger)";
             }
         }
 
