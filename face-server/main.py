@@ -11,7 +11,6 @@ import json
 import hashlib
 import threading
 import requests
-import psutil
 from pathlib import Path
 from typing import Optional
 from myges_api import MyGesAPI
@@ -70,20 +69,41 @@ async def lifespan(app: FastAPI):
                 print(f"[AutoUpdater] Erreur : {e}")
 
     def _gateway_telemetry_collector():
+        prev_idle = prev_total = 0
         while True:
             try:
-                gateway_telemetry["cpu_percent"] = psutil.cpu_percent(interval=1)
-                mem = psutil.virtual_memory()
-                gateway_telemetry["ram_percent"] = mem.percent
-                disk = psutil.disk_usage("/")
-                gateway_telemetry["disk_percent"] = disk.percent
-                temps = psutil.sensors_temperatures()
-                if temps:
-                    for name, entries in temps.items():
-                        if entries:
-                            gateway_telemetry["temp_c"] = entries[0].current
-                            break
-                gateway_telemetry["uptime_s"] = time.time() - psutil.boot_time()
+                with open("/proc/stat") as f:
+                    parts = f.readline().split()
+                    idle, total = int(parts[4]), sum(int(x) for x in parts[1:])
+                d_idle, d_total = idle - prev_idle, total - prev_total
+                prev_idle, prev_total = idle, total
+                gateway_telemetry["cpu_percent"] = round((1 - d_idle / max(d_total, 1)) * 100, 1)
+
+                with open("/proc/meminfo") as f:
+                    mem = {}
+                    for line in f:
+                        k, *v = line.split(":")
+                        mem[k.strip()] = int(v[0].strip().split()[0]) if v else 0
+                total_mem = mem.get("MemTotal", 1)
+                avail_mem = mem.get("MemAvailable", 0)
+                gateway_telemetry["ram_percent"] = round((1 - avail_mem / total_mem) * 100, 1)
+
+                st = os.statvfs("/")
+                total_disk = st.f_blocks * st.f_frsize
+                free_disk = st.f_bavail * st.f_frsize
+                gateway_telemetry["disk_percent"] = round((1 - free_disk / max(total_disk, 1)) * 100, 1)
+
+                try:
+                    with open("/sys/class/thermal/thermal_zone0/temp") as f:
+                        gateway_telemetry["temp_c"] = round(int(f.read().strip()) / 1000, 1)
+                except Exception:
+                    gateway_telemetry["temp_c"] = 0
+
+                try:
+                    with open("/proc/uptime") as f:
+                        gateway_telemetry["uptime_s"] = float(f.read().split()[0])
+                except Exception:
+                    gateway_telemetry["uptime_s"] = 0
             except Exception:
                 pass
             time.sleep(3)
