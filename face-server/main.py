@@ -2423,16 +2423,18 @@ def dashboard():
 
                         <div>
                             <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Détection d'Objets (YOLO)</h4>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
-                                <button class="btn btn-secondary active-control" id="yolo-ctrl-enabled" onclick="setAIControl('yolo', 'enabled')">Activé</button>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="yolo-ctrl-robot" onclick="setAIControl('yolo', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="yolo-ctrl-node" onclick="setAIControl('yolo', 'node')">PC Node</button>
                                 <button class="btn btn-secondary" id="yolo-ctrl-disabled" onclick="setAIControl('yolo', 'disabled')">Désactivé</button>
                             </div>
                         </div>
 
                         <div>
                             <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Reconnaissance Faciale</h4>
-                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem;">
-                                <button class="btn btn-secondary active-control" id="face_rec-ctrl-enabled" onclick="setAIControl('face_rec', 'enabled')">Activé</button>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="face_rec-ctrl-robot" onclick="setAIControl('face_rec', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="face_rec-ctrl-node" onclick="setAIControl('face_rec', 'node')">PC Node</button>
                                 <button class="btn btn-secondary" id="face_rec-ctrl-disabled" onclick="setAIControl('face_rec', 'disabled')">Désactivé</button>
                             </div>
                         </div>
@@ -2829,6 +2831,14 @@ def dashboard():
                         </button>
                         <button class="btn btn-secondary" onclick="sendCalibrationOffsets()" style="flex:1;">
                             ⚡ Tester Directement
+                        </button>
+                    </div>
+                    <div style="margin-top: 0.75rem; display: flex; gap: 1rem;">
+                        <button class="btn btn-secondary" onclick="resetAndSendZeroOffsets()" style="flex:1; border-color: #f59e0b; color: #f59e0b;">
+                            🔄 Remettre à zéro les offsets
+                        </button>
+                        <button class="btn btn-secondary" onclick="sendStopServos()" style="flex:1; border-color: #ef4444; color: #ef4444;">
+                            🚫 Désactiver servos
                         </button>
                     </div>
                 </div>
@@ -3682,8 +3692,8 @@ def dashboard():
                 'tts': ['robot', 'node', 'disabled'],
                 'stt': ['robot', 'node', 'disabled'],
                 'chat': ['robot', 'node', 'disabled'],
-                'yolo': ['enabled', 'disabled'],
-                'face_rec': ['enabled', 'disabled']
+                'yolo': ['robot', 'node', 'disabled'],
+                'face_rec': ['robot', 'node', 'disabled']
             };
             
             buttons[feature].forEach(t => {
@@ -3704,10 +3714,9 @@ def dashboard():
         }
 
         function updateAIControlUI(feature, target) {
-            const list = (feature === 'yolo' || feature === 'face_rec') ? ['enabled', 'disabled'] : ['robot', 'node', 'disabled'];
+            const list = ['robot', 'node', 'disabled'];
             list.forEach(t => {
-                const suffix = (t === 'disabled' && feature !== 'yolo' && feature !== 'face_rec') ? 'off' : t;
-                const btnId = `${feature}-ctrl-${suffix}`;
+                const btnId = `${feature}-ctrl-${t}`;
                 const btn = document.getElementById(btnId);
                 if (btn) {
                     if (t === target) {
@@ -3748,6 +3757,29 @@ def dashboard():
             }
         }
 
+        async function resetAndSendZeroOffsets() {
+            // Remet tous les sliders à 0
+            resetMotorCalibration();
+            const zeroes = new Array(12).fill(0);
+            // Sauvegarde sur la gateway
+            try {
+                await fetch('/core/calibration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Token': apiToken },
+                    body: JSON.stringify({ offsets: zeroes })
+                });
+            } catch(e) {}
+            // Transmet immédiatement au robot
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: zeroes }));
+            }
+        }
+
+        function sendStopServos() {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+            }
+        }
         async function sendCalibrationOffsets() {
             const offsets = [];
             for (let i = 0; i < 12; i++) {
