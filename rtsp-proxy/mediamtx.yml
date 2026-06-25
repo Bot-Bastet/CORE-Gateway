@@ -25,9 +25,10 @@ webrtc: yes
 webrtcIPsFromInterfaces: false
 webrtcAdditionalHosts:
   - ha.arthonetwork.fr
+  - 192.168.0.100
 webrtcLocalUDPAddress: :48189
 webrtcLocalTCPAddress: :48189
-webrtcICEServers2:
+webrtcICEServers:
   - url: stun:stun.l.google.com:19302
 
 # ─── Niveau de log ───────────────────────────────────────────────────────────
