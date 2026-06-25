@@ -2170,7 +2170,13 @@ def dashboard():
             <div class="card-grid">
                 <!-- 12 Servomotor Angles -->
                 <div class="card" style="grid-column: 1 / -1;">
-                    <div class="card-title">Angles en Direct des 12 Servomoteurs (Arduino Mega)</div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                        <div class="card-title" style="margin:0;">Angles en Direct des 12 Servomoteurs (Arduino Mega)</div>
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem;">
+                            <input type="checkbox" id="joint-manual-toggle" onchange="toggleManualJointControl(this.checked)" style="accent-color:var(--accent); cursor:pointer; width:16px; height:16px;"/>
+                            <label for="joint-manual-toggle" style="cursor:pointer; font-weight:600; color: #a5b4fc; user-select:none;">Activer le contrôle manuel (Mode Test)</label>
+                        </div>
+                    </div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.5rem;">
                         <!-- FR -->
                         <div class="joint-group-card">
@@ -2178,15 +2184,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.5rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad (Hanche)</span><span id="joint-val-0">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-0" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-0" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(0, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper (Cuisse)</span><span id="joint-val-1">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-1" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-1" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(1, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower (Tibia)</span><span id="joint-val-2">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-2" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-2" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(2, this.value)"/>
                                 </div>
                             </div>
                         </div>
@@ -2197,15 +2203,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.5rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad (Hanche)</span><span id="joint-val-3">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-3" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-3" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(3, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper (Cuisse)</span><span id="joint-val-4">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-4" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-4" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(4, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower (Tibia)</span><span id="joint-val-5">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-5" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-5" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(5, this.value)"/>
                                 </div>
                             </div>
                         </div>
@@ -2216,15 +2222,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.5rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad (Hanche)</span><span id="joint-val-6">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-6" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-6" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(6, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper (Cuisse)</span><span id="joint-val-7">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-7" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-7" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(7, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower (Tibia)</span><span id="joint-val-8">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-8" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-8" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(8, this.value)"/>
                                 </div>
                             </div>
                         </div>
@@ -2235,15 +2241,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.5rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad (Hanche)</span><span id="joint-val-9">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-9" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-9" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(9, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper (Cuisse)</span><span id="joint-val-10">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-10" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-10" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(10, this.value)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower (Tibia)</span><span id="joint-val-11">90°</span></div>
-                                    <div class="progress-bar-container" style="height: 6px; margin: 0.25rem 0;"><div id="joint-bar-11" class="progress-bar-fill" style="width: 50%;"></div></div>
+                                    <input type="range" id="joint-slider-11" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(11, this.value)"/>
                                 </div>
                             </div>
                         </div>
@@ -2913,6 +2919,7 @@ def dashboard():
         window.localViewing = { 1: false, 2: false };
         window.userClosedStream = { 1: false, 2: false };
         let peerConnections = { 1: null, 2: null };
+        window.manualJointControlActive = false;
         
         // SLAM / Map variables
         window.slamGrid = null;
@@ -3057,9 +3064,11 @@ def dashboard():
                         for (let i = 0; i < 12; i++) {
                             const angle = payload.joints[i];
                             const valEl = document.getElementById(`joint-val-${i}`);
-                            const barEl = document.getElementById(`joint-bar-${i}`);
-                            if (valEl) valEl.textContent = `${Math.round(angle)}°`;
-                            if (barEl) barEl.style.width = `${(angle / 180) * 100}%`;
+                            const sliderEl = document.getElementById(`joint-slider-${i}`);
+                            if (!window.manualJointControlActive) {
+                                if (valEl) valEl.textContent = `${Math.round(angle)}°`;
+                                if (sliderEl) sliderEl.value = Math.round(angle);
+                            }
                         }
                     }
                     
@@ -3300,6 +3309,37 @@ def dashboard():
                 appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
             } else {
                 alert("WebSocket déconnecté.");
+            }
+        }
+
+        function toggleManualJointControl(checked) {
+            window.manualJointControlActive = checked;
+            for (let i = 0; i < 12; i++) {
+                const slider = document.getElementById(`joint-slider-${i}`);
+                if (slider) {
+                    slider.disabled = !checked;
+                    slider.style.cursor = checked ? 'pointer' : 'not-allowed';
+                }
+            }
+            if (checked) {
+                sendManualJointAngles();
+            }
+        }
+
+        function onJointSliderInput(index, val) {
+            const valEl = document.getElementById(`joint-val-${index}`);
+            if (valEl) valEl.textContent = `${Math.round(val)}°`;
+            sendManualJointAngles();
+        }
+
+        function sendManualJointAngles() {
+            const angles = [];
+            for (let i = 0; i < 12; i++) {
+                const slider = document.getElementById(`joint-slider-${i}`);
+                angles.push(slider ? parseFloat(slider.value) : 90.0);
+            }
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "manual_joint_control", angles: angles }));
             }
         }
 
@@ -4979,6 +5019,30 @@ def dashboard():
             document.getElementById('ec-progress-text').textContent = `Étape ${step} sur 4`;
             document.getElementById('ec-btn-prev').disabled = (step === 1);
             
+            if (step === 2 || step === 3) {
+                const camId = step === 2 ? 1 : 2;
+                const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
+                const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
+                const overlayEl = document.getElementById(`ec-cam-status-overlay-${camId}`);
+                const statusText = document.getElementById(`ec-cam-status-text-${camId}`);
+                const videoEl = document.getElementById(`ec-cam-video-${camId}`);
+                const hudEl = document.getElementById(`ec-cam-hud-${camId}`);
+                
+                if (btnRun) {
+                    btnRun.disabled = false;
+                    btnRun.innerHTML = `📷 Lancer la Calibration Cam${camId}`;
+                    btnRun.onclick = () => ecRunCameraCalib(camId);
+                }
+                if (btnSkip) btnSkip.disabled = false;
+                if (overlayEl) {
+                    overlayEl.style.display = 'flex';
+                    overlayEl.style.backgroundColor = 'rgba(0,0,0,0.85)';
+                }
+                if (statusText) statusText.innerHTML = `Le flux vidéo de la caméra s'affiche dès le lancement.`;
+                if (videoEl) videoEl.style.display = 'none';
+                if (hudEl) hudEl.style.display = 'none';
+            }
+            
             let canGoNext = false;
             if (step === 1 && ecCalibratedMotors) canGoNext = true;
             if (step === 2 && ecCalibratedCam1) canGoNext = true;
@@ -5083,6 +5147,7 @@ def dashboard():
             
             btnRun.disabled = true;
             btnSkip.disabled = true;
+            btnRun.innerHTML = `<span>📷 Connexion...</span>`;
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false }));
@@ -5112,7 +5177,10 @@ def dashboard():
                     videoEl.style.display = 'block';
                     hudEl.style.display = 'block';
                     
-                    ecStartScanningSim(camId);
+                    btnRun.disabled = false;
+                    btnSkip.disabled = false;
+                    btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
+                    btnRun.onclick = () => ecConfirmCalibration(camId);
                 };
                 
                 const offer = await pc.createOffer();
@@ -5161,7 +5229,20 @@ def dashboard():
                 `;
                 btnRun.disabled = false;
                 btnSkip.disabled = false;
+                btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
+                btnRun.onclick = () => ecRunCameraCalib(camId);
             }
+        }
+
+        function ecConfirmCalibration(camId) {
+            const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
+            const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
+            
+            btnRun.disabled = true;
+            btnSkip.disabled = true;
+            btnRun.innerHTML = `<span>📷 Analyse...</span>`;
+            
+            ecStartScanningSim(camId);
         }
 
         function ecStartScanningSim(camId) {
@@ -5209,9 +5290,11 @@ def dashboard():
                         `;
                         btnRun.disabled = false;
                         btnSkip.disabled = false;
+                        btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
+                        btnRun.onclick = () => ecRunCameraCalib(camId);
                     }
                 }
-            }, 1000);
+            }, 500);
         }
 
         function ecStartRobotAndClose() {
