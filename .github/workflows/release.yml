@@ -24,11 +24,10 @@ jobs:
 
       - name: Create Release Archive
         run: |
-          zip -r core-gateway-${{ steps.version.outputs.VERSION }}.zip . \
-            --exclude "*.git*" \
-            --exclude "*.env*" \
-            --exclude "verification.jpg" \
-            --exclude "*.log"
+          cd face-server
+          zip -r ../core-gateway-${{ steps.version.outputs.VERSION }}.zip . \
+            --exclude "__pycache__/*" \
+            --exclude "*.pyc"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2

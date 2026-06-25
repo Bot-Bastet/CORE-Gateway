@@ -10,18 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 curl unzip git \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer les dépendances Python
+# Copier requirements.txt et installer les dépendances Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Copier le code applicatif
-COPY *.py .
-COPY version.txt .
 
 # Volumes (faces + state/myges data)
 VOLUME ["/data"]
 
 EXPOSE 44888
 
-# Lancement HTTP (SSL désactivé pour éviter les erreurs de certificat sur IP publique)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "44888", "--log-level", "info", "--proxy-headers"]
+# Le code source est monté en volume depuis l'hôte via docker-compose
+# Le script d'entrée réinstalle les deps si requirements.txt a changé
+CMD ["sh", "-c", "pip install --no-cache-dir -r /app/requirements.txt 2>/dev/null; exec uvicorn main:app --host 0.0.0.0 --port 44888 --log-level info --proxy-headers"]

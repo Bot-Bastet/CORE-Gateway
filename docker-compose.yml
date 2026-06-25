@@ -34,12 +34,6 @@ services:
       - "49997:9997"                     # API
     networks:
       - bastet-net
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9997/v3/paths/list"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
 
   # ─────────────────────────────────────────────────────────────────────────
   #  Face & State Server — FastAPI (HTTPS)
@@ -55,6 +49,7 @@ services:
       - API_TOKEN=${API_TOKEN:-your-api-token-here}
     volumes:
       - gateway-data:/data
+      - ./face-server:/app
     ports:
       - "127.0.0.1:44887:44888"
     networks:

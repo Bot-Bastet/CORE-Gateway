@@ -1,16 +1,18 @@
 """
 Auto-updater pour CORE-Gateway (Python / Docker sur serveur Linux).
-Vérifie GitHub Releases et effectue git pull + docker compose up si une nouvelle version existe.
-Appelé au démarrage par main.py.
+Vérifie GitHub Releases et télécharge l'archive zip pour mettre à jour le code source.
+Le code source est monté en volume bind-mount (./face-server → /app),
+donc les fichiers extraits persistent sur l'hôte et survivent aux redémarrages Docker.
 """
 import os
+import shutil
 import subprocess
+import tempfile
 import requests
 import logging
 import socket
 from pathlib import Path
 
-# Set global socket timeout to prevent hangs
 socket.setdefaulttimeout(30.0)
 
 logger = logging.getLogger("auto_updater")
@@ -47,6 +49,9 @@ def _version_tuple(v: str) -> tuple:
 def check_and_apply_update() -> bool:
     """
     Vérifie et applique la mise à jour si disponible.
+    Le zip de la release contient la structure complète du repo (face-server/, docker-compose.yml, etc.).
+    On extrait dans un dossier temporaire, puis on copie seulement face-server/* vers /app.
+    Comme /app est un bind-mount vers ./face-server sur l'hôte, les fichiers persistent.
     Retourne True si une mise à jour a été appliquée (le service doit être redémarré).
     """
     current = get_current_version()
@@ -64,7 +69,6 @@ def check_and_apply_update() -> bool:
 
     logger.info(f"[AutoUpdater] Nouvelle version disponible : {latest_tag} (actuelle : {current})")
 
-    # Trouver l'archive zip dans les assets
     zip_asset = None
     for asset in release.get("assets", []):
         if asset["name"].endswith(".zip"):
@@ -77,11 +81,10 @@ def check_and_apply_update() -> bool:
 
     try:
         import json
-        # Télécharger l'archive
-        repo_root = Path(__file__).parent.parent
-        zip_path = repo_root / "update.zip"
-        
+
+        app_dir = Path("/app")
         progress_file = Path("/data/gateway_update_state.json")
+
         def save_progress(status: str, percent: int):
             try:
                 with open(progress_file, "w") as f_prog:
@@ -93,22 +96,39 @@ def check_and_apply_update() -> bool:
         resp = requests.get(zip_asset["browser_download_url"], stream=True, timeout=120)
         total_size = int(resp.headers.get("content-length", 0))
         downloaded = 0
-        
-        save_progress("downloading", 0)
-        with open(zip_path, "wb") as f:
-            for chunk in resp.iter_content(chunk_size=8192):
-                f.write(chunk)
-                downloaded += len(chunk)
-                if total_size > 0:
-                    percent = int((downloaded / total_size) * 100)
-                    save_progress("downloading", percent)
 
-        # Extraire sur place (écrase les fichiers existants)
-        save_progress("extracting", 100)
-        subprocess.run(["unzip", "-o", str(zip_path), "-d", str(repo_root)], check=True)
-        zip_path.unlink()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            zip_path = Path(tmp_dir) / "update.zip"
 
-        # Mettre à jour la version
+            save_progress("downloading", 0)
+            with open(zip_path, "wb") as f:
+                for chunk in resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        percent = int((downloaded / total_size) * 100)
+                        save_progress("downloading", percent)
+
+            save_progress("extracting", 100)
+            subprocess.run(["unzip", "-o", str(zip_path), "-d", tmp_dir], check=True)
+
+            extracted_face = Path(tmp_dir) / "face-server"
+            if not extracted_face.exists():
+                logger.warning("[AutoUpdater] Dossier face-server/ absent dans l'archive.")
+                save_progress("failed", 0)
+                return False
+
+            for item in extracted_face.iterdir():
+                if item.name == "__pycache__":
+                    continue
+                dest = app_dir / item.name
+                if item.is_dir():
+                    if dest.exists():
+                        shutil.rmtree(dest)
+                    shutil.copytree(item, dest)
+                else:
+                    shutil.copy2(item, dest)
+
         VERSION_FILE.write_text(latest_tag)
         save_progress("idle", 100)
         logger.info(f"[AutoUpdater] Mise à jour {latest_tag} appliquée. Redémarrage requis.")
@@ -116,4 +136,5 @@ def check_and_apply_update() -> bool:
 
     except Exception as e:
         logger.error(f"[AutoUpdater] Erreur lors de la mise à jour : {e}")
+        save_progress("failed", 0)
         return False
