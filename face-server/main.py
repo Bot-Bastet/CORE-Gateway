@@ -2620,6 +2620,7 @@ def dashboard():
                 <div>
                     <h3 class="font-outfit" style="font-size: 1.15rem; margin-bottom: 0.25rem;">Section Calibration & Configuration WiFi</h3>
                     <p style="color: var(--text-secondary); font-size: 0.85rem;">Ajuster les angles des moteurs, configurer le WiFi et observer la minimap.</p>
+                    <div id="calib-status-badge" style="font-size: 0.8rem; margin-top: 0.4rem; color: var(--text-secondary);">Chargement du statut des moteurs...</div>
                 </div>
                 <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
                     <button class="btn btn-secondary" onclick="openWifiModal()">
@@ -2630,6 +2631,12 @@ def dashboard():
                     </button>
                     <button class="btn btn-primary" onclick="openCalibrationOverlay()">
                         ⚙️ Ouvrir la Calibration
+                    </button>
+                    <button class="btn btn-secondary" style="background-color: rgba(255, 255, 255, 0.05);" onclick="resetAndSendZeroOffsets()">
+                        🔄 Remettre à zéro les offsets
+                    </button>
+                    <button class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger); background-color: rgba(239, 68, 68, 0.05);" onclick="sendStopServos()">
+                        🚫 Désactiver servos
                     </button>
                 </div>
             </div>
@@ -3476,6 +3483,7 @@ def dashboard():
             startIntervals();
             initDragAndDrop();
             connectGlobalWebSocket();
+            loadSavedOffsets();
         }
 
         // --- INTERVALS ---
@@ -3831,9 +3839,48 @@ def dashboard():
 
         // ─── CALIBRATION WINDOW FUNCTIONS ──────────────────────────────────────
         
+        async function loadSavedOffsets() {
+            try {
+                const res = await fetch('/core/calibration', {
+                    headers: { 'X-API-Token': apiToken }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    const offsets = data.offsets || [];
+                    
+                    let allZero = true;
+                    for (let i = 0; i < 12; i++) {
+                        const val = offsets[i] !== undefined ? offsets[i] : 0;
+                        if (val !== 0) allZero = false;
+                        
+                        const slider = document.getElementById(`calib-slider-${i}`);
+                        if (slider) {
+                            slider.value = val;
+                            updateCalibSliderVal(i);
+                        }
+                    }
+                    
+                    const statusText = allZero 
+                        ? '🚫 Offsets non configurés (Moteurs désactivés)' 
+                        : '✅ Offsets configurés (Moteurs actifs)';
+                    const statusColor = allZero ? 'var(--danger)' : 'var(--success)';
+                    
+                    const badgeCalib = document.getElementById('calib-status-badge');
+                    if (badgeCalib) {
+                        badgeCalib.textContent = statusText;
+                        badgeCalib.style.color = statusColor;
+                        badgeCalib.style.fontWeight = 'bold';
+                    }
+                }
+            } catch (err) {
+                console.error("Erreur lors du chargement des offsets:", err);
+            }
+        }
+
         function openCalibrationOverlay() {
             document.getElementById('calibration-overlay').classList.add('active');
             setTimeout(drawMinimap, 100);
+            loadSavedOffsets();
         }
 
         function closeCalibrationOverlay() {
@@ -3859,10 +3906,8 @@ def dashboard():
         }
 
         async function resetAndSendZeroOffsets() {
-            // Remet tous les sliders à 0
             resetMotorCalibration();
             const zeroes = new Array(12).fill(0);
-            // Sauvegarde sur la gateway
             try {
                 await fetch('/core/calibration', {
                     method: 'POST',
@@ -3870,10 +3915,10 @@ def dashboard():
                     body: JSON.stringify({ offsets: zeroes })
                 });
             } catch(e) {}
-            // Transmet immédiatement au robot
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "motor_calibration", offsets: zeroes }));
             }
+            loadSavedOffsets();
         }
 
         function sendStopServos() {
@@ -3946,6 +3991,7 @@ def dashboard():
                     if (appWs && appWs.readyState === WebSocket.OPEN) {
                         appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
                     }
+                    loadSavedOffsets();
                 } else {
                     alert("Erreur lors de la sauvegarde.");
                 }
