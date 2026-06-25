@@ -4156,6 +4156,11 @@ def dashboard():
             const loaderEl = document.getElementById(`stream-loader-${camId}`);
             const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
 
+            if (window.hlsInstances && window.hlsInstances[camId]) {
+                try { window.hlsInstances[camId].destroy(); } catch(e) {}
+                delete window.hlsInstances[camId];
+            }
+
             if (peerConnections[camId]) {
                 try {
                     peerConnections[camId].close();
@@ -4165,6 +4170,8 @@ def dashboard():
 
             if (videoEl) {
                 videoEl.srcObject = null;
+                videoEl.src = '';
+                videoEl.removeAttribute('src');
                 videoEl.style.display = 'none';
             }
             if (videoContainer) {
@@ -4183,6 +4190,105 @@ def dashboard():
             statusEl.className = isActive ? 'status-badge active' : 'status-badge';
             btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
             window.localViewing[camId] = false;
+        }
+
+        function playHLSStream(videoEl, camId, onPlay, onError, customKey) {
+            const hlsUrl = `${window.location.protocol}//${window.location.hostname}:48888/robot/cam${camId}/index.m3u8`;
+            const hlsKey = customKey || camId;
+            
+            if (!window.hlsInstances) window.hlsInstances = {};
+            if (window.hlsInstances[hlsKey]) {
+                try { window.hlsInstances[hlsKey].destroy(); } catch(e) {}
+                delete window.hlsInstances[hlsKey];
+            }
+            
+            if (Hls.isSupported()) {
+                const hls = new Hls({
+                    maxBufferSize: 0,
+                    maxBufferLength: 0.5,
+                    liveSyncDuration: 0.5,
+                    liveMaxLatencyDuration: 1.5,
+                    enableWorker: true,
+                    lowLatencyMode: true
+                });
+                window.hlsInstances[hlsKey] = hls;
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(videoEl);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    videoEl.play().then(onPlay).catch(e => {
+                        console.warn(e);
+                        onPlay();
+                    });
+                });
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        switch(data.type) {
+                            case Hls.ErrorTypes.NETWORK_ERROR:
+                                console.warn("HLS Network error, retrying...", data);
+                                hls.startLoad();
+                                break;
+                            case Hls.ErrorTypes.MEDIA_ERROR:
+                                console.warn("HLS Media error, recovering...", data);
+                                hls.recoverMediaError();
+                                break;
+                            default:
+                                console.error("HLS Fatal error:", data);
+                                if (onError) onError(data);
+                                break;
+                        }
+                    }
+                });
+            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                videoEl.src = hlsUrl;
+                videoEl.addEventListener('loadedmetadata', function() {
+                    videoEl.play().then(onPlay).catch(e => {
+                        console.warn(e);
+                        onPlay();
+                    });
+                });
+            } else {
+                if (onError) onError("HLS not supported in this browser");
+            }
+        }
+
+        function startStreamHLS(camId) {
+            const placeholder = document.getElementById(`stream-placeholder-${camId}`);
+            const statusEl = document.getElementById(`stream-status-${camId}`);
+            const btnText = document.getElementById(`stream-btn-text-${camId}`);
+            const videoContainer = document.getElementById(`video-container-${camId}`);
+            const videoEl = document.getElementById(`video-cam-${camId}`);
+            const loaderEl = document.getElementById(`stream-loader-${camId}`);
+            const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
+
+            statusEl.textContent = 'Connexion (HLS)…';
+            statusEl.className = 'status-badge';
+            placeholder.style.display = 'none';
+            videoContainer.style.display = 'block';
+            videoEl.style.display = 'none';
+            fsBtn.style.display = 'none';
+            loaderEl.style.display = 'flex';
+
+            playHLSStream(
+                videoEl,
+                camId,
+                () => {
+                    loaderEl.style.display = 'none';
+                    videoEl.style.display = 'block';
+                    fsBtn.style.display = 'block';
+                    statusEl.textContent = 'En direct (HLS)';
+                    statusEl.className = 'status-badge active';
+                    btnText.textContent = 'Couper Caméra';
+                },
+                (err) => {
+                    loaderEl.style.display = 'none';
+                    statusEl.textContent = 'Erreur connexion';
+                    statusEl.className = 'status-badge error';
+                    btnText.textContent = 'Réessayer';
+                    window.activeStreams[camId] = false;
+                    placeholder.style.display = 'flex';
+                    videoContainer.style.display = 'none';
+                }
+            );
         }
 
         async function startStreamWebRTC(camId) {
@@ -4209,15 +4315,44 @@ def dashboard():
             fsBtn.style.display = 'none';
             loaderEl.style.display = 'flex';
 
+            let pc = null;
+            let fallbackTriggered = false;
+            const triggerHLSFallback = () => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                console.warn(`WebRTC failed or timed out for cam${camId}, trying HLS fallback...`);
+                if (pc) {
+                    if (peerConnections[camId] === pc) {
+                        peerConnections[camId] = null;
+                    }
+                    try { pc.close(); } catch(e) {}
+                }
+                startStreamHLS(camId);
+            };
+
             try {
-                const pc = new RTCPeerConnection({
+                pc = new RTCPeerConnection({
                     iceServers: []
                 });
                 peerConnections[camId] = pc;
 
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
+                let trackTimeout = setTimeout(() => {
+                    triggerHLSFallback();
+                }, 4000);
+
+                pc.oniceconnectionstatechange = () => {
+                    console.log(`WebRTC ICE state cam${camId}: ${pc.iceConnectionState}`);
+                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+                        triggerHLSFallback();
+                    }
+                };
+
                 pc.ontrack = (event) => {
+                    clearTimeout(trackTimeout);
+                    if (fallbackTriggered) return;
+
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -4269,14 +4404,8 @@ def dashboard():
                 }));
 
             } catch (err) {
-                console.error("WHEP error:", err);
-                loaderEl.style.display = 'none';
-                statusEl.textContent = 'Erreur connexion';
-                statusEl.className = 'status-badge error';
-                btnText.textContent = 'Réessayer';
-                window.activeStreams[camId] = false;
-                placeholder.style.display = 'flex';
-                videoContainer.style.display = 'none';
+                console.error("WHEP error, falling back to HLS:", err);
+                triggerHLSFallback();
             }
         }
 
@@ -4327,9 +4456,17 @@ def dashboard():
             document.getElementById('cameraCalibModal').classList.remove('active');
             
             const videoEl = document.getElementById('mcc-cam-video');
-            if (videoEl.srcObject) {
-                videoEl.srcObject.getTracks().forEach(t => t.stop());
-                videoEl.srcObject = null;
+            if (window.hlsInstances && window.hlsInstances['calib']) {
+                try { window.hlsInstances['calib'].destroy(); } catch(e) {}
+                delete window.hlsInstances['calib'];
+            }
+            if (videoEl) {
+                if (videoEl.srcObject) {
+                    videoEl.srcObject.getTracks().forEach(t => t.stop());
+                    videoEl.srcObject = null;
+                }
+                videoEl.src = '';
+                videoEl.removeAttribute('src');
             }
             if (mccPeerConnection) {
                 mccPeerConnection.close();
@@ -4368,15 +4505,70 @@ def dashboard():
                 <span>Initialisation flux WebRTC caméra...</span>
             `;
             
+            let pc = null;
+            let fallbackTriggered = false;
+            const triggerHLSFallback = () => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                console.warn(`WebRTC failed or timed out for calibration cam${camId}, trying HLS fallback...`);
+                if (pc) {
+                    if (mccPeerConnection === pc) {
+                        mccPeerConnection = null;
+                    }
+                    try { pc.close(); } catch(e) {}
+                }
+                
+                playHLSStream(
+                    videoEl,
+                    camId,
+                    () => {
+                        overlayEl.style.display = 'none';
+                        videoEl.style.display = 'block';
+                        hudEl.style.display = 'block';
+                        
+                        btnRun.disabled = false;
+                        btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
+                        btnRun.onclick = () => confirmIndividualCameraCalib();
+                    },
+                    (err) => {
+                        videoEl.style.display = 'none';
+                        hudEl.style.display = 'none';
+                        overlayEl.style.display = 'flex';
+                        statusText.innerHTML = `
+                            <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                            <span style="color:var(--danger); font-weight:bold;">Échec : Flux vidéo indisponible.</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez le branchement ou que le service spotbot est démarré.</span>
+                        `;
+                        btnRun.disabled = false;
+                        btnRun.innerHTML = `<span>📷 Lancer la Caméra</span>`;
+                        btnRun.onclick = () => runIndividualCameraCalib();
+                    },
+                    'calib'
+                );
+            };
+
             try {
                 if (mccPeerConnection) {
                     mccPeerConnection.close();
                 }
-                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [] });
                 mccPeerConnection = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
                 
+                let trackTimeout = setTimeout(() => {
+                    triggerHLSFallback();
+                }, 4000);
+
+                pc.oniceconnectionstatechange = () => {
+                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+                        triggerHLSFallback();
+                    }
+                };
+
                 pc.ontrack = (event) => {
+                    clearTimeout(trackTimeout);
+                    if (fallbackTriggered) return;
+
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -4431,17 +4623,7 @@ def dashboard():
                 
             } catch (err) {
                 console.error(err);
-                videoEl.style.display = 'none';
-                hudEl.style.display = 'none';
-                overlayEl.style.display = 'flex';
-                statusText.innerHTML = `
-                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
-                    <span style="color:var(--danger); font-weight:bold;">Échec : Flux WebRTC indisponible.</span><br/>
-                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez le branchement ou que le service spotbot est démarré.</span>
-                `;
-                btnRun.disabled = false;
-                btnRun.innerHTML = `<span>📷 Lancer la Caméra</span>`;
-                btnRun.onclick = () => runIndividualCameraCalib();
+                triggerHLSFallback();
             }
         }
         
@@ -5251,6 +5433,16 @@ def dashboard():
             document.getElementById('easyconfig-overlay').classList.remove('active');
             
             for (let id of [1, 2]) {
+                const videoEl = document.getElementById(`ec-cam-video-${id}`);
+                if (window.hlsInstances && window.hlsInstances[`ec-${id}`]) {
+                    try { window.hlsInstances[`ec-${id}`].destroy(); } catch(e) {}
+                    delete window.hlsInstances[`ec-${id}`];
+                }
+                if (videoEl) {
+                    videoEl.srcObject = null;
+                    videoEl.src = '';
+                    videoEl.removeAttribute('src');
+                }
                 if (ecPeerConnections[id]) {
                     try { ecPeerConnections[id].close(); } catch(e) {}
                     ecPeerConnections[id] = null;
@@ -5453,12 +5645,69 @@ def dashboard():
                 <span>Initialisation flux WebRTC caméra...</span>
             `;
             
+            let pc = null;
+            let fallbackTriggered = false;
+            const triggerHLSFallback = () => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                console.warn(`WebRTC failed or timed out for EasyConfig camera ${camId}, trying HLS fallback...`);
+                if (pc) {
+                    if (ecPeerConnections[camId] === pc) {
+                        ecPeerConnections[camId] = null;
+                    }
+                    try { pc.close(); } catch(e) {}
+                }
+                
+                playHLSStream(
+                    videoEl,
+                    camId,
+                    () => {
+                        overlayEl.style.display = 'none';
+                        videoEl.style.display = 'block';
+                        hudEl.style.display = 'block';
+                        
+                        btnRun.disabled = false;
+                        btnSkip.disabled = false;
+                        btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
+                        btnRun.onclick = () => ecConfirmCalibration(camId);
+                    },
+                    (err) => {
+                        videoEl.style.display = 'none';
+                        hudEl.style.display = 'none';
+                        overlayEl.style.display = 'flex';
+                        statusText.innerHTML = `
+                            <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                            <span style="color:var(--danger); font-weight:bold;">Échec : Flux vidéo indisponible.</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que la caméra est bien branchée sur le robot.</span>
+                        `;
+                        btnRun.disabled = false;
+                        btnSkip.disabled = false;
+                        btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
+                        btnRun.onclick = () => ecRunCameraCalib(camId);
+                    },
+                    `ec-${camId}`
+                );
+            };
+
             try {
-                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [] });
                 ecPeerConnections[camId] = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
                 
+                let trackTimeout = setTimeout(() => {
+                    triggerHLSFallback();
+                }, 4000);
+
+                pc.oniceconnectionstatechange = () => {
+                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+                        triggerHLSFallback();
+                    }
+                };
+
                 pc.ontrack = (event) => {
+                    clearTimeout(trackTimeout);
+                    if (fallbackTriggered) return;
+
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -5514,18 +5763,7 @@ def dashboard():
                 
             } catch (err) {
                 console.error(err);
-                videoEl.style.display = 'none';
-                hudEl.style.display = 'none';
-                overlayEl.style.display = 'flex';
-                statusText.innerHTML = `
-                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
-                    <span style="color:var(--danger); font-weight:bold;">Échec : Flux WebRTC indisponible.</span><br/>
-                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que la caméra est bien branchée sur le robot.</span>
-                `;
-                btnRun.disabled = false;
-                btnSkip.disabled = false;
-                btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
-                btnRun.onclick = () => ecRunCameraCalib(camId);
+                triggerHLSFallback();
             }
         }
 
@@ -5690,6 +5928,17 @@ def dashboard():
                 
                 clearInterval(vslamHzInterval);
                 
+                if (window.hlsInstances && window.hlsInstances['vslam']) {
+                    try { window.hlsInstances['vslam'].destroy(); } catch(e) {}
+                    delete window.hlsInstances['vslam'];
+                }
+                const videoEl = document.getElementById('vslam-test-video');
+                if (videoEl) {
+                    videoEl.srcObject = null;
+                    videoEl.src = '';
+                    videoEl.removeAttribute('src');
+                }
+
                 if (vslamPeerConnection) {
                     try { vslamPeerConnection.close(); } catch(e) {}
                     vslamPeerConnection = null;
@@ -5713,12 +5962,54 @@ def dashboard():
             loaderEl.style.display = 'flex';
             videoEl.style.display = 'none';
             
+            let pc = null;
+            let fallbackTriggered = false;
+            const triggerHLSFallback = () => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                console.warn("WebRTC failed or timed out for VSLAM test, trying HLS fallback...");
+                if (pc) {
+                    if (vslamPeerConnection === pc) {
+                        vslamPeerConnection = null;
+                    }
+                    try { pc.close(); } catch(e) {}
+                }
+                
+                playHLSStream(
+                    videoEl,
+                    1,
+                    () => {
+                        loaderEl.style.display = 'none';
+                        videoEl.style.display = 'block';
+                    },
+                    (err) => {
+                        loaderEl.style.display = 'none';
+                        statusVal.textContent = "Erreur HLS";
+                        statusVal.style.color = "var(--danger)";
+                    },
+                    'vslam'
+                );
+            };
+
             try {
-                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [] });
                 vslamPeerConnection = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
                 
+                let trackTimeout = setTimeout(() => {
+                    triggerHLSFallback();
+                }, 4000);
+
+                pc.oniceconnectionstatechange = () => {
+                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
+                        triggerHLSFallback();
+                    }
+                };
+
                 pc.ontrack = (event) => {
+                    clearTimeout(trackTimeout);
+                    if (fallbackTriggered) return;
+
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -5767,9 +6058,7 @@ def dashboard():
                 
             } catch(err) {
                 console.error(err);
-                loaderEl.style.display = 'none';
-                statusVal.textContent = "Erreur WebRTC";
-                statusVal.style.color = "var(--danger)";
+                triggerHLSFallback();
             }
         }
 
