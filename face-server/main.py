@@ -11,6 +11,7 @@ import json
 import hashlib
 import threading
 import requests
+import psutil
 from pathlib import Path
 from typing import Optional
 from myges_api import MyGesAPI
@@ -32,6 +33,7 @@ MYGES_FILE = DATA_DIR / "myges.json"
 STATE_FILE = DATA_DIR / "core_state.json"
 USERS_FILE = DATA_DIR / "users.json"
 latest_diagnostics = {}
+gateway_telemetry = {"cpu_percent": 0, "ram_percent": 0, "disk_percent": 0, "temp_c": 0, "uptime_s": 0}
 
 
 FACES_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,7 +69,27 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"[AutoUpdater] Erreur : {e}")
 
+    def _gateway_telemetry_collector():
+        while True:
+            try:
+                gateway_telemetry["cpu_percent"] = psutil.cpu_percent(interval=1)
+                mem = psutil.virtual_memory()
+                gateway_telemetry["ram_percent"] = mem.percent
+                disk = psutil.disk_usage("/")
+                gateway_telemetry["disk_percent"] = disk.percent
+                temps = psutil.sensors_temperatures()
+                if temps:
+                    for name, entries in temps.items():
+                        if entries:
+                            gateway_telemetry["temp_c"] = entries[0].current
+                            break
+                gateway_telemetry["uptime_s"] = time.time() - psutil.boot_time()
+            except Exception:
+                pass
+            time.sleep(3)
+
     threading.Thread(target=_hourly_check, daemon=True).start()
+    threading.Thread(target=_gateway_telemetry_collector, daemon=True).start()
     yield
 
 app = FastAPI(
@@ -889,6 +911,9 @@ def dashboard():
         .cpu-gauge .circle { stroke: var(--accent); }
         .ram-gauge .circle { stroke: var(--success); }
         .temp-gauge .circle { stroke: #f59e0b; }
+        .gw-cpu-gauge .circle { stroke: #8b5cf6; }
+        .gw-ram-gauge .circle { stroke: #06b6d4; }
+        .gw-disk-gauge .circle { stroke: #f97316; }
 
         .gauge-value {
             position: absolute;
@@ -1993,7 +2018,76 @@ def dashboard():
                         <div class="sensor-item"><span class="sensor-label">Dernière mise à jour</span><span id="sensor-last-seen" class="sensor-val">--</span></div>
                     </div>
                 </div>
-                
+
+                <!-- Gateway Telemetry Card -->
+                <div class="card" id="gateway-card">
+                    <div class="card-title">
+                        <span>Télémétrie Gateway</span>
+                        <span id="gateway-status-badge" class="status-badge online">En ligne</span>
+                    </div>
+                    <div id="gateway-telemetry-content">
+                        <div class="gauge-container">
+                            <div class="gauge-item">
+                                <div class="gauge-circle gw-cpu-gauge">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                        <path id="gw-gauge-cpu" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    </svg>
+                                    <span id="gw-gauge-cpu-val" class="gauge-value">--%</span>
+                                </div>
+                                <span class="gauge-label">CPU</span>
+                            </div>
+                            <div class="gauge-item">
+                                <div class="gauge-circle gw-ram-gauge">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                        <path id="gw-gauge-ram" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    </svg>
+                                    <span id="gw-gauge-ram-val" class="gauge-value">--%</span>
+                                </div>
+                                <span class="gauge-label">RAM</span>
+                            </div>
+                            <div class="gauge-item">
+                                <div class="gauge-circle gw-disk-gauge">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                        <path id="gw-gauge-disk" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    </svg>
+                                    <span id="gw-gauge-disk-val" class="gauge-value">--%</span>
+                                </div>
+                                <span class="gauge-label">Disque</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div class="sensor-item"><span class="sensor-label">Température</span><span id="gw-temp-val" class="sensor-val">--°C</span></div>
+                            <div class="sensor-item"><span class="sensor-label">Uptime</span><span id="gw-uptime-val" class="sensor-val">--</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Arduino Mega Card -->
+                <div class="card" id="arduino-card">
+                    <div class="card-title">
+                        <span>Arduino Mega</span>
+                        <span id="arduino-status-badge" class="status-badge offline">Hors-ligne</span>
+                    </div>
+                    <div id="arduino-telemetry-content">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div class="sensor-item"><span class="sensor-label">IMU Roll</span><span id="arduino-roll" class="sensor-val">--</span></div>
+                            <div class="sensor-item"><span class="sensor-label">IMU Pitch</span><span id="arduino-pitch" class="sensor-val">--</span></div>
+                            <div class="sensor-item"><span class="sensor-label">IMU Yaw</span><span id="arduino-yaw" class="sensor-val">--</span></div>
+                        </div>
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;">Servos (12 joints)</div>
+                            <div id="arduino-joints-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.3rem;">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="arduino-offline-msg" style="display: none; text-align: center; padding: 1.5rem 0; color: var(--text-secondary); font-size: 0.85rem;">
+                        Arduino Mega non connecté
+                    </div>
+                </div>
+
                 <!-- Live Chat Card -->
                 <div class="card" style="display: flex; flex-direction: column; min-height: 280px; max-height: 280px;">
                     <div class="card-title">Conversation Live avec Bastet</div>
@@ -3280,6 +3374,19 @@ def dashboard():
                 console.log("Global WebSocket connecté.");
                 const consoleEl = document.getElementById('json-traffic-console');
                 if (consoleEl) consoleEl.textContent = '[WebSocket connecté - En attente de trafic...]';
+                window.lastArduinoTelemetry = Date.now();
+                if (!window.arduinoOfflineChecker) {
+                    window.arduinoOfflineChecker = setInterval(() => {
+                        if (window.lastArduinoTelemetry && Date.now() - window.lastArduinoTelemetry > 5000) {
+                            const badge = document.getElementById('arduino-status-badge');
+                            const content = document.getElementById('arduino-telemetry-content');
+                            const offlineMsg = document.getElementById('arduino-offline-msg');
+                            if (badge) { badge.className = 'status-badge offline'; badge.textContent = 'Hors-ligne'; }
+                            if (content) content.style.display = 'none';
+                            if (offlineMsg) offlineMsg.style.display = '';
+                        }
+                    }, 3000);
+                }
             };
             
             appWs.onmessage = (event) => {
@@ -3317,6 +3424,7 @@ def dashboard():
                 logToJSONConsole(JSON.stringify(payload, null, 2));
                 
                 if (payload.type === "telemetry_diagnostics") {
+                    window.lastArduinoTelemetry = Date.now();
                     if (payload.cameras) {
                         updateCameraModularity(payload.cameras.cam1 === true, payload.cameras.cam2 === true);
                     }
@@ -3355,6 +3463,42 @@ def dashboard():
                         const cube = document.getElementById('imu-visual-cube');
                         if (cube) {
                             cube.style.transform = `rotateX(${pitch}deg) rotateY(${roll}deg) rotateZ(${-yaw}deg)`;
+                        }
+                    }
+
+                    // Update Arduino Mega dashboard card
+                    const arduinoBadge = document.getElementById('arduino-status-badge');
+                    const arduinoOfflineMsg = document.getElementById('arduino-offline-msg');
+                    const arduinoContent = document.getElementById('arduino-telemetry-content');
+                    const hasArduino = payload.imu || (payload.joints && payload.joints.length === 12);
+                    if (hasArduino) {
+                        arduinoBadge.className = 'status-badge active';
+                        arduinoBadge.textContent = 'En ligne';
+                        arduinoOfflineMsg.style.display = 'none';
+                        arduinoContent.style.display = '';
+                    }
+                    if (payload.imu) {
+                        document.getElementById('arduino-roll').textContent = `${roll.toFixed(1)}°`;
+                        document.getElementById('arduino-pitch').textContent = `${pitch.toFixed(1)}°`;
+                        document.getElementById('arduino-yaw').textContent = `${yaw.toFixed(1)}°`;
+                    }
+                    if (payload.joints && payload.joints.length === 12) {
+                        const jointsGrid = document.getElementById('arduino-joints-grid');
+                        if (jointsGrid && !jointsGrid.dataset.init) {
+                            const names = ['FR-H','FR-C','FR-T','FL-H','FL-C','FL-T','BR-H','BR-C','BR-T','BL-H','BL-C','BL-T'];
+                            jointsGrid.innerHTML = '';
+                            for (let i = 0; i < 12; i++) {
+                                const el = document.createElement('div');
+                                el.style.cssText = 'font-size:0.7rem; text-align:center; padding:0.2rem; background:var(--bg-main); border-radius:4px;';
+                                el.innerHTML = `<div style="color:var(--text-secondary);">${names[i]}</div><div style="font-weight:700; color:var(--accent);" id="gw-joint-${i}">${Math.round(payload.joints[i])}°</div>`;
+                                jointsGrid.appendChild(el);
+                            }
+                            jointsGrid.dataset.init = '1';
+                        } else if (jointsGrid) {
+                            for (let i = 0; i < 12; i++) {
+                                const el = document.getElementById(`gw-joint-${i}`);
+                                if (el) el.textContent = `${Math.round(payload.joints[i])}°`;
+                            }
                         }
                     }
                     
@@ -4334,6 +4478,26 @@ def dashboard():
                 }
             } catch (e) {
                 console.error("Telemetry fetch error:", e);
+            }
+
+            try {
+                const gwRes = await fetch('/gateway/telemetry', { headers: { 'X-API-Token': apiToken } });
+                if (gwRes.ok) {
+                    const gw = await gwRes.json();
+                    updateGaugeCircle('gw-gauge-cpu', gw.cpu_percent);
+                    document.getElementById('gw-gauge-cpu-val').textContent = `${Math.round(gw.cpu_percent)}%`;
+                    updateGaugeCircle('gw-gauge-ram', gw.ram_percent);
+                    document.getElementById('gw-gauge-ram-val').textContent = `${Math.round(gw.ram_percent)}%`;
+                    updateGaugeCircle('gw-gauge-disk', gw.disk_percent);
+                    document.getElementById('gw-gauge-disk-val').textContent = `${Math.round(gw.disk_percent)}%`;
+                    document.getElementById('gw-temp-val').textContent = `${Math.round(gw.temp_c)}°C`;
+                    const days = Math.floor(gw.uptime_s / 86400);
+                    const hrs = Math.floor((gw.uptime_s % 86400) / 3600);
+                    const mins = Math.floor((gw.uptime_s % 3600) / 60);
+                    document.getElementById('gw-uptime-val').textContent = days > 0 ? `${days}j ${hrs}h ${mins}m` : `${hrs}h ${mins}m`;
+                }
+            } catch (e) {
+                console.error("Gateway telemetry fetch error:", e);
             }
         }
 
@@ -6483,6 +6647,11 @@ def get_state():
         "2": stream_active[2]
     }
     return state
+
+@app.get("/gateway/telemetry", tags=["Gateway"], summary="Télémétrie de la Gateway (Pi)", dependencies=[Depends(verify_token)])
+def get_gateway_telemetry():
+    """Retourne les métriques système de la Gateway (CPU, RAM, disque, température)."""
+    return gateway_telemetry
 
 # ─── System Updates API ───────────────────────────────────────────────────────
 GITHUB_RELEASES_CACHE = {} # repo_name -> (tag_name, timestamp)
