@@ -5756,8 +5756,21 @@ def dashboard():
                     const ard = await arduinoRes.json();
                     const ardUpToDate = ard.current_version && ard.latest_version && ard.current_version === ard.latest_version;
                     const ardStatusLower = (ard.status || '').toLowerCase();
-                    let ardDisplayStatus = ard.status || 'Prêt';
-                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = 'À jour';
+                    const ardStatusLabels = {
+                        'stopping_services': '⏹ Arrêt services...',
+                        'checking_tools': '🔍 Vérification arduino-cli...',
+                        'installing_core': '📦 Installation core AVR...',
+                        'installing_libs': '📚 Installation librairies...',
+                        'detecting_device': '🔌 Détection Arduino...',
+                        'preparing_sketch': '📁 Préparation sketch...',
+                        'compiling': '⚙️ Compilation...',
+                        'flashing': '⚡ Flashage en cours...',
+                        'idle': '✓ Prêt',
+                        'starting': '▶ Démarrage...',
+                    };
+                    let ardDisplayStatus = ardStatusLabels[ardStatusLower] || ard.status || 'Prêt';
+                    if (ardStatusLower.startsWith('failed')) ardDisplayStatus = '✗ ' + (ardStatusLower.replace('failed_','').replace(/_/g,' ') || 'Erreur');
+                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = '✓ À jour';
 
                     document.getElementById('arduino-update-status').textContent = ardDisplayStatus;
                     document.getElementById('arduino-update-bar').style.width = `${ard.percent}%`;
