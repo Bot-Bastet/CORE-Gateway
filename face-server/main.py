@@ -81,7 +81,7 @@ LOGO_PATH = Path(__file__).parent / "logo.webp"
 
 @app.get("/logo.webp", include_in_schema=False)
 def serve_logo():
-    return FileResponse(LOGO_PATH, media_type="image/webp", cache_control="public, max-age=86400")
+    return FileResponse(LOGO_PATH, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
 
 app.add_middleware(
     CORSMiddleware,
