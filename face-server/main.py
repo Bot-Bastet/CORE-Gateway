@@ -2550,11 +2550,39 @@ def dashboard():
                 <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto;">
                     <div class="card" style="margin: 0; background-color: rgba(255,255,255,0.01);">
                         <div class="card-title" style="font-size:0.95rem;">Configuration des Caméras</div>
-                        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.5rem;">
+                        
+                        <!-- Mapping Selection -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+                            <div>
+                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
+                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="saveCameraPortsMapping()">
+                                    <option value="/dev/video0">/dev/video0</option>
+                                    <option value="/dev/video1">/dev/video1</option>
+                                    <option value="/dev/video2">/dev/video2</option>
+                                    <option value="/dev/video3">/dev/video3</option>
+                                    <option value="/dev/video4">/dev/video4</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Droite</label>
+                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="saveCameraPortsMapping()">
+                                    <option value="/dev/video0">/dev/video0</option>
+                                    <option value="/dev/video1">/dev/video1</option>
+                                    <option value="/dev/video2">/dev/video2</option>
+                                    <option value="/dev/video3">/dev/video3</option>
+                                    <option value="/dev/video4">/dev/video4</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.75rem;">
                             <div id="calib-cam-container-1" style="display:flex; justify-content:space-between; align-items:center;">
                                 <div>
                                     <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
-                                    <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
+                                    <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.1rem;">
+                                        <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(1)">📷 Calibrer</button>
+                                    </div>
                                 </div>
                                 <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
                             </div>
@@ -2562,7 +2590,10 @@ def dashboard():
                             <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                                 <div>
                                     <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Droite</span>
-                                    <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
+                                    <div style="display:flex; align-items:center; gap:0.5rem; margin-top:0.1rem;">
+                                        <span style="font-size:0.75rem; color:var(--text-secondary);">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(2)">📷 Calibrer</button>
+                                    </div>
                                 </div>
                                 <input type="checkbox" style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-2" onchange="toggleCalibCamera(2)"/>
                             </div>
@@ -2898,6 +2929,44 @@ def dashboard():
                     <button type="button" class="btn btn-secondary" onclick="cancelWifiConnection()">Annuler</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal : Camera Calibration -->
+    <div id="cameraCalibModal" class="modal-overlay" onclick="closeCameraCalibModalOnClick(event)">
+        <div class="modal-content" style="max-width: 650px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;" id="mcc-modal-title">Calibration Caméra</h3>
+                <button class="modal-close" onclick="closeCameraCalibModal()">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <p style="font-size:0.85rem; color:var(--text-secondary);">Placez la feuille de calibration (damier noir et blanc) bien à plat devant la caméra.</p>
+            </div>
+            
+            <!-- Video Container -->
+            <div style="width: 100%; height: 320px; border: 1px solid var(--border-color); border-radius: 8px; background-color: #050507; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 1.25rem;">
+                <video id="mcc-cam-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                
+                <div id="mcc-cam-hud" style="position: absolute; top:0; left:0; width:100%; height:100%; border: 2px dashed rgba(99, 102, 241, 0.4); box-sizing: border-box; display:none; pointer-events:none;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:rgba(99, 102, 241, 0.6); font-family:monospace; font-size:0.75rem; border:1px solid rgba(99,102,241,0.6); padding:0.25rem 0.5rem; background:rgba(0,0,0,0.5);">MIRE DE CALIBRATION EN COURS D'ANALYSE</div>
+                </div>
+                
+                <div id="mcc-cam-status-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(9,9,11,0.85); padding:1rem; text-align:center;">
+                    <div id="mcc-cam-status-text" style="color: var(--text-primary); font-size: 0.85rem;">
+                        <span>Cliquez sur Lancer pour vous connecter à la caméra.</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:0.5rem;">
+                <button id="btn-mcc-run-calib" class="btn btn-primary" style="flex:2;" onclick="runIndividualCameraCalib()">
+                    📷 Lancer la Caméra
+                </button>
+                <button class="btn btn-secondary" style="flex:1;" onclick="closeCameraCalibModal()">
+                    Fermer
+                </button>
+            </div>
         </div>
     </div>
 
@@ -3474,7 +3543,7 @@ def dashboard():
                         </div>
                     `;
                     
-                    const isSecureNet = scannedNet ? (scannedNet.security && scannedNet.security.trim() !== "" && scannedNet.security !== "--") : true;
+                    const isSecureNet = scannedNet ? (scannedNet.security && scannedNet.security.trim() !== "" && scannedNet.security !== "--" && scannedNet.security.toLowerCase() !== "open") : true;
                     item.onclick = () => selectWifiNetwork(ssid, isSecureNet, true);
                     knownContainer.appendChild(item);
                 });
@@ -3490,7 +3559,7 @@ def dashboard():
                     const item = document.createElement('div');
                     item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease;';
                     
-                    const isSecure = net.security && net.security.trim() !== "" && net.security !== "--";
+                    const isSecure = net.security && net.security.trim() !== "" && net.security !== "--" && net.security.toLowerCase() !== "open";
                     const lockIcon = isSecure ? '🔒' : '🔓';
                     
                     item.innerHTML = `
@@ -3923,6 +3992,17 @@ def dashboard():
                     document.getElementById('sensor-seen-objects').textContent = (state.seen_objects && state.seen_objects.length > 0) ? state.seen_objects.join(', ') : 'Aucun';
                     document.getElementById('sensor-version').textContent = state.robot_version || 'v0.0.0';
                     
+                    if (state.camera_mapping) {
+                        const selectLeft = document.getElementById('cam-port-left');
+                        const selectRight = document.getElementById('cam-port-right');
+                        if (selectLeft && state.camera_mapping.left && selectLeft.value !== state.camera_mapping.left) {
+                            selectLeft.value = state.camera_mapping.left;
+                        }
+                        if (selectRight && state.camera_mapping.right && selectRight.value !== state.camera_mapping.right) {
+                            selectRight.value = state.camera_mapping.right;
+                        }
+                    }
+                    
                     if (state.ai_state) {
                         updateAIControlUI('tts', state.ai_state.tts);
                         updateAIControlUI('stt', state.ai_state.stt);
@@ -4198,6 +4278,221 @@ def dashboard():
                 placeholder.style.display = 'flex';
                 videoContainer.style.display = 'none';
             }
+        }
+
+        function saveCameraPortsMapping() {
+            const left = document.getElementById('cam-port-left').value;
+            const right = document.getElementById('cam-port-right').value;
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({
+                    type: "save_camera_mapping",
+                    left: left,
+                    right: right
+                }));
+                showToast("Configuration des ports caméra envoyée au robot (Redémarrage ROS en cours)...");
+            }
+        }
+
+        window.mccCurrentCamId = 1;
+        let mccPeerConnection = null;
+
+        function openCameraCalibModal(camId) {
+            window.mccCurrentCamId = camId;
+            document.getElementById('mcc-modal-title').textContent = `Calibration Caméra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
+            
+            const videoEl = document.getElementById('mcc-cam-video');
+            const hudEl = document.getElementById('mcc-cam-hud');
+            const overlayEl = document.getElementById('mcc-cam-status-overlay');
+            const statusText = document.getElementById('mcc-cam-status-text');
+            const btnRun = document.getElementById('btn-mcc-run-calib');
+            
+            if (videoEl.srcObject) {
+                videoEl.srcObject.getTracks().forEach(t => t.stop());
+                videoEl.srcObject = null;
+            }
+            videoEl.style.display = 'none';
+            hudEl.style.display = 'none';
+            overlayEl.style.display = 'flex';
+            overlayEl.style.backgroundColor = 'rgba(9,9,11,0.85)';
+            statusText.innerHTML = `<span>Cliquez sur Lancer pour vous connecter à la caméra.</span>`;
+            
+            btnRun.disabled = false;
+            btnRun.innerHTML = `<span>📷 Lancer la Caméra</span>`;
+            btnRun.onclick = () => runIndividualCameraCalib();
+            
+            document.getElementById('cameraCalibModal').classList.add('active');
+        }
+
+        function closeCameraCalibModal() {
+            document.getElementById('cameraCalibModal').classList.remove('active');
+            
+            const videoEl = document.getElementById('mcc-cam-video');
+            if (videoEl.srcObject) {
+                videoEl.srcObject.getTracks().forEach(t => t.stop());
+                videoEl.srcObject = null;
+            }
+            if (mccPeerConnection) {
+                mccPeerConnection.close();
+                mccPeerConnection = null;
+            }
+            
+            const camId = window.mccCurrentCamId;
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "stop_camera", camera: camId }));
+            }
+        }
+
+        function closeCameraCalibModalOnClick(e) {
+            if (e.target === document.getElementById('cameraCalibModal')) {
+                closeCameraCalibModal();
+            }
+        }
+
+        async function runIndividualCameraCalib() {
+            const camId = window.mccCurrentCamId;
+            const videoEl = document.getElementById('mcc-cam-video');
+            const hudEl = document.getElementById('mcc-cam-hud');
+            const overlayEl = document.getElementById('mcc-cam-status-overlay');
+            const statusText = document.getElementById('mcc-cam-status-text');
+            const btnRun = document.getElementById('btn-mcc-run-calib');
+            
+            btnRun.disabled = true;
+            btnRun.innerHTML = `<span>📷 Connexion...</span>`;
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false }));
+            }
+            
+            statusText.innerHTML = `
+                <div style="width:20px; height:20px; border:2px solid var(--accent); border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 0.5rem;"></div>
+                <span>Initialisation flux WebRTC caméra...</span>
+            `;
+            
+            try {
+                if (mccPeerConnection) {
+                    mccPeerConnection.close();
+                }
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                mccPeerConnection = pc;
+                pc.addTransceiver('video', { direction: 'recvonly' });
+                
+                pc.ontrack = (event) => {
+                    if (event.streams && event.streams[0]) {
+                        videoEl.srcObject = event.streams[0];
+                    } else {
+                        const inboundStream = new MediaStream();
+                        inboundStream.addTrack(event.track);
+                        videoEl.srcObject = inboundStream;
+                    }
+                    videoEl.play().catch(e => console.warn(e));
+                    
+                    overlayEl.style.display = 'none';
+                    videoEl.style.display = 'block';
+                    hudEl.style.display = 'block';
+                    
+                    btnRun.disabled = false;
+                    btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
+                    btnRun.onclick = () => confirmIndividualCameraCalib();
+                };
+                
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
+                
+                let response = null;
+                let retries = 15;
+                while (retries > 0 && document.getElementById('cameraCalibModal').classList.contains('active')) {
+                    try {
+                        response = await fetch(webrtcUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/sdp' },
+                            body: pc.localDescription.sdp
+                        });
+                        if (response.ok) break;
+                    } catch (e) {
+                        console.warn(e);
+                    }
+                    retries--;
+                    if (retries > 0) {
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                }
+                
+                if (!response || !response.ok) {
+                    throw new Error("WHEP stream not ready");
+                }
+                
+                const answerSdp = await response.text();
+                await pc.setRemoteDescription(new RTCSessionDescription({
+                    type: 'answer',
+                    sdp: answerSdp
+                }));
+                
+            } catch (err) {
+                console.error(err);
+                videoEl.style.display = 'none';
+                hudEl.style.display = 'none';
+                overlayEl.style.display = 'flex';
+                statusText.innerHTML = `
+                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                    <span style="color:var(--danger); font-weight:bold;">Échec : Flux WebRTC indisponible.</span><br/>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez le branchement ou que le service spotbot est démarré.</span>
+                `;
+                btnRun.disabled = false;
+                btnRun.innerHTML = `<span>📷 Lancer la Caméra</span>`;
+                btnRun.onclick = () => runIndividualCameraCalib();
+            }
+        }
+        
+        function confirmIndividualCameraCalib() {
+            const btnRun = document.getElementById('btn-mcc-run-calib');
+            btnRun.disabled = true;
+            btnRun.innerHTML = `<span>📷 Analyse...</span>`;
+            
+            const overlayEl = document.getElementById('mcc-cam-status-overlay');
+            const statusText = document.getElementById('mcc-cam-status-text');
+            const hudEl = document.getElementById('mcc-cam-hud');
+            const videoEl = document.getElementById('mcc-cam-video');
+            
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 25;
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                    
+                    const camId = window.mccCurrentCamId;
+                    const isCameraConnected = window.lastTelemetryState && window.lastTelemetryState.sensors && 
+                        window.lastTelemetryState.sensors[`cam${camId}_connected`] === true;
+                        
+                    if (isCameraConnected) {
+                        hudEl.style.display = 'none';
+                        videoEl.style.display = 'none';
+                        overlayEl.style.display = 'flex';
+                        overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
+                        statusText.innerHTML = `
+                            <span style="font-size: 2rem; color: var(--success); display:block; margin-bottom:0.5rem;">✓</span>
+                            <span style="color:var(--success); font-weight:bold; font-size:1.05rem;">Calibration réussie !</span><br/>
+                            <span style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem; display:block;">Les paramètres intrinsèques ont été sauvegardés.</span>
+                        `;
+                        btnRun.disabled = false;
+                        btnRun.innerHTML = `<span>Fermer la Calibration</span>`;
+                        btnRun.onclick = () => closeCameraCalibModal();
+                    } else {
+                        hudEl.style.display = 'none';
+                        videoEl.style.display = 'none';
+                        overlayEl.style.display = 'flex';
+                        statusText.innerHTML = `
+                            <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                            <span style="color:var(--danger); font-weight:bold;">Échec de l'analyse</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Mire de calibration introuvable ou illisible.</span>
+                        `;
+                        btnRun.disabled = false;
+                        btnRun.innerHTML = `<span>📷 Réessayer la Calibration</span>`;
+                        btnRun.onclick = () => runIndividualCameraCalib();
+                    }
+                }
+            }, 500);
         }
 
         function toggleStream(camId) {
