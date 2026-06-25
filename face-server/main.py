@@ -3438,8 +3438,6 @@ def dashboard():
                             keepBtn.innerHTML = "📌 Keep Stream : OFF";
                         }
                     }
-                
-                    }
                 }
                 else if (payload.type === "wifi_list") {
                     displayWifiNetworks(payload.networks, payload.known_ssids);
