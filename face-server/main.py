@@ -4741,9 +4741,7 @@ def dashboard():
             }
 
             if (peerConnections[camId]) {
-                try {
-                    peerConnections[camId].close();
-                } catch(e) {}
+                try { peerConnections[camId].close(); } catch(e) {}
                 peerConnections[camId] = null;
             }
 
@@ -4753,22 +4751,18 @@ def dashboard():
                 videoEl.removeAttribute('src');
                 videoEl.style.display = 'none';
             }
-            if (videoContainer) {
-                videoContainer.style.display = 'none';
-            }
-            if (loaderEl) {
-                loaderEl.style.display = 'none';
-            }
-            if (fsBtn) {
-                fsBtn.style.display = 'none';
-            }
+            if (videoContainer) videoContainer.style.display = 'none';
+            if (loaderEl) loaderEl.style.display = 'none';
+            if (fsBtn) fsBtn.style.display = 'none';
+
+            window.localViewing[camId] = false;
 
             placeholder.style.display = 'flex';
+            // On affiche l'état RÉEL du flux robot, pas l'état de visionnage local
             const isActive = window.activeStreams && window.activeStreams[camId];
-            statusEl.textContent = isActive ? 'En direct' : 'Inactif';
+            statusEl.textContent = isActive ? 'En direct (non visionné)' : 'Inactif';
             statusEl.className = isActive ? 'status-badge active' : 'status-badge';
             btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
-            window.localViewing[camId] = false;
         }
 
         function playHLSStream(videoEl, camId, onPlay, onError, customKey) {
@@ -5299,8 +5293,12 @@ def dashboard():
         function toggleStream(camId, isExplicit = false) {
             if (!window.activeStreams) window.activeStreams = { 1: false, 2: false };
             if (!window.localViewing) window.localViewing = { 1: false, 2: false };
-            
+
+            const statusEl = document.getElementById(`stream-status-${camId}`);
+            const btnText = document.getElementById(`stream-btn-text-${camId}`);
+
             if (!window.localViewing[camId]) {
+                // === DÉMARRER ===
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     let vSlamVal = false;
                     if (camId === 1) {
@@ -5309,29 +5307,40 @@ def dashboard():
                     }
                     appWs.send(JSON.stringify({type: "request_camera", camera: camId, v_slam: vSlamVal}));
                     window.localViewing[camId] = true;
-                    
-                    const statusEl = document.getElementById(`stream-status-${camId}`);
-                    const btnText = document.getElementById(`stream-btn-text-${camId}`);
-                    statusEl.textContent = 'Démarrage…';
+                    if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
+                    window.userClosedStream[camId] = false;
+
+                    statusEl.textContent = 'Connexion WebRTC…';
                     statusEl.className = 'status-badge';
                     btnText.textContent = 'Couper Caméra';
-                    
+
                     startStreamWebRTC(camId);
                 } else {
-                    if (isExplicit) {
-                        alert("WebSocket déconnecté. Impossible d'activer la caméra.");
-                    } else {
-                        console.warn("[Auto] WebSocket not open, deferring stream startup.");
-                    }
+                    if (isExplicit) alert("WebSocket déconnecté. Impossible d'activer la caméra.");
+                    else console.warn("[Auto] WebSocket not open, deferring stream startup.");
                 }
             } else {
-                if (appWs && appWs.readyState === WebSocket.OPEN) {
-                    appWs.send(JSON.stringify({type: "release_camera", camera: camId}));
-                }
+                // === COUPER ===
                 window.localViewing[camId] = false;
                 if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
                 window.userClosedStream[camId] = true;
+
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({type: "release_camera", camera: camId}));
+                }
+
+                // Fermer la PeerConnection immédiatement
+                if (peerConnections[camId]) {
+                    try { peerConnections[camId].close(); } catch(e) {}
+                    peerConnections[camId] = null;
+                }
+
                 stopStreamUI(camId);
+
+                // Forcer l'affichage correct après stop
+                statusEl.textContent = 'Coupé';
+                statusEl.className = 'status-badge';
+                btnText.textContent = 'Rejoindre le flux';
             }
         }
 
