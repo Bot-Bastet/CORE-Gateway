@@ -4801,20 +4801,8 @@ def dashboard():
                 });
                 hls.on(Hls.Events.ERROR, function(event, data) {
                     if (data.fatal) {
-                        switch(data.type) {
-                            case Hls.ErrorTypes.NETWORK_ERROR:
-                                console.warn("HLS Network error, retrying...", data);
-                                hls.startLoad();
-                                break;
-                            case Hls.ErrorTypes.MEDIA_ERROR:
-                                console.warn("HLS Media error, recovering...", data);
-                                hls.recoverMediaError();
-                                break;
-                            default:
-                                console.error("HLS Fatal error:", data);
-                                if (onError) onError(data);
-                                break;
-                        }
+                        console.error('HLS Fatal error:', data);
+                        if (onError) onError(data);
                     }
                 });
             } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
@@ -4826,48 +4814,8 @@ def dashboard():
                     });
                 });
             } else {
-                if (onError) onError("HLS not supported in this browser");
+                if (onError) onError('HLS not supported in this browser');
             }
-        }
-
-        function startStreamHLS(camId) {
-            const placeholder = document.getElementById(`stream-placeholder-${camId}`);
-            const statusEl = document.getElementById(`stream-status-${camId}`);
-            const btnText = document.getElementById(`stream-btn-text-${camId}`);
-            const videoContainer = document.getElementById(`video-container-${camId}`);
-            const videoEl = document.getElementById(`video-cam-${camId}`);
-            const loaderEl = document.getElementById(`stream-loader-${camId}`);
-            const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
-
-            statusEl.textContent = 'Connexion (HLS)…';
-            statusEl.className = 'status-badge';
-            placeholder.style.display = 'none';
-            videoContainer.style.display = 'block';
-            videoEl.style.display = 'none';
-            fsBtn.style.display = 'none';
-            loaderEl.style.display = 'flex';
-
-            playHLSStream(
-                videoEl,
-                camId,
-                () => {
-                    loaderEl.style.display = 'none';
-                    videoEl.style.display = 'block';
-                    fsBtn.style.display = 'block';
-                    statusEl.textContent = 'En direct (HLS)';
-                    statusEl.className = 'status-badge active';
-                    btnText.textContent = 'Couper Caméra';
-                },
-                (err) => {
-                    loaderEl.style.display = 'none';
-                    statusEl.textContent = 'Erreur connexion';
-                    statusEl.className = 'status-badge error';
-                    btnText.textContent = 'Réessayer';
-                    window.activeStreams[camId] = false;
-                    placeholder.style.display = 'flex';
-                    videoContainer.style.display = 'none';
-                }
-            );
         }
 
         async function startStreamWebRTC(camId) {
@@ -4880,13 +4828,11 @@ def dashboard():
             const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
 
             if (peerConnections[camId]) {
-                try {
-                    peerConnections[camId].close();
-                } catch(e) {}
+                try { peerConnections[camId].close(); } catch(e) {}
                 peerConnections[camId] = null;
             }
 
-            statusEl.textContent = 'Démarrage…';
+            statusEl.textContent = 'Connexion WebRTC…';
             statusEl.className = 'status-badge';
             placeholder.style.display = 'none';
             videoContainer.style.display = 'block';
@@ -4895,43 +4841,49 @@ def dashboard():
             loaderEl.style.display = 'flex';
 
             let pc = null;
-            let fallbackTriggered = false;
-            const triggerHLSFallback = () => {
-                if (fallbackTriggered) return;
-                fallbackTriggered = true;
-                console.warn(`WebRTC failed or timed out for cam${camId}, trying HLS fallback...`);
+            let aborted = false;
+            let trackReceived = false;
+
+            const showWebRTCError = (msg) => {
+                if (aborted) return;
+                aborted = true;
                 if (pc) {
-                    if (peerConnections[camId] === pc) {
-                        peerConnections[camId] = null;
-                    }
                     try { pc.close(); } catch(e) {}
+                    if (peerConnections[camId] === pc) peerConnections[camId] = null;
                 }
-                startStreamHLS(camId);
+                window.localViewing[camId] = false;
+                loaderEl.style.display = 'none';
+                videoEl.style.display = 'none';
+                fsBtn.style.display = 'none';
+                placeholder.style.display = 'flex';
+                videoContainer.style.display = 'none';
+                statusEl.textContent = 'Erreur WebRTC';
+                statusEl.className = 'status-badge error';
+                btnText.textContent = 'Réessayer';
+                console.error(`WebRTC cam${camId} error:`, msg);
             };
 
             try {
-                pc = new RTCPeerConnection({
-                    iceServers: []
-                });
+                pc = new RTCPeerConnection({ iceServers: [] });
                 peerConnections[camId] = pc;
-
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
                 let trackTimeout = setTimeout(() => {
-                    triggerHLSFallback();
-                }, 4000);
+                    if (!trackReceived) showWebRTCError('Timeout — aucun flux reçu après 12s');
+                }, 12000);
 
                 pc.oniceconnectionstatechange = () => {
                     console.log(`WebRTC ICE state cam${camId}: ${pc.iceConnectionState}`);
-                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
-                        triggerHLSFallback();
+                    if (!trackReceived && (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected')) {
+                        clearTimeout(trackTimeout);
+                        showWebRTCError(`ICE ${pc.iceConnectionState}`);
                     }
                 };
 
                 pc.ontrack = (event) => {
+                    trackReceived = true;
                     clearTimeout(trackTimeout);
-                    if (fallbackTriggered) return;
-
+                    if (aborted) return;
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -4939,23 +4891,23 @@ def dashboard():
                         inboundStream.addTrack(event.track);
                         videoEl.srcObject = inboundStream;
                     }
-                    videoEl.play().catch(e => console.warn("Video play failed:", e));
-                    
+                    videoEl.play().catch(e => console.warn('Video play failed:', e));
                     loaderEl.style.display = 'none';
                     videoEl.style.display = 'block';
                     fsBtn.style.display = 'block';
                     statusEl.textContent = 'En direct';
                     statusEl.className = 'status-badge active';
+                    btnText.textContent = 'Couper Caméra';
                 };
 
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
 
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
-                
                 let response = null;
-                let retries = 15;
-                while (retries > 0 && window.localViewing[camId]) {
+                // 48 retries × 250ms = 12s pour laisser le temps à la caméra de démarrer
+                let retries = 48;
+                while (retries > 0 && !aborted) {
                     try {
                         response = await fetch(webrtcUrl, {
                             method: 'POST',
@@ -4964,27 +4916,24 @@ def dashboard():
                         });
                         if (response.ok) break;
                     } catch (e) {
-                        console.warn(`Signaling failed: ${e.message}`);
+                        console.warn(`WHEP signaling cam${camId}: ${e.message}`);
                     }
                     retries--;
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 200));
-                    }
+                    if (retries > 0 && !aborted) await new Promise(r => setTimeout(r, 250));
                 }
 
+                if (aborted) return;
+
                 if (!response || !response.ok) {
-                    throw new Error(`MediaMTX WHEP stream cam${camId} not ready/reachable.`);
+                    clearTimeout(trackTimeout);
+                    throw new Error(`WHEP cam${camId} non disponible après 12s.`);
                 }
 
                 const answerSdp = await response.text();
-                await pc.setRemoteDescription(new RTCSessionDescription({
-                    type: 'answer',
-                    sdp: answerSdp
-                }));
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
 
             } catch (err) {
-                console.error("WHEP error, falling back to HLS:", err);
-                triggerHLSFallback();
+                showWebRTCError(err.message);
             }
         }
 
@@ -5159,69 +5108,45 @@ def dashboard():
             `;
             
             let pc = null;
-            let fallbackTriggered = false;
-            const triggerHLSFallback = () => {
-                if (fallbackTriggered) return;
-                fallbackTriggered = true;
-                console.warn(`WebRTC failed or timed out for calibration cam${camId}, trying HLS fallback...`);
-                if (pc) {
-                    if (mccPeerConnection === pc) {
-                        mccPeerConnection = null;
-                    }
-                    try { pc.close(); } catch(e) {}
+
+            const showCalibWebRTCError = (msg) => {
+                if (mccPeerConnection) {
+                    try { mccPeerConnection.close(); } catch(e) {}
+                    mccPeerConnection = null;
                 }
-                
-                playHLSStream(
-                    videoEl,
-                    camId,
-                    () => {
-                        overlayEl.style.display = 'none';
-                        videoEl.style.display = 'block';
-                        hudEl.style.display = 'block';
-                        
-                        btnRun.disabled = false;
-                        btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
-                        btnRun.onclick = () => confirmIndividualCameraCalib();
-                    },
-                    (err) => {
-                        videoEl.style.display = 'none';
-                        hudEl.style.display = 'none';
-                        overlayEl.style.display = 'flex';
-                        statusText.innerHTML = `
-                            <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
-                            <span style="color:var(--danger); font-weight:bold;">Échec : Flux vidéo indisponible.</span><br/>
-                            <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez le branchement ou que le service spotbot est démarré.</span>
-                        `;
-                        btnRun.disabled = false;
-                        btnRun.innerHTML = `<span>📷 Lancer la Caméra</span>`;
-                        btnRun.onclick = () => runIndividualCameraCalib();
-                    },
-                    'calib'
-                );
+                videoEl.style.display = 'none';
+                hudEl.style.display = 'none';
+                overlayEl.style.display = 'flex';
+                statusText.innerHTML = `
+                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                    <span style="color:var(--danger); font-weight:bold;">Erreur WebRTC : Flux indisponible.</span><br/>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que MediaMTX est actif et que la caméra est démarrée.</span>
+                `;
+                btnRun.disabled = false;
+                btnRun.innerHTML = `<span>📷 Lancer la Caméra</span>`;
+                btnRun.onclick = () => runIndividualCameraCalib();
+                console.error('Calib WebRTC error:', msg);
             };
 
             try {
-                if (mccPeerConnection) {
-                    mccPeerConnection.close();
-                }
+                if (mccPeerConnection) mccPeerConnection.close();
                 pc = new RTCPeerConnection({ iceServers: [] });
                 mccPeerConnection = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
-                
+
                 let trackTimeout = setTimeout(() => {
-                    triggerHLSFallback();
-                }, 4000);
+                    showCalibWebRTCError('Timeout — aucun flux reçu après 8s');
+                }, 8000);
 
                 pc.oniceconnectionstatechange = () => {
                     if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
-                        triggerHLSFallback();
+                        clearTimeout(trackTimeout);
+                        showCalibWebRTCError(`ICE ${pc.iceConnectionState}`);
                     }
                 };
 
                 pc.ontrack = (event) => {
                     clearTimeout(trackTimeout);
-                    if (fallbackTriggered) return;
-
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -5230,21 +5155,18 @@ def dashboard():
                         videoEl.srcObject = inboundStream;
                     }
                     videoEl.play().catch(e => console.warn(e));
-                    
                     overlayEl.style.display = 'none';
                     videoEl.style.display = 'block';
                     hudEl.style.display = 'block';
-                    
                     btnRun.disabled = false;
                     btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
                     btnRun.onclick = () => confirmIndividualCameraCalib();
                 };
-                
+
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                
+
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
-                
                 let response = null;
                 let retries = 15;
                 while (retries > 0 && document.getElementById('cameraCalibModal').classList.contains('active')) {
@@ -5255,28 +5177,21 @@ def dashboard():
                             body: pc.localDescription.sdp
                         });
                         if (response.ok) break;
-                    } catch (e) {
-                        console.warn(e);
-                    }
+                    } catch (e) { console.warn(e); }
                     retries--;
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 200));
-                    }
+                    if (retries > 0) await new Promise(r => setTimeout(r, 200));
                 }
-                
+
                 if (!response || !response.ok) {
-                    throw new Error("WHEP stream not ready");
+                    clearTimeout(trackTimeout);
+                    throw new Error('WHEP calib non disponible.');
                 }
-                
+
                 const answerSdp = await response.text();
-                await pc.setRemoteDescription(new RTCSessionDescription({
-                    type: 'answer',
-                    sdp: answerSdp
-                }));
-                
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+
             } catch (err) {
-                console.error(err);
-                triggerHLSFallback();
+                showCalibWebRTCError(err.message);
             }
         }
         
@@ -6379,68 +6294,45 @@ def dashboard():
             `;
             
             let pc = null;
-            let fallbackTriggered = false;
-            const triggerHLSFallback = () => {
-                if (fallbackTriggered) return;
-                fallbackTriggered = true;
-                console.warn(`WebRTC failed or timed out for EasyConfig camera ${camId}, trying HLS fallback...`);
-                if (pc) {
-                    if (ecPeerConnections[camId] === pc) {
-                        ecPeerConnections[camId] = null;
-                    }
-                    try { pc.close(); } catch(e) {}
+
+            const showEcWebRTCError = (msg) => {
+                if (ecPeerConnections[camId]) {
+                    try { ecPeerConnections[camId].close(); } catch(e) {}
+                    ecPeerConnections[camId] = null;
                 }
-                
-                playHLSStream(
-                    videoEl,
-                    camId,
-                    () => {
-                        overlayEl.style.display = 'none';
-                        videoEl.style.display = 'block';
-                        hudEl.style.display = 'block';
-                        
-                        btnRun.disabled = false;
-                        btnSkip.disabled = false;
-                        btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
-                        btnRun.onclick = () => ecConfirmCalibration(camId);
-                    },
-                    (err) => {
-                        videoEl.style.display = 'none';
-                        hudEl.style.display = 'none';
-                        overlayEl.style.display = 'flex';
-                        statusText.innerHTML = `
-                            <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
-                            <span style="color:var(--danger); font-weight:bold;">Échec : Flux vidéo indisponible.</span><br/>
-                            <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que la caméra est bien branchée sur le robot.</span>
-                        `;
-                        btnRun.disabled = false;
-                        btnSkip.disabled = false;
-                        btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
-                        btnRun.onclick = () => ecRunCameraCalib(camId);
-                    },
-                    `ec-${camId}`
-                );
+                videoEl.style.display = 'none';
+                hudEl.style.display = 'none';
+                overlayEl.style.display = 'flex';
+                statusText.innerHTML = `
+                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">✗</span>
+                    <span style="color:var(--danger); font-weight:bold;">Erreur WebRTC : Flux indisponible.</span><br/>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que MediaMTX est actif et que la caméra est démarrée.</span>
+                `;
+                btnRun.disabled = false;
+                btnSkip.disabled = false;
+                btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
+                btnRun.onclick = () => ecRunCameraCalib(camId);
+                console.error('EasyConfig WebRTC error:', msg);
             };
 
             try {
                 pc = new RTCPeerConnection({ iceServers: [] });
                 ecPeerConnections[camId] = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
-                
+
                 let trackTimeout = setTimeout(() => {
-                    triggerHLSFallback();
-                }, 4000);
+                    showEcWebRTCError('Timeout — aucun flux reçu après 8s');
+                }, 8000);
 
                 pc.oniceconnectionstatechange = () => {
                     if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
-                        triggerHLSFallback();
+                        clearTimeout(trackTimeout);
+                        showEcWebRTCError(`ICE ${pc.iceConnectionState}`);
                     }
                 };
 
                 pc.ontrack = (event) => {
                     clearTimeout(trackTimeout);
-                    if (fallbackTriggered) return;
-
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -6449,22 +6341,19 @@ def dashboard():
                         videoEl.srcObject = inboundStream;
                     }
                     videoEl.play().catch(e => console.warn(e));
-                    
                     overlayEl.style.display = 'none';
                     videoEl.style.display = 'block';
                     hudEl.style.display = 'block';
-                    
                     btnRun.disabled = false;
                     btnSkip.disabled = false;
                     btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
                     btnRun.onclick = () => ecConfirmCalibration(camId);
                 };
-                
+
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                
+
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
-                
                 let response = null;
                 let retries = 15;
                 while (retries > 0 && ecCurrentStep === (camId === 1 ? 2 : 3)) {
@@ -6475,28 +6364,21 @@ def dashboard():
                             body: pc.localDescription.sdp
                         });
                         if (response.ok) break;
-                    } catch (e) {
-                        console.warn(e);
-                    }
+                    } catch (e) { console.warn(e); }
                     retries--;
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 200));
-                    }
+                    if (retries > 0) await new Promise(r => setTimeout(r, 200));
                 }
-                
+
                 if (!response || !response.ok) {
-                    throw new Error("WHEP stream not ready");
+                    clearTimeout(trackTimeout);
+                    throw new Error('WHEP EasyConfig non disponible.');
                 }
-                
+
                 const answerSdp = await response.text();
-                await pc.setRemoteDescription(new RTCSessionDescription({
-                    type: 'answer',
-                    sdp: answerSdp
-                }));
-                
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+
             } catch (err) {
-                console.error(err);
-                triggerHLSFallback();
+                showEcWebRTCError(err.message);
             }
         }
 
@@ -6733,53 +6615,36 @@ def dashboard():
             videoEl.style.display = 'none';
             
             let pc = null;
-            let fallbackTriggered = false;
-            const triggerHLSFallback = () => {
-                if (fallbackTriggered) return;
-                fallbackTriggered = true;
-                console.warn("WebRTC failed or timed out for VSLAM test, trying HLS fallback...");
-                if (pc) {
-                    if (vslamPeerConnection === pc) {
-                        vslamPeerConnection = null;
-                    }
-                    try { pc.close(); } catch(e) {}
+
+            const showVslamWebRTCError = (msg) => {
+                if (vslamPeerConnection) {
+                    try { vslamPeerConnection.close(); } catch(e) {}
+                    vslamPeerConnection = null;
                 }
-                
-                playHLSStream(
-                    videoEl,
-                    1,
-                    () => {
-                        loaderEl.style.display = 'none';
-                        videoEl.style.display = 'block';
-                    },
-                    (err) => {
-                        loaderEl.style.display = 'none';
-                        statusVal.textContent = "Erreur HLS";
-                        statusVal.style.color = "var(--danger)";
-                    },
-                    'vslam'
-                );
+                loaderEl.style.display = 'none';
+                statusVal.textContent = 'Erreur WebRTC';
+                statusVal.style.color = 'var(--danger)';
+                console.error('VSLAM WebRTC error:', msg);
             };
 
             try {
                 pc = new RTCPeerConnection({ iceServers: [] });
                 vslamPeerConnection = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
-                
+
                 let trackTimeout = setTimeout(() => {
-                    triggerHLSFallback();
-                }, 4000);
+                    showVslamWebRTCError('Timeout — aucun flux reçu après 8s');
+                }, 8000);
 
                 pc.oniceconnectionstatechange = () => {
                     if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "disconnected") {
-                        triggerHLSFallback();
+                        clearTimeout(trackTimeout);
+                        showVslamWebRTCError(`ICE ${pc.iceConnectionState}`);
                     }
                 };
 
                 pc.ontrack = (event) => {
                     clearTimeout(trackTimeout);
-                    if (fallbackTriggered) return;
-
                     if (event.streams && event.streams[0]) {
                         videoEl.srcObject = event.streams[0];
                     } else {
@@ -6791,12 +6656,11 @@ def dashboard():
                     loaderEl.style.display = 'none';
                     videoEl.style.display = 'block';
                 };
-                
+
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
-                
+
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam1/whep`;
-                
                 let response = null;
                 let retries = 15;
                 while (retries > 0 && window.vslamTesting) {
@@ -6807,28 +6671,21 @@ def dashboard():
                             body: pc.localDescription.sdp
                         });
                         if (response.ok) break;
-                    } catch (e) {
-                        console.warn(e);
-                    }
+                    } catch (e) { console.warn(e); }
                     retries--;
-                    if (retries > 0) {
-                        await new Promise(r => setTimeout(r, 200));
-                    }
+                    if (retries > 0) await new Promise(r => setTimeout(r, 200));
                 }
-                
+
                 if (!response || !response.ok) {
-                    throw new Error("WHEP stream not ready");
+                    clearTimeout(trackTimeout);
+                    throw new Error('WHEP VSLAM non disponible.');
                 }
-                
+
                 const answerSdp = await response.text();
-                await pc.setRemoteDescription(new RTCSessionDescription({
-                    type: 'answer',
-                    sdp: answerSdp
-                }));
-                
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+
             } catch(err) {
-                console.error(err);
-                triggerHLSFallback();
+                showVslamWebRTCError(err.message);
             }
         }
 
