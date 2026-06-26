@@ -3688,19 +3688,26 @@ def dashboard():
                     const btnText = document.getElementById(`stream-btn-text-${camId}`);
                     
                     if (!isActive && window.localViewing && window.localViewing[camId]) {
+                        // Le flux s'est arr\u00eat\u00e9 c\u00f4t\u00e9 robot alors qu'on le visionnait
                         window.localViewing[camId] = false;
                         stopStreamUI(camId);
                     }
-                    
+
+                    // Ne mettre \u00e0 jour l'UI que si on n'est pas en train de visionner localement
                     if (!window.localViewing || !window.localViewing[camId]) {
                         if (statusEl) {
-                            statusEl.textContent = isActive ? 'En direct' : 'Inactif';
-                            statusEl.className = isActive ? 'status-badge active' : 'status-badge';
+                            // Si l'utilisateur vient de couper manuellement, on garde 'Coup\u00e9'
+                            const userCut = window.userClosedStream && window.userClosedStream[camId];
+                            if (!userCut) {
+                                statusEl.textContent = isActive ? 'En direct' : 'Inactif';
+                                statusEl.className = isActive ? 'status-badge active' : 'status-badge';
+                            }
                         }
                         if (btnText) {
-                            btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
+                            btnText.textContent = isActive ? 'Rejoindre le flux' : 'D\u00e9marrer le flux';
                         }
-                        
+
+                        // Auto-rejoindre seulement si flux devenu actif ET user n'a pas coup\u00e9 manuellement
                         if (isActive && (!window.userClosedStream || !window.userClosedStream[camId])) {
                             toggleStream(camId);
                         }
