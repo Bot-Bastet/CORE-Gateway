@@ -115,15 +115,18 @@ def check_and_apply_update() -> bool:
             save_progress("extracting", 100)
             subprocess.run(["unzip", "-o", str(zip_path), "-d", tmp_dir], check=True)
 
-            # Trouver le dossier face-server dans tmp_dir (gère les sous-dossiers des zipball)
+            # Trouver le dossier face-server (gère les zips plats et les zips structurés/zipballs)
             extracted_face = None
-            for p in Path(tmp_dir).rglob("face-server"):
-                if p.is_dir():
-                    extracted_face = p
-                    break
+            if (Path(tmp_dir) / "main.py").exists():
+                extracted_face = Path(tmp_dir)
+            else:
+                for p in Path(tmp_dir).rglob("face-server"):
+                    if p.is_dir():
+                        extracted_face = p
+                        break
 
             if not extracted_face:
-                logger.warning("[AutoUpdater] Dossier face-server/ absent dans l'archive.")
+                logger.warning("[AutoUpdater] Dossier face-server/ ou fichier main.py absent dans l'archive.")
                 save_progress("failed", 0)
                 return False
 
