@@ -69,14 +69,17 @@ def check_and_apply_update() -> bool:
 
     logger.info(f"[AutoUpdater] Nouvelle version disponible : {latest_tag} (actuelle : {current})")
 
-    zip_asset = None
+    zip_url = None
     for asset in release.get("assets", []):
         if asset["name"].endswith(".zip"):
-            zip_asset = asset
+            zip_url = asset["browser_download_url"]
             break
 
-    if not zip_asset:
-        logger.warning("[AutoUpdater] Aucun asset .zip trouvé dans la release.")
+    if not zip_url:
+        zip_url = release.get("zipball_url")
+
+    if not zip_url:
+        logger.warning("[AutoUpdater] Aucune URL de téléchargement (asset ou zipball) trouvée.")
         return False
 
     try:
@@ -92,8 +95,8 @@ def check_and_apply_update() -> bool:
             except Exception:
                 pass
 
-        logger.info(f"[AutoUpdater] Téléchargement de {zip_asset['browser_download_url']}...")
-        resp = requests.get(zip_asset["browser_download_url"], stream=True, timeout=120)
+        logger.info(f"[AutoUpdater] Téléchargement de {zip_url}...")
+        resp = requests.get(zip_url, stream=True, timeout=120)
         total_size = int(resp.headers.get("content-length", 0))
         downloaded = 0
 
@@ -112,8 +115,14 @@ def check_and_apply_update() -> bool:
             save_progress("extracting", 100)
             subprocess.run(["unzip", "-o", str(zip_path), "-d", tmp_dir], check=True)
 
-            extracted_face = Path(tmp_dir) / "face-server"
-            if not extracted_face.exists():
+            # Trouver le dossier face-server dans tmp_dir (gère les sous-dossiers des zipball)
+            extracted_face = None
+            for p in Path(tmp_dir).rglob("face-server"):
+                if p.is_dir():
+                    extracted_face = p
+                    break
+
+            if not extracted_face:
                 logger.warning("[AutoUpdater] Dossier face-server/ absent dans l'archive.")
                 save_progress("failed", 0)
                 return False
