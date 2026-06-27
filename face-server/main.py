@@ -3262,6 +3262,7 @@ def dashboard():
                 </div>
                 <div style="display:flex; gap:0.5rem;">
                     <button type="submit" class="btn btn-primary" style="flex:1;">Se connecter au WiFi</button>
+                    <button type="button" class="btn btn-secondary" id="btn-wifi-forget-form" style="border-color: var(--danger); color: var(--danger); background: transparent; display: none;" onclick="handleForgetFromForm()">🗑️ Oublier</button>
                     <button type="button" class="btn btn-secondary" onclick="cancelWifiConnection()">Annuler</button>
                 </div>
             </form>
@@ -3730,7 +3731,7 @@ def dashboard():
                     }
                 }
                 else if (payload.type === "wifi_list") {
-                    displayWifiNetworks(payload.networks, payload.known_ssids);
+                    displayWifiNetworks(payload.networks, payload.known_ssids, payload.known_passwords, payload.current_ssid);
                 } 
                 else if (payload.type === "wifi_connect_result") {
                     handleWifiConnectResult(payload);
@@ -4072,7 +4073,10 @@ def dashboard():
             }
         }
 
-        function displayWifiNetworks(networks, knownSsids = []) {
+        window.wifiPasswords = {};
+        window.wifiCurrentSsid = '';
+
+        function displayWifiNetworks(networks, knownSsids = [], knownPasswords = {}, currentSsid = '') {
             const listContainer = document.getElementById('wifi-list-container');
             const knownContainer = document.getElementById('wifi-known-container');
             const btn = document.getElementById('btn-wifi-scan');
@@ -4081,10 +4085,13 @@ def dashboard():
             listContainer.innerHTML = '';
             knownContainer.innerHTML = '';
             
+            window.wifiPasswords = knownPasswords || {};
+            window.wifiCurrentSsid = currentSsid || '';
+            
             if (!knownSsids) knownSsids = [];
             if (!networks) networks = [];
             
-            // Sort by signal strength (highest first)
+            // Sort scanned networks by signal strength
             networks.sort((a, b) => {
                 const sigA = parseInt(a.signal) || 0;
                 const sigB = parseInt(b.signal) || 0;
@@ -4092,24 +4099,51 @@ def dashboard():
             });
             
             // Display known networks
-            if (knownSsids.length === 0) {
+            if (knownSsids.length === 0 && !window.wifiCurrentSsid) {
                 knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">Aucun réseau enregistré configuré sur le robot.</div>`;
             } else {
-                knownSsids.forEach(ssid => {
+                // Ensure current connected SSID is in the list of known SSIDs (if it isn't already)
+                let allKnown = [...knownSsids];
+                if (window.wifiCurrentSsid && !allKnown.includes(window.wifiCurrentSsid)) {
+                    allKnown.unshift(window.wifiCurrentSsid);
+                }
+                
+                // Sort so currently connected SSID is always FIRST
+                allKnown.sort((a, b) => {
+                    if (a === window.wifiCurrentSsid) return -1;
+                    if (b === window.wifiCurrentSsid) return 1;
+                    return 0;
+                });
+                
+                allKnown.forEach(ssid => {
                     const scannedNet = networks.find(n => n.ssid === ssid);
                     const inRange = !!scannedNet;
+                    const isConnected = (ssid === window.wifiCurrentSsid);
                     
                     const item = document.createElement('div');
-                    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease; margin-bottom: 0.25rem; border-radius: 6px;';
-                    item.style.backgroundColor = 'rgba(255, 111, 97, 0.05)';
-                    item.style.border = '1px solid rgba(255, 111, 97, 0.2)';
+                    item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s ease; margin-bottom: 0.25rem; border-radius: 6px; position: relative;';
                     
-                    const signalText = inRange ? `${scannedNet.signal}%` : 'Hors de portée';
-                    const signalColor = inRange ? 'var(--success)' : 'var(--text-secondary)';
+                    if (isConnected) {
+                        item.style.backgroundColor = 'rgba(76, 175, 80, 0.08)';
+                        item.style.border = '1px solid rgba(76, 175, 80, 0.3)';
+                    } else {
+                        item.style.backgroundColor = 'rgba(255, 111, 97, 0.03)';
+                        item.style.border = '1px solid rgba(255, 111, 97, 0.15)';
+                    }
+                    
+                    const signalText = inRange ? `${scannedNet.signal}%` : (isConnected ? 'Connecté' : 'Hors de portée');
+                    const signalColor = isConnected ? 'var(--success)' : (inRange ? 'var(--success)' : 'var(--text-secondary)');
+                    
+                    let badge = '';
+                    if (isConnected) {
+                        badge = `<span style="font-size:0.65rem; background:rgba(76,175,80,0.2); color: #4CAF50; padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">✓ Connecté</span>`;
+                    } else {
+                        badge = `<span style="font-size:0.65rem; background:rgba(255,111,97,0.15); color: var(--accent); padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:600;">Enregistré</span>`;
+                    }
                     
                     item.innerHTML = `
                         <div style="flex: 1;">
-                            <span style="font-weight: 600; font-size: 0.9rem; display: block; color: var(--accent);">${ssid} <span style="font-size:0.65rem; background:rgba(255,111,97,0.2); color: var(--success); padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem;">Enregistré</span></span>
+                            <span style="font-weight: 600; font-size: 0.9rem; display: block; color: ${isConnected ? '#4CAF50' : 'var(--accent)'};">${ssid} ${badge}</span>
                             <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' • ' + scannedNet.security) : 'Profil de connexion sauvegardé'}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:0.5rem;">
@@ -4125,7 +4159,7 @@ def dashboard():
             }
             
             // Display other scanned networks (excluding the known ones)
-            const otherNetworks = networks.filter(n => !knownSsids.includes(n.ssid));
+            const otherNetworks = networks.filter(n => !knownSsids.includes(n.ssid) && n.ssid !== window.wifiCurrentSsid);
             
             if (otherNetworks.length === 0) {
                 listContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.8rem;">Aucun autre réseau WiFi à proximité.</div>`;
@@ -4160,19 +4194,33 @@ def dashboard():
             
             const pwdGroup = document.getElementById('wifi-password-group');
             const pwdInput = document.getElementById('form-wifi-password');
-            if (isSecure) {
-                pwdGroup.style.display = 'block';
-                if (isKnown) {
-                    pwdInput.placeholder = 'Laisser vide pour utiliser le mot de passe enregistré';
+            const forgetBtn = document.getElementById('btn-wifi-forget-form');
+            
+            if (isKnown) {
+                forgetBtn.style.display = 'inline-block';
+                const savedPwd = window.wifiPasswords[ssid] || '';
+                pwdInput.value = savedPwd;
+                pwdInput.type = 'text'; // Show saved password clearly
+                if (isSecure) {
+                    pwdGroup.style.display = 'block';
+                    pwdInput.placeholder = 'Mot de passe enregistré';
                 } else {
-                    pwdInput.placeholder = 'Mot de passe';
+                    pwdGroup.style.display = 'none';
+                    pwdInput.placeholder = '';
                 }
             } else {
-                pwdGroup.style.display = 'none';
-                pwdInput.placeholder = '';
+                forgetBtn.style.display = 'none';
+                pwdInput.value = '';
+                pwdInput.type = 'password'; // Password mask for new network
+                if (isSecure) {
+                    pwdGroup.style.display = 'block';
+                    pwdInput.placeholder = 'Mot de passe';
+                } else {
+                    pwdGroup.style.display = 'none';
+                    pwdInput.placeholder = '';
+                }
             }
             
-            pwdInput.value = '';
             document.getElementById('wifi-connect-form').style.display = 'block';
         }
 
@@ -4228,6 +4276,13 @@ def dashboard():
                 } else {
                     alert("WebSocket déconnecté.");
                 }
+            }
+        }
+
+        function handleForgetFromForm() {
+            const ssid = document.getElementById('form-wifi-ssid').value;
+            if (ssid) {
+                forgetWifiNetwork(ssid);
             }
         }
 
