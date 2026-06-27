@@ -3734,6 +3734,14 @@ def dashboard():
                 } 
                 else if (payload.type === "wifi_connect_result") {
                     handleWifiConnectResult(payload);
+                }
+                else if (payload.type === "wifi_forget_result") {
+                    if (payload.status === "success") {
+                        alert("Succès : Réseau oublié.");
+                        scanWifiNetworks();
+                    } else {
+                        alert("Erreur lors de l'oubli du réseau : " + payload.message);
+                    }
                 } 
                 else if (payload.type === "chat_response" || payload.type === "chat") {
                     appendLLMMessage(payload.sender || 'LLM', payload.text || '');
@@ -4100,12 +4108,13 @@ def dashboard():
                     const signalColor = inRange ? 'var(--success)' : 'var(--text-secondary)';
                     
                     item.innerHTML = `
-                        <div>
+                        <div style="flex: 1;">
                             <span style="font-weight: 600; font-size: 0.9rem; display: block; color: var(--accent);">${ssid} <span style="font-size:0.65rem; background:rgba(255,111,97,0.2); color: var(--success); padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem;">Enregistré</span></span>
                             <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' • ' + scannedNet.security) : 'Profil de connexion sauvegardé'}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:0.5rem;">
                             <span style="font-size: 0.85rem; font-weight: bold; color: ${signalColor};">${signalText}</span>
+                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--danger); color: var(--danger); background: transparent;" onclick="event.stopPropagation(); forgetWifiNetwork('${ssid}')">🗑️ Oublier</button>
                         </div>
                     `;
                     
@@ -4209,6 +4218,16 @@ def dashboard():
                 closeWifiModal();
             } else {
                 alert("Erreur de connexion : " + res.message);
+            }
+        }
+
+        function forgetWifiNetwork(ssid) {
+            if (confirm(`Êtes-vous sûr de vouloir oublier le réseau WiFi "${ssid}" sur le robot ?`)) {
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "forget_wifi", ssid: ssid }));
+                } else {
+                    alert("WebSocket déconnecté.");
+                }
             }
         }
 
