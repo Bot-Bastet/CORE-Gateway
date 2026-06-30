@@ -63,6 +63,22 @@ Chaque requête doit inclure le Header : `X-API-Token: votre-token`.
 
 ---
 
+
+## 📷 Calibration Stéréo (via EasyConfig)
+
+L'assistant EasyConfig gère automatiquement la calibration des caméras :
+- **0 caméra** : Les étapes caméra sont sautées
+- **1 caméra** : Calibration mono uniquement (pattern A4)
+- **2 caméras** : Attribution gauche/droite + calibration mono gauche + calibration mono droite + calibration stéréo
+
+### Fichiers de calibration stéréo
+Les calibrations sont sauvegardées sur le serveur Gateway et synchronisées automatiquement avec le robot au démarrage :
+- `config/camera_stereo_left.yaml` — Paramètres intrinsèques caméra gauche
+- `config/camera_stereo_right.yaml` — Paramètres intrinsèques caméra droite
+- `config/stereo_transform.yaml` — Matrice de transformation stéréo (rotation + translation)
+
+> **Note :** Pour la procédure détaillée de calibration stéréo, consultez le [README du dépôt CORE](https://github.com/Bot-Bastet/CORE).
+
 ## 🌐 ROADMAP
 
 - [x] **Hub WebSockets** : Routage temps-réel entre Robot, Node et App.

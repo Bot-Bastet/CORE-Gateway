@@ -22,13 +22,13 @@ hlsSegmentDuration: 1s
 
 # ─── WebRTC ──────────────────────────────────────────────────────────────────
 webrtc: yes
-webrtcIPsFromInterfaces: false
+webrtcIPsFromInterfaces: true
 webrtcAdditionalHosts:
   - ha.arthonetwork.fr
   - 192.168.0.100
 webrtcLocalUDPAddress: :48189
 webrtcLocalTCPAddress: :48189
-webrtcICEServers:
+webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
 
 # ─── Niveau de log ───────────────────────────────────────────────────────────

@@ -34,9 +34,40 @@ USERS_FILE = DATA_DIR / "users.json"
 latest_diagnostics = {}
 gateway_telemetry = {"cpu_percent": 0, "ram_percent": 0, "disk_percent": 0, "temp_c": 0, "uptime_s": 0}
 
+# Cache mémoire pour l'état du robot (évite les races conditions fichier)
+_last_robot_state = None
+_last_robot_state_time = 0
+
 
 FACES_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+# ─── Calibration Files ────────────────────────────────────────────────────────
+CALIBRATION_FILE = DATA_DIR / "calibration.json"
+CAMERA_CALIB_1_FILE = DATA_DIR / "camera_calib_1.json"
+CAMERA_CALIB_2_FILE = DATA_DIR / "camera_calib_2.json"
+DEFAULT_CAM_CALIB = {
+    "image_width": 640,
+    "image_height": 480,
+    "camera_name": "usb_cam",
+    "camera_matrix": {
+        "rows": 3, "cols": 3,
+        "data": [600.0, 0.0, 320.0, 0.0, 600.0, 240.0, 0.0, 0.0, 1.0]
+    },
+    "distortion_model": "plumb_bob",
+    "distortion_coefficients": {
+        "rows": 1, "cols": 5,
+        "data": [0.0, 0.0, 0.0, 0.0, 0.0]
+    },
+    "rectification_matrix": {
+        "rows": 3, "cols": 3,
+        "data": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+    },
+    "projection_matrix": {
+        "rows": 3, "cols": 4,
+        "data": [600.0, 0.0, 320.0, 0.0, 0.0, 600.0, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+    }
+}
+
 
 API_TOKEN = os.getenv("API_TOKEN", "your-api-token-here")
 api_key_header = APIKeyHeader(name="X-API-Token", auto_error=False)
@@ -55,8 +86,18 @@ async def lifespan(app: FastAPI):
             print(f"[AutoUpdater] Erreur : {e}")
 
     def _hourly_check():
-        time.sleep(10)  # Attendre que l'app démarre
-        _run_update()
+        time.sleep(120)  # Attendre 2 min que l'app démarre avant la première vérification
+        # First check: passive only (log if update available, no restart)
+        try:
+            from updater import get_latest_release, get_current_version, _version_tuple
+            current = get_current_version()
+            release = get_latest_release()
+            if release:
+                latest = release.get("tag_name", "v0.0.0")
+                if _version_tuple(latest) > _version_tuple(current):
+                    print(f"[AutoUpdater] Mise à jour disponible: {latest} (actuelle: {current}) — appliquée au prochain redémarrage.")
+        except Exception as e:
+            print(f"[AutoUpdater] Erreur vérification passive: {e}")
         while True:
             time.sleep(3600)
             try:
@@ -64,7 +105,17 @@ async def lifespan(app: FastAPI):
                 status = state.get("robot_status", "offline")
                 if status != "online":
                     print("[AutoUpdater] Robot inactif. Vérification de mise à jour Gateway...")
-                    _run_update()
+                    # Passive check only - no restart
+                    try:
+                        from updater import get_latest_release, get_current_version, _version_tuple
+                        current = get_current_version()
+                        release = get_latest_release()
+                        if release:
+                            latest = release.get("tag_name", "v0.0.0")
+                            if _version_tuple(latest) > _version_tuple(current):
+                                print(f"[AutoUpdater] Mise à jour disponible: {latest}")
+                    except Exception as e:
+                        print(f"[AutoUpdater] Erreur vérification horaire: {e}")
             except Exception as e:
                 print(f"[AutoUpdater] Erreur : {e}")
 
@@ -317,6 +368,28 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Configuration préférée des cibles d'IA par l'utilisateur
+preferred_ai_targets = {
+    "tts": "robot",
+    "stt": "robot",
+    "chat": "robot",
+    "yolo": "robot",
+    "face_rec": "robot"
+}
+
+async def handle_node_connection_change(connected: bool):
+    """Bascule automatiquement les services si le PC Node se déconnecte/reconnecte."""
+    for feature, target in preferred_ai_targets.items():
+        if target == "node":
+            active_target = "node" if connected else "robot"
+            controlled_msg = json.dumps({
+                "type": "ai_control",
+                "feature": feature,
+                "target": active_target
+            })
+            await manager.broadcast(controlled_msg, "robot")
+            await manager.broadcast(controlled_msg, "app")
+
 @app.websocket("/ws/robot")
 async def websocket_robot(websocket: WebSocket, token: Optional[str] = Query(None)):
     if token != API_TOKEN:
@@ -373,6 +446,7 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
         return
 
     await manager.connect(websocket, "node")
+    await handle_node_connection_change(True)
     try:
         while True:
             data = await websocket.receive_text()
@@ -427,6 +501,7 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
             await manager.broadcast(data, "app")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "node")
+        await handle_node_connection_change(False)
 
 @app.websocket("/ws/app")
 async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)):
@@ -487,11 +562,26 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                                 camera_stop_timers[cam_id].cancel()
                             camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id))
                     await manager.broadcast(json.dumps({"type": "keep_stream_status", "camera": cam_id, "keep": keep}), "app")
+                elif msg_type == "ai_control":
+                    feature = msg_json.get("feature")
+                    target = msg_json.get("target")
+                    if feature in preferred_ai_targets:
+                        preferred_ai_targets[feature] = target
+                        node_connected = len(manager.active_connections.get("node", [])) > 0
+                        active_target = target
+                        if target == "node" and not node_connected:
+                            active_target = "robot"
+                        msg_json["target"] = active_target
+                        data = json.dumps(msg_json)
+                elif msg_type == "arduino_cmd":
+                    # Forward arduino commands (attach, write, detach, stand, etc.) to the robot
+                    await manager.broadcast(data, "robot")
             except Exception:
                 pass
                 
-            # Routage des commandes de l'app mobile vers le robot
+            # Routage des commandes de l'app mobile vers le robot et le PC Node
             await manager.broadcast(data, "robot")
+            await manager.broadcast(data, "node")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "app")
 
@@ -505,123 +595,6 @@ def delete_account(full_name: str):
         save_json(USERS_FILE, users)
         return {"status": "deleted", "user": full_name}
     raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-
-@app.delete("/accounts/{full_name}", tags=["Accounts"], summary="Supprimer un compte", dependencies=[Depends(verify_token)])
-def delete_account(full_name: str):
-    users = load_json(USERS_FILE, default={})
-    if full_name in users:
-        # Supprimer des comptes
-        del users[full_name]
-        save_json(USERS_FILE, users)
-
-        # Nettoyer les identifiants MyGES associés
-        myges = load_json(MYGES_FILE, default={})
-        if full_name in myges:
-            del myges[full_name]
-            save_json(MYGES_FILE, myges)
-
-        # Nettoyer les photos de visage associées
-        meta = load_json(META_FILE, default=[])
-        new_meta = []
-        for entry in meta:
-            if entry.get("name", "").lower() == full_name.lower():
-                path = FACES_DIR / entry["filename"]
-                try:
-                    if path.exists():
-                        path.unlink()
-                except Exception as e:
-                    print(f"Error deleting face image {path}: {e}")
-            else:
-                new_meta.append(entry)
-        save_json(META_FILE, new_meta)
-
-        return {"status": "deleted", "user": full_name}
-    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-
-@app.delete("/accounts/{full_name}", tags=["Accounts"], summary="Supprimer un compte", dependencies=[Depends(verify_token)])
-def delete_account(full_name: str):
-    users = load_json(USERS_FILE, default={})
-    if full_name in users:
-        # Supprimer des comptes
-        del users[full_name]
-        save_json(USERS_FILE, users)
-
-        # Nettoyer les identifiants MyGES associés
-        myges = load_json(MYGES_FILE, default={})
-        if full_name in myges:
-            del myges[full_name]
-            save_json(MYGES_FILE, myges)
-
-        # Nettoyer les photos de visage associées
-        meta = load_json(META_FILE, default=[])
-        new_meta = []
-        for entry in meta:
-            if entry.get("name", "").lower() == full_name.lower():
-                path = FACES_DIR / entry["filename"]
-                try:
-                    if path.exists():
-                        path.unlink()
-                except Exception as e:
-                    print(f"Error deleting face image {path}: {e}")
-            else:
-                new_meta.append(entry)
-        save_json(META_FILE, new_meta)
-
-        return {"status": "deleted", "user": full_name}
-    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-
-@app.delete("/accounts/{full_name}", tags=["Accounts"], summary="Supprimer un compte", dependencies=[Depends(verify_token)])
-def delete_account(full_name: str):
-    users = load_json(USERS_FILE, default={})
-    if full_name in users:
-        # Supprimer des comptes
-        del users[full_name]
-        save_json(USERS_FILE, users)
-
-        # Nettoyer les identifiants MyGES associés
-        myges = load_json(MYGES_FILE, default={})
-        if full_name in myges:
-            del myges[full_name]
-            save_json(MYGES_FILE, myges)
-
-        # Nettoyer les photos de visage associées
-        meta = load_json(META_FILE, default=[])
-        new_meta = []
-        for entry in meta:
-            if entry.get("name", "").lower() == full_name.lower():
-                path = FACES_DIR / entry["filename"]
-                try:
-                    if path.exists():
-                        path.unlink()
-                except Exception as e:
-                    print(f"Error deleting face image {path}: {e}")
-            else:
-                new_meta.append(entry)
-        save_json(META_FILE, new_meta)
-
-        return {"status": "deleted", "user": full_name}
-    raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-
-
-CALIBRATION_FILE = DATA_DIR / "calibration.json"
-CAMERA_CALIB_1_FILE = DATA_DIR / "camera_calibration_1.json"
-CAMERA_CALIB_2_FILE = DATA_DIR / "camera_calibration_2.json"
-
-DEFAULT_CAM_CALIB = {
-    "camera_name": "usb_cam",
-    "image_width": 640,
-    "image_height": 480,
-    "distortion_model": "plumb_bob",
-    "camera_matrix": [600.0, 0.0, 320.0, 0.0, 600.0, 240.0, 0.0, 0.0, 1.0],
-    "distortion_coefficients": [0.0, 0.0, 0.0, 0.0, 0.0],
-    "rectification_matrix": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-    "projection_matrix": [600.0, 0.0, 320.0, 0.0, 0.0, 600.0, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-    "is_calibrated": False,
-    "calibrated_at": "Jamais (Défaut)"
-}
 
 @app.post("/core/calibration", tags=["CORE State"], summary="Sauvegarder les offsets de calibration", dependencies=[Depends(verify_token)])
 def save_calibration(data: dict):
@@ -890,6 +863,10 @@ def dashboard():
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
+        }
+
+        .ros2-topics-card {
+            grid-column: 2 / -1;
         }
 
         .card {
@@ -1883,6 +1860,10 @@ def dashboard():
                 grid-template-columns: 1fr;
             }
 
+            .ros2-topics-card {
+                grid-column: 1 / -1;
+            }
+
             .stream-grid {
                 grid-template-columns: 1fr;
             }
@@ -1901,7 +1882,29 @@ def dashboard():
                 gap: 0.75rem;
             }
         }
+        
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(255, 111, 97, 0.7);
+            }
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 0 10px rgba(255, 111, 97, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(255, 111, 97, 0);
+            }
+        }
+        .mic-active {
+            animation: pulse-ring 1.5s infinite !important;
+            background-color: var(--accent) !important;
+            color: white !important;
+            border-color: var(--accent) !important;
+        }
     </style>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 </head>
 <body>
     <!-- Mobile Sidebar Overlay -->
@@ -1938,6 +1941,12 @@ def dashboard():
                     <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
                 </svg>
                 <span>Vue d'ensemble</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('control')" id="nav-control">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+                </svg>
+                <span>Télécommande</span>
             </li>
             <li class="nav-item" onclick="switchTab('users')" id="nav-users">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2304,7 +2313,18 @@ def dashboard():
                             <span id="gateway-update-percent">0%</span>
                         </div>
                     </div>
-                    <button id="btn-update-gateway" class="btn btn-secondary" onclick="triggerUpdate('gateway')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                    <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Version à déployer :</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="gateway-release-select" class="form-input" style="flex: 1; font-size: 0.8rem; padding: 0.3rem 0.5rem;">
+                                    <option value="">-- Chargement... --</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="applySelectedRelease('CORE-Gateway')" style="font-size: 0.75rem; padding: 0.3rem 0.75rem; white-space: nowrap;">
+                                    Appliquer
+                                </button>
+                            </div>
+                        </div>
+                        <button id="btn-update-gateway" class="btn btn-secondary" onclick="triggerUpdate('gateway')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
                         </svg>
@@ -2329,7 +2349,7 @@ def dashboard():
                             </div>
                             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
                                 <span>Statut de l'agent :</span>
-                                <span id="robot-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
+                                                                <span id="robot-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
                             </div>
                             <div class="progress-bar-container">
                                 <div id="robot-update-bar" class="progress-bar-value progress-bar-fill"></div>
@@ -2337,6 +2357,17 @@ def dashboard():
                             <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
                                 <span>Progression</span>
                                 <span id="robot-update-percent">0%</span>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Version à déployer (Pi + Arduino liés) :</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="robot-release-select" class="form-input" style="flex: 1; font-size: 0.8rem; padding: 0.3rem 0.5rem;">
+                                    <option value="">-- Chargement... --</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="applySelectedRelease('CORE')" style="font-size: 0.75rem; padding: 0.3rem 0.75rem; white-space: nowrap;">
+                                    Appliquer
+                                </button>
                             </div>
                         </div>
                         <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
@@ -2403,7 +2434,10 @@ def dashboard():
         </div>
 
         <!-- ─────────────────── TAB 5: CHAT & CONTROL IA ─────────────────── -->
-        <div id="tab-chat-content" class="tab-content">
+        <div </div>
+            </div>
+            <!-- End SLAM disabled overlay -->
+id="tab-chat-content" class="tab-content">
             <div class="card-grid">
                 <!-- Live Conversation Box -->
                 <div class="card" style="display: flex; flex-direction: column; min-height: 450px;">
@@ -2579,13 +2613,164 @@ def dashboard():
                 <div class="card">
                     <div class="card-title">Gyroscope & Orientation IMU</div>
                     <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height: 180px; position:relative;">
+                        <style>
+                            .spot-model {
+                                position: absolute;
+                                width: 0;
+                                height: 0;
+                                left: 40px;
+                                top: 40px;
+                                transform-style: preserve-3d;
+                            }
+                            .spot-box {
+                                position: absolute;
+                                transform-style: preserve-3d;
+                            }
+                            .spot-face {
+                                position: absolute;
+                                background: #1a1a20;
+                                border: 1px solid #3c3c46;
+                                box-sizing: border-box;
+                            }
+                            .chassis .spot-face {
+                                background: #22222a;
+                                border: 1.5px solid var(--accent);
+                            }
+                            .chassis .face-top {
+                                background: #2d2d38;
+                                border-bottom: 2px solid var(--accent);
+                            }
+                            .head .spot-face {
+                                background: #111115;
+                                border: 1px solid var(--accent);
+                            }
+                            .head .face-front {
+                                background: #08080c;
+                                box-shadow: inset 0 0 8px var(--accent);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            }
+                            .head .face-front::after {
+                                content: '';
+                                width: 8px;
+                                height: 2px;
+                                background: var(--accent);
+                                box-shadow: 0 0 6px var(--accent);
+                            }
+                            .thigh .spot-face {
+                                background: #2c2c36;
+                                border: 1px solid #4a4a58;
+                            }
+                            .shin .spot-face {
+                                background: #18181f;
+                                border: 1px solid #2e2e38;
+                            }
+                        </style>
                         <div id="imu-visual-cube" style="width: 80px; height: 80px; transform-style: preserve-3d; transition: transform 0.1s linear; transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);">
-                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(99, 102, 241, 0.4); border: 2px solid var(--accent); transform: translateZ(40px); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">AVANT</div>
-                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(255, 111, 97, 0.2); border: 2px solid var(--accent); transform: rotateY(180deg) translateZ(40px);"></div>
-                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(255, 111, 97, 0.2); border: 2px solid var(--accent); transform: rotateY(90deg) translateZ(40px);"></div>
-                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(255, 111, 97, 0.2); border: 2px solid var(--accent); transform: rotateY(-90deg) translateZ(40px);"></div>
-                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(255, 111, 97, 0.2); border: 2px solid var(--accent); transform: rotateX(90deg) translateZ(40px); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">HAUT</div>
-                            <div style="position: absolute; width: 80px; height: 80px; background: rgba(255, 111, 97, 0.2); border: 2px solid var(--accent); transform: rotateX(-90deg) translateZ(40px);"></div>
+                            <div class="spot-model">
+                                <!-- Main Chassis (Body) -->
+                                <div class="spot-box chassis" style="transform: translate3d(0, -5px, 0);">
+                                    <!-- Front -->
+                                    <div class="spot-face face-front" style="width: 32px; height: 18px; left: -16px; top: -9px; transform: translateZ(35px);"></div>
+                                    <!-- Back -->
+                                    <div class="spot-face face-back" style="width: 32px; height: 18px; left: -16px; top: -9px; transform: rotateY(180deg) translateZ(35px);"></div>
+                                    <!-- Left -->
+                                    <div class="spot-face face-left" style="width: 70px; height: 18px; left: -35px; top: -9px; transform: rotateY(-90deg) translateZ(16px);"></div>
+                                    <!-- Right -->
+                                    <div class="spot-face face-right" style="width: 70px; height: 18px; left: -35px; top: -9px; transform: rotateY(90deg) translateZ(16px);"></div>
+                                    <!-- Top -->
+                                    <div class="spot-face face-top" style="width: 32px; height: 70px; left: -16px; top: -35px; transform: rotateX(90deg) translateZ(9px);"></div>
+                                    <!-- Bottom -->
+                                    <div class="spot-face face-bottom" style="width: 32px; height: 70px; left: -16px; top: -35px; transform: rotateX(-90deg) translateZ(9px);"></div>
+                                </div>
+
+                                <!-- Head -->
+                                <div class="spot-box head" style="transform: translate3d(0, -18px, 38px);">
+                                    <div class="spot-face face-front" style="width: 20px; height: 12px; left: -10px; top: -6px; transform: translateZ(8px);"></div>
+                                    <div class="spot-face face-back" style="width: 20px; height: 12px; left: -10px; top: -6px; transform: rotateY(180deg) translateZ(8px);"></div>
+                                    <div class="spot-face face-left" style="width: 16px; height: 12px; left: -8px; top: -6px; transform: rotateY(-90deg) translateZ(10px);"></div>
+                                    <div class="spot-face face-right" style="width: 16px; height: 12px; left: -8px; top: -6px; transform: rotateY(90deg) translateZ(10px);"></div>
+                                    <div class="spot-face face-top" style="width: 20px; height: 16px; left: -10px; top: -8px; transform: rotateX(90deg) translateZ(6px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 20px; height: 16px; left: -10px; top: -8px; transform: rotateX(-90deg) translateZ(6px);"></div>
+                                </div>
+
+                                <!-- Leg Front Left -->
+                                <div class="spot-box thigh" style="transform: translate3d(-18px, 2px, 22px) rotateX(15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(-30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Leg Front Right -->
+                                <div class="spot-box thigh" style="transform: translate3d(18px, 2px, 22px) rotateX(15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(-30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Leg Back Left -->
+                                <div class="spot-box thigh" style="transform: translate3d(-18px, 2px, -22px) rotateX(-15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Leg Back Right -->
+                                <div class="spot-box thigh" style="transform: translate3d(18px, 2px, -22px) rotateX(-15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
@@ -2593,12 +2778,20 @@ def dashboard():
                         <div><div style="font-size:0.75rem; color:var(--text-secondary);">Tangage</div><span id="imu-val-pitch" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
                         <div><div style="font-size:0.75rem; color:var(--text-secondary);">Lacet</div><span id="imu-val-yaw" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
                     </div>
+                    <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: center;">
+                        <button class="btn btn-secondary" onclick="resetIMU()" style="gap: 0.5rem; font-size:0.8rem;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6"/><path d="M2.5 12a9 9 0 0 1 15.4-5.8L21.5 8M2.5 22v-6h6"/><path d="M21.5 12a9 9 0 0 1-15.4 5.8L2.5 16"/>
+                            </svg>
+                            Recalibrer l'IMU (BNO085)
+                        </button>
+                    </div>
                 </div>
 
                 <!-- ROS 2 Topics -->
-                <div class="card" style="display:flex; flex-direction:column; max-height: 310px; min-width: 0; overflow: hidden;">
+                <div class="card ros2-topics-card" style="display:flex; flex-direction:column; height: 365px; min-width: 0; overflow: hidden;">
                     <div class="card-title">Flux de Topics ROS 2 Actifs</div>
-                    <div style="flex:1; overflow-x: auto; margin-top: 0.5rem; max-width: 100%; width: 100%;">
+                    <div style="flex:1; overflow: auto; margin-top: 0.5rem; max-width: 100%; width: 100%;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left; min-width: 450px;">
                             <thead>
                                 <tr style="color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 600;">
@@ -2632,6 +2825,9 @@ def dashboard():
                     <button class="btn btn-primary" onclick="openCalibrationOverlay()">
                         ⚙️ Ouvrir la Calibration
                     </button>
+                    <button class="btn btn-secondary" style="border-color: var(--accent); color: var(--accent); background-color: rgba(99, 102, 241, 0.05);" onclick="openServoTester()">
+                        🔧 Test Individuel
+                    </button>
                     <button class="btn btn-secondary" style="background-color: rgba(255, 255, 255, 0.05);" onclick="resetAndSendZeroOffsets()">
                         🔄 Remettre à zéro les offsets
                     </button>
@@ -2642,9 +2838,145 @@ def dashboard():
             </div>
         </div>
 
+        <!-- ─────────────────── TAB: TELECOMMANDE & NAVIGATION ─────────────────── -->
+        <div id="tab-control-content" class="tab-content">
+            <div class="card-grid" style="grid-template-columns: 1.6fr 1.1fr 1fr; gap: 1.5rem;">
+                
+                <!-- Localisation & Waypoint Canvas -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 550px; margin: 0;">
+                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Carte de Navigation Interactive</span>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">
+                            Cliquez sur la carte pour définir une destination (Objectif)
+                        </div>
+                    </div>
+                    <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: #07070a; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-top: 1rem; cursor: crosshair;">
+                        <canvas id="control-map-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                        
+                        <!-- Navigation overlay info -->
+                        <div id="nav-target-panel" style="position: absolute; bottom: 1rem; left: 1rem; right: 1rem; background: rgba(24,24,27,0.92); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
+                            <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                                <span style="font-size:0.7rem; color:var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Objectif Sélectionné</span>
+                                <span style="font-size:0.85rem; font-family: monospace; font-weight: bold; color: var(--accent);">X: <span id="nav-target-x">0.00</span> m, Y: <span id="nav-target-y">0.00</span> m</span>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.35rem 0.75rem;" onclick="clearNavGoal()">Annuler</button>
+                                <button class="btn btn-primary" style="font-size:0.75rem; padding: 0.35rem 1rem;" onclick="sendNavGoal()">🚀 Aller à ce point</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat & Contrôle Vocal LLM -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 550px; margin: 0;">
+                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Contrôle Vocal & IA</span>
+                        <span class="status-badge active" id="control-llm-badge" style="background-color: var(--success); color: var(--bg-main); font-weight: bold; font-size: 0.75rem;">Node</span>
+                    </div>
+                    
+                    <!-- Chat Messages Box -->
+                    <div id="control-chat-messages" style="flex: 1; overflow-y: auto; padding: 0.75rem; background-color: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 380px; min-height: 250px;">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 2rem 0;">
+                            Parlez à Bastet par texte ou par voix pour le piloter.
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Input & Mic Box -->
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center;">
+                        <button class="btn btn-secondary" id="control-mic-btn" onclick="toggleVoiceRecognition()" style="width: 42px; height: 42px; min-width: 42px; padding: 0; justify-content: center; border-radius: 50%; background: rgba(255,111,97,0.1); border: 1px solid rgba(255,111,97,0.3); color: var(--accent); transition: all 0.3s ease; position: relative;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                <line x1="12" y1="19" x2="12" y2="23"/>
+                                <line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                            <span id="mic-pulse" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: rgba(255,111,97,0.4); top: 0; left: 0; transform: scale(1); opacity: 0; transition: all 0.3s ease; pointer-events: none;"></span>
+                        </button>
+                        <form onsubmit="sendControlChatMessage(event)" style="display: flex; gap: 0.5rem; flex: 1;">
+                            <input type="text" id="control-chat-input" class="form-input" style="flex: 1; height: 42px;" placeholder="Dites au robot d'avancer..." autocomplete="off"/>
+                            <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 1rem;">Envoyer</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Manual controls column -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    
+                    <!-- Posture card -->
+                    <div class="card" style="margin:0;">
+                        <div class="card-title" style="font-size: 1rem;">Posture & Hauteur</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+                            <button class="btn btn-primary" onclick="sendControlCmd('stand')" style="justify-content: center; gap: 0.5rem; padding: 0.6rem 0.5rem; font-size: 0.8rem;">
+                                ⬆ Se Lever (Stand)
+                            </button>
+                            <button class="btn btn-secondary" onclick="sendControlCmd('sit')" style="justify-content: center; gap: 0.5rem; padding: 0.6rem 0.5rem; font-size: 0.8rem; background-color: rgba(255,255,255,0.05);">
+                                ⬇ S'Asseoir (Sit)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- D-Pad card -->
+                    <div class="card" style="margin:0; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <div class="card-title" style="font-size: 1rem; width: 100%; text-align: left; margin-bottom: 1.5rem;">Télécommande Moteur</div>
+                        
+                        <!-- Visual D-Pad Layout -->
+                        <div style="display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(3, 70px); gap: 0.75rem; margin: auto;">
+                            <div></div>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-up" onmousedown="startWalking('up')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                            </button>
+                            <div></div>
+                            
+                            <button class="btn btn-secondary dpad-btn" id="dpad-left" onmousedown="startWalking('left')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                            </button>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-stop" onclick="sendControlStop()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></svg>
+                            </button>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-right" onmousedown="startWalking('right')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
+                            
+                            <div></div>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-down" onmousedown="startWalking('down')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div></div>
+                        </div>
+
+                        <!-- Keyboard guidance -->
+                        <div style="font-size:0.75rem; color:var(--text-secondary); text-align:center; margin-top: 1.5rem;">
+                            💡 Astuce : Utilisez les touches <b style="color:var(--text-primary);">Z / Q / S / D</b> ou les <b style="color:var(--text-primary);">flèches</b> de votre clavier lorsque l'onglet est actif.
+                        </div>
+                    </div>
+
+                    <!-- Speed card -->
+                    <div class="card" style="margin:0;">
+                        <div class="card-title" style="font-size: 1rem;">Facteur de Vitesse</div>
+                        <div style="margin-top: 1rem;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.5rem;">
+                                <span>Vitesse de déplacement</span>
+                                <span id="control-speed-val" style="font-weight: bold; color: var(--accent);">0.15 m/s</span>
+                            </div>
+                            <input type="range" min="5" max="30" value="15" class="form-input" style="padding:0; height:4px;" id="control-speed-slider" oninput="updateControlSpeed()"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ─────────────────── TAB 7: SLAM & MAP ─────────────────── -->
         <div id="tab-map-content" class="tab-content">
-            <div class="card-grid" style="grid-template-columns: 2.5fr 1fr;">
+            
+            <!-- SLAM Mode Indicator -->
+            <div id="slam-mode-bar" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: rgba(99,102,241,0.08); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 0.75rem;">
+                <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Mode SLAM :</span>
+                <span id="slam-mode-badge" style="font-weight: 700; font-size: 0.85rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: rgba(99,102,241,0.15); color: var(--accent);">--</span>
+                <span id="slam-cameras-badge" style="font-size: 0.75rem; color: var(--text-secondary); margin-left: auto;"></span>
+            </div>
+            <!-- SLAM disabled overlay -->
+            <div id="slam-disabled-overlay" style="display: none; position: relative;">
+                <div class="card-grid" style="opacity: 0.3; pointer-events: none;"><div class="card-grid" style="grid-template-columns: 2.5fr 1fr;">
                 <!-- SLAM Visualizer -->
                 <div class="card" style="display: flex; flex-direction: column; min-height: 500px;">
                     <div class="card-title">
@@ -2684,7 +3016,7 @@ def dashboard():
                         </div>
                     </div>
                     
-                    <div class="card" style="margin: 0; flex:1;">
+                    <div class="card" style="max-height: fit-content; padding: 0.75rem 1rem; margin: 0; flex:1;">
                         <div class="card-title" style="font-size: 1rem;">Paramètres SLAM</div>
                         <div style="display:flex; flex-direction:column; gap:1rem; margin-top: 1rem;">
                             <div>
@@ -2765,6 +3097,34 @@ def dashboard():
         </div>
     </div>
 
+    <!-- Menu Test Servos Individuel Modal -->
+    <div id="servo-tester-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 500px; max-width: 95vw; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.3rem; color: var(--text-primary);">Test Moteur Individuel</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Activez et testez chaque servo un par un sans allumer le reste.</p>
+                </div>
+                <button class="btn btn-secondary" onclick="closeServoTester()">&times; Fermer</button>
+            </div>
+            
+            <div style="padding: 1.5rem; overflow-y: auto; max-height: 70vh; display: flex; flex-direction: column; gap: 1rem;">
+                <!-- General control -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Tous les moteurs :</span>
+                    <button class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger); font-size: 0.8rem; padding: 0.4rem 0.8rem; background-color: rgba(239, 68, 68, 0.05);" onclick="testerStopAll()">
+                        🚫 Tout éteindre (Limp)
+                    </button>
+                </div>
+
+                <!-- 12 Servos list -->
+                <div id="tester-servos-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Dynamically populated via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Full page Calibration Overlay -->
     <div id="calibration-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
         <div style="width: 95vw; height: 95vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
@@ -2780,7 +3140,7 @@ def dashboard():
                 <!-- Offsets sliders -->
                 <div style="padding: 1.5rem; overflow-y: auto; border-right: 1px solid var(--border-color);">
                     <h3 class="font-outfit" style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                        <span>Offsets des Angles Moteurs (-30° à +30°)</span>
+                        <span>Offsets des Angles Moteurs (-90° à +90°)</span>
                         <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetMotorCalibration()">Réinitialiser</button>
                     </h3>
                     
@@ -2791,15 +3151,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad Offset</span><span id="calib-val-0">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper Offset</span><span id="calib-val-1">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower Offset</span><span id="calib-val-2">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)"/>
                                 </div>
                             </div>
                         </div>
@@ -2810,15 +3170,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad Offset</span><span id="calib-val-3">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper Offset</span><span id="calib-val-4">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower Offset</span><span id="calib-val-5">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)"/>
                                 </div>
                             </div>
                         </div>
@@ -2829,15 +3189,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad Offset</span><span id="calib-val-6">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper Offset</span><span id="calib-val-7">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower Offset</span><span id="calib-val-8">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)"/>
                                 </div>
                             </div>
                         </div>
@@ -2848,15 +3208,15 @@ def dashboard():
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad Offset</span><span id="calib-val-9">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper Offset</span><span id="calib-val-10">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)"/>
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower Offset</span><span id="calib-val-11">0</span></div>
-                                    <input type="range" min="-30" max="30" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)"/>
                                 </div>
                             </div>
                         </div>
@@ -2966,22 +3326,32 @@ def dashboard():
             
             <!-- Steps Indicator -->
             <div style="display: flex; background: var(--bg-main); border-bottom: 1px solid var(--border-color); padding: 0.75rem 1.5rem; justify-content: space-between; font-size: 0.8rem;">
-                <div id="step-dot-1" style="display:flex; align-items:center; gap:0.5rem; color: var(--accent); font-weight: 600;">
+                <div id="step-dot-1" onclick="ecGoToStep(1)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--accent); font-weight: 600;">
                     <span style="width:20px; height:20px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem;">1</span>
                     <span>Offsets Moteurs</span>
                 </div>
                 <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
-                <div id="step-dot-2" style="display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                <div id="step-dot-lr" onclick="ecGoToStep(2)" style="display:none; cursor:pointer; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
+                    <span>Attribution G/D</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-2" onclick="ecGoToStep(2)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
                     <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
                     <span>Caméra Gauche</span>
                 </div>
                 <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
-                <div id="step-dot-3" style="display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                <div id="step-dot-3" onclick="ecGoToStep(3)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
                     <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">3</span>
                     <span>Caméra Droite</span>
                 </div>
                 <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
-                <div id="step-dot-4" style="display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                <div id="step-dot-stereo" onclick="ecGoToStep(5)" style="display:none; cursor:pointer; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">5</span>
+                    <span>Stereo</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-4" onclick="ecGoToStep(4)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
                     <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">4</span>
                     <span>Finalisation</span>
                 </div>
@@ -2991,55 +3361,142 @@ def dashboard():
             <div style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; min-height: 350px;">
                 
                 <!-- STEP 1 CONTENT -->
-                <div id="ec-step-1" style="display: flex; flex-direction: column; gap: 1rem; height: 100%;">
-                    <div style="line-height:1.5; font-size:0.9rem;">
-                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 1 : Alignement Physique & Niveau 0 des Moteurs</p>
-                        Avant de démarrer le robot, veuillez le positionner manuellement dans la position de calibration :
-                        <ul style="margin: 0.5rem 0; padding-left: 1.25rem; display:flex; flex-direction:column; gap:0.25rem;">
-                            <li>• Positionnez les <strong>hanches droites</strong>, perpendiculaires et parallèles au sol.</li>
-                            <li>• Mettez les <strong>cuisses parallèles au sol</strong> (angle de 90°).</li>
-                            <li>• Pliez le <strong>tibia à 100%</strong> contre la cuisse (angle de 0°).</li>
-                        </ul>
-                    </div>
-                    
-                    <!-- Motor angles feedback grid -->
-                    <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; font-size:0.75rem;">
-                        <div style="border-right: 1px solid var(--border-color); padding-right: 0.5rem;">
-                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte FR</span>
-                            <span>Hanche: <strong id="ec-j0">90°</strong></span><br/>
-                            <span>Cuisse: <strong id="ec-j1">90°</strong></span><br/>
-                            <span>Tibia: <strong id="ec-j2">0°</strong></span>
-                        </div>
-                        <div style="border-right: 1px solid var(--border-color); padding-right: 0.5rem; padding-left: 0.25rem;">
-                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte FL</span>
-                            <span>Hanche: <strong id="ec-j3">90°</strong></span><br/>
-                            <span>Cuisse: <strong id="ec-j4">90°</strong></span><br/>
-                            <span>Tibia: <strong id="ec-j5">0°</strong></span>
-                        </div>
-                        <div style="border-right: 1px solid var(--border-color); padding-right: 0.5rem; padding-left: 0.25rem;">
-                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte BR</span>
-                            <span>Hanche: <strong id="ec-j6">90°</strong></span><br/>
-                            <span>Cuisse: <strong id="ec-j7">90°</strong></span><br/>
-                            <span>Tibia: <strong id="ec-j8">0°</strong></span>
-                        </div>
-                        <div style="padding-left: 0.25rem;">
-                            <span style="font-weight:bold; color:var(--accent); display:block; margin-bottom:0.25rem;">Patte BL</span>
-                            <span>Hanche: <strong id="ec-j9">90°</strong></span><br/>
-                            <span>Cuisse: <strong id="ec-j10">90°</strong></span><br/>
-                            <span>Tibia: <strong id="ec-j11">0°</strong></span>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: auto; display: flex; flex-direction:column; gap:0.75rem;">
-                        <button class="btn btn-primary" onclick="ecCalculateOffsets()" style="width: 100%; justify-content: center; padding: 0.75rem;">
-                            📐 Calculer et Définir le Niveau 0 (Offsets)
-                        </button>
-                        <div id="ec-motor-success-anim" style="display:none; text-align:center; color:var(--success); font-size:0.85rem; font-weight:bold; animation: fadeIn 0.3s ease;">
-                            ✅ Offsets calculés et transmis au robot avec succès !
-                        </div>
-                    </div>
+                <div id="ec-step-1" style="display: none; flex-direction: column; gap: 1.5rem; padding: 1.5rem; flex: 1;">
+        <!-- ===== Joint Calibration Wizard View ===== -->
+        <div id="ec-joint-calibration-view" style="display: flex; flex-direction: column; gap: 1.5rem; flex: 1;">
+            <!-- Leg banner -->
+            <div id="ec-joint-leg-banner" style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05)); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 600; color: var(--accent); text-align: center;">
+                Patte <span id="ec-joint-leg-name">Arrière Gauche</span>
+            </div>
+            
+            <!-- Joint name and progress -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="ec-joint-name" style="margin: 0; font-size: 1.4rem;">Hanche</h3>
+                <span id="ec-joint-progress" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 0.35rem 0.85rem; border-radius: 20px; border: 1px solid var(--border-color);">Articulation 1/12</span>
+            </div>
+            
+            <!-- Instruction text -->
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+                1. Cliquez sur <strong>"Allumer le servo"</strong> pour activer l'articulation<br>
+                2. Utilisez le curseur pour positionner l'articulation à sa <strong>position neutre</strong><br>
+                3. Cliquez sur <strong>"Valider"</strong> pour enregistrer l'offset et passer à la suivante
+            </p>
+            
+            <!-- Joint visualization & slider area -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Servo icon -->
+                <div style="text-align: center; font-size: 3rem; opacity: 0.6;" id="ec-joint-icon">🦵</div>
+                
+                <!-- Slider -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-30</span>
+                    <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" 
+                           oninput="ecUpdateJointSlider(this.value)" 
+                           style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+30</span>
                 </div>
                 
+                <!-- Value display -->
+                <div style="text-align: center;">
+                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
+                    <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
+                </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 1rem; justify-content: center; align-items: center;">
+                <button id="ec-btn-attach-servo" class="btn btn-secondary" onclick="ecAttachCurrentJoint()" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    🔌 Allumer le servo
+                </button>
+                <button id="ec-btn-validate-joint" class="btn btn-primary" onclick="ecValidateJoint()" disabled style="gap: 0.5rem; padding: 0.75rem 1.5rem; opacity: 0.5;">
+                    ✅ Valider cet offset
+                </button>
+            </div>
+        </div>
+        
+        <!-- ===== Final View (all 12 joints done) ===== -->
+        <div id="ec-joint-final-view" style="display: none; flex-direction: column; gap: 1.5rem; align-items: center; justify-content: center; flex: 1; padding: 2rem;">
+            <div style="font-size: 4rem; line-height: 1;">✅</div>
+            <h3 style="margin: 0; font-size: 1.3rem;">Offset de toutes les articulations définis !</h3>
+            <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">
+                12 offsets collectés. Vous pouvez maintenant enregistrer la configuration pour activer les moteurs ou garder le robot éteint.
+            </p>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                <button class="btn btn-primary" onclick="ecCalculateOffsets(true)" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    ⚡ Enregistrer & Activer les Moteurs
+                </button>
+                <button class="btn btn-secondary" onclick="ecCalculateOffsets(false)" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    💾 Enregistrer Uniquement (Garder Éteint)
+                </button>
+            </div>
+        </div>
+        
+        <!-- Success animation (kept for compatibility) -->
+        <div id="ec-motor-success-anim" style="display: none;">
+                
+                <!-- STEP LR: Attribution Gauche/Droite (2 cameras only) -->
+                <div id="ec-step-lr" style="display: none; flex-direction: column; gap: 1.5rem; height: 100%; padding: 1.5rem;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1.1rem; margin-bottom:0.5rem;">Attribution des Cameras : Gauche / Droite</p>
+                        <p style="color: var(--text-secondary);">Deux cameras sont detectees. Regardez les flux ci-dessous et indiquez laquelle est la <strong>gauche</strong> et laquelle est la <strong>droite</strong>.</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Camera A preview -->
+                        <div style="border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; background: #000; position: relative; display: flex; flex-direction: column;">
+                            <div style="padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 1px solid var(--border-color);">
+                                Camera A
+                            </div>
+                            <div style="flex: 1; position: relative; min-height: 150px;">
+                                <video id="ec-lr-video-a" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <div id="ec-lr-status-a" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Chargement...
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; padding: 0.5rem;">
+                                <button class="btn btn-primary" onclick="ecAssignLR('left', 'a')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a GAUCHE
+                                </button>
+                                <button class="btn btn-secondary" onclick="ecAssignLR('right', 'a')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a DROITE
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Camera B preview -->
+                        <div style="border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; background: #000; position: relative; display: flex; flex-direction: column;">
+                            <div style="padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 1px solid var(--border-color);">
+                                Camera B
+                            </div>
+                            <div style="flex: 1; position: relative; min-height: 150px;">
+                                <video id="ec-lr-video-b" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <div id="ec-lr-status-b" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Chargement...
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; padding: 0.5rem;">
+                                <button class="btn btn-primary" onclick="ecAssignLR('left', 'b')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a GAUCHE
+                                </button>
+                                <button class="btn btn-secondary" onclick="ecAssignLR('right', 'b')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a DROITE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="ec-lr-assignment-result" style="display: none; text-align: center; padding: 0.75rem; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px;">
+                        <span style="color: var(--success); font-weight: 600;" id="ec-lr-result-text"></span>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: center; gap: 1rem; padding-top: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="ecSkipLR()" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
+                            Passer (garder defaut : video0=gauche, video2=droite)
+                        </button>
+                    </div>
+                </div>
+
                 <!-- STEP 2 CONTENT (CAMERA GAUCHE) -->
                 <div id="ec-step-2" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
                     <div style="line-height:1.5; font-size:0.9rem;">
@@ -3383,7 +3840,7 @@ def dashboard():
 
     <script>
         let apiToken = localStorage.getItem('bastet_api_token') || '';
-        let activeTab = 'dashboard';
+        let activeTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
         let telemetryInterval = null;
         let updateInterval = null;
         let accountsCached = {};
@@ -3485,6 +3942,15 @@ def dashboard():
             initDragAndDrop();
             connectGlobalWebSocket();
             loadSavedOffsets();
+            // Fallback: si le badge est toujours en 'Chargement...' apres 10s, afficher un etat neutre
+            setTimeout(() => {
+                const badgeCalib = document.getElementById('calib-status-badge');
+                if (badgeCalib && badgeCalib.textContent.includes('Chargement')) {
+                    badgeCalib.textContent = '⏳ En attente des donnees moteurs...';
+                    badgeCalib.style.color = 'var(--text-secondary)';
+                    badgeCalib.style.fontWeight = 'normal';
+                }
+            }, 10000);
         }
 
         // --- INTERVALS ---
@@ -3517,7 +3983,7 @@ def dashboard():
                 window.lastArduinoTelemetry = Date.now();
                 if (!window.arduinoOfflineChecker) {
                     window.arduinoOfflineChecker = setInterval(() => {
-                        if (window.lastArduinoTelemetry && Date.now() - window.lastArduinoTelemetry > 5000) {
+                        if (window.lastArduinoTelemetry && Date.now() - window.lastArduinoTelemetry > 30000) {
                             const badge = document.getElementById('arduino-status-badge');
                             const content = document.getElementById('arduino-telemetry-content');
                             const offlineMsg = document.getElementById('arduino-offline-msg');
@@ -3557,9 +4023,14 @@ def dashboard():
         }
 
         function handleIncomingWebSocketMessage(data) {
+            var payload;
             try {
-                const payload = JSON.parse(data);
-                
+                payload = JSON.parse(data);
+            } catch (e) {
+                console.error("[WS] JSON parse error:", e);
+                return;
+            }
+            try {
                 // Print all JSON traffic to the Console
                 logToJSONConsole(JSON.stringify(payload, null, 2));
                 
@@ -3594,10 +4065,15 @@ def dashboard():
                         const roll = payload.imu.roll || 0;
                         const pitch = payload.imu.pitch || 0;
                         const yaw = payload.imu.yaw || 0;
+                        // Cache module-level pour la carte Vue d ensemble (payload.imu peut etre null/absent sur certains ticks 0.5s)
+                        window._bastetLastImu = { roll: roll, pitch: pitch, yaw: yaw };
                         
-                        document.getElementById('imu-val-roll').textContent = `${roll.toFixed(1)}°`;
-                        document.getElementById('imu-val-pitch').textContent = `${pitch.toFixed(1)}°`;
-                        document.getElementById('imu-val-yaw').textContent = `${yaw.toFixed(1)}°`;
+                        const elRoll = document.getElementById('imu-val-roll');
+                        const elPitch = document.getElementById('imu-val-pitch');
+                        const elYaw = document.getElementById('imu-val-yaw');
+                        if (elRoll) elRoll.textContent = `${roll.toFixed(1)}°`;
+                        if (elPitch) elPitch.textContent = `${pitch.toFixed(1)}°`;
+                        if (elYaw) elYaw.textContent = `${yaw.toFixed(1)}°`;
                         
                         // Rotate 3D IMU CSS Cube
                         const cube = document.getElementById('imu-visual-cube');
@@ -3616,11 +4092,12 @@ def dashboard():
                         arduinoBadge.textContent = 'En ligne';
                         arduinoOfflineMsg.style.display = 'none';
                         arduinoContent.style.display = '';
-                    }
-                    if (payload.imu) {
-                        document.getElementById('arduino-roll').textContent = `${roll.toFixed(1)}°`;
-                        document.getElementById('arduino-pitch').textContent = `${pitch.toFixed(1)}°`;
-                        document.getElementById('arduino-yaw').textContent = `${yaw.toFixed(1)}°`;
+                        // IMU Vue d ensemble : lit le cache window._bastetLastImu maj par le 1er if(payload.imu).
+                        // Permet de garder les valeurs affichees meme quand payload.imu est null/absent.
+                        const cachedImu = window._bastetLastImu || { roll: 0, pitch: 0, yaw: 0 };
+                        document.getElementById('arduino-roll').textContent = `${cachedImu.roll.toFixed(1)}°`;
+                        document.getElementById('arduino-pitch').textContent = `${cachedImu.pitch.toFixed(1)}°`;
+                        document.getElementById('arduino-yaw').textContent = `${cachedImu.yaw.toFixed(1)}°`;
                     }
                     if (payload.joints && payload.joints.length === 12) {
                         const jointsGrid = document.getElementById('arduino-joints-grid');
@@ -3732,7 +4209,10 @@ def dashboard():
                 }
                 else if (payload.type === "wifi_list") {
                     displayWifiNetworks(payload.networks, payload.known_ssids, payload.known_passwords, payload.current_ssid);
-                } 
+                }
+                else if (payload.type === "wifi_list_error") {
+                    handleWifiScanError(payload);
+                }
                 else if (payload.type === "wifi_connect_result") {
                     handleWifiConnectResult(payload);
                 }
@@ -3745,7 +4225,7 @@ def dashboard():
                     }
                 } 
                 else if (payload.type === "chat_response" || payload.type === "chat") {
-                    appendLLMMessage(payload.sender || 'LLM', payload.text || '');
+                    handleIncomingLLMMessage(payload.sender || 'LLM', payload.text || '');
                 }
             } catch(e) {
                 // not json or parsing error
@@ -3807,6 +4287,196 @@ def dashboard():
             box.scrollTop = box.scrollHeight;
         }
 
+        // ─── TÉLÉCOMMANDE CHAT VOCAL & PILOTAGE IA ────────────────────────────
+        function sendControlChatMessage(e) {
+            if (e) e.preventDefault();
+            const input = document.getElementById('control-chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            appendControlChatMessage('Moi', text);
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "chat", text: text }));
+            } else {
+                appendControlChatMessage('Système', 'Erreur : WebSocket déconnecté.');
+            }
+            input.value = '';
+        }
+
+        function appendControlChatMessage(sender, text) {
+            const box = document.getElementById('control-chat-messages');
+            if (!box) return;
+            
+            if (box.textContent.includes("Parlez à Bastet")) {
+                box.innerHTML = '';
+            }
+            
+            const msgEl = document.createElement('div');
+            msgEl.style.padding = '0.5rem 0.75rem';
+            msgEl.style.borderRadius = '6px';
+            msgEl.style.fontSize = '0.85rem';
+            msgEl.style.maxWidth = '85%';
+            msgEl.style.marginBottom = '0.25rem';
+            msgEl.style.lineHeight = '1.3';
+            
+            if (sender === 'Moi') {
+                msgEl.style.alignSelf = 'flex-end';
+                msgEl.style.backgroundColor = 'rgba(255, 111, 97, 0.2)';
+                msgEl.style.border = '1px solid var(--accent)';
+                msgEl.innerHTML = `<span style="font-weight:bold;color: var(--accent);display:block;font-size:0.7rem;margin-bottom:0.15rem;">Moi</span>${text}`;
+            } else if (sender === 'Système') {
+                msgEl.style.alignSelf = 'center';
+                msgEl.style.backgroundColor = 'rgba(225, 29, 72, 0.1)';
+                msgEl.style.border = '1px solid var(--danger)';
+                msgEl.innerHTML = `<span style="font-style:italic;color:#f87171;font-size:0.75rem;">${text}</span>`;
+            } else {
+                msgEl.style.alignSelf = 'flex-start';
+                msgEl.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                msgEl.style.border = '1px solid var(--border-color)';
+                msgEl.innerHTML = `<span style="font-weight:bold;color:var(--text-primary);display:block;font-size:0.7rem;margin-bottom:0.15rem;">${sender}</span>${text}`;
+            }
+            
+            box.appendChild(msgEl);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        let voiceRecognition = null;
+        let isVoiceListening = false;
+
+        function toggleVoiceRecognition() {
+            const btn = document.getElementById('control-mic-btn');
+            const pulse = document.getElementById('mic-pulse');
+            
+            if (isVoiceListening) {
+                if (voiceRecognition) voiceRecognition.stop();
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                appendControlChatMessage('Système', "La reconnaissance vocale n'est pas supportée par votre navigateur.");
+                return;
+            }
+            
+            voiceRecognition = new SpeechRecognition();
+            voiceRecognition.lang = 'fr-FR';
+            voiceRecognition.interimResults = false;
+            voiceRecognition.maxAlternatives = 1;
+            
+            voiceRecognition.onstart = () => {
+                isVoiceListening = true;
+                btn.classList.add('mic-active');
+                if (pulse) {
+                    pulse.style.opacity = '1';
+                    pulse.style.transform = 'scale(1.5)';
+                }
+            };
+            
+            voiceRecognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                const input = document.getElementById('control-chat-input');
+                if (input) {
+                    input.value = speechResult;
+                    sendControlChatMessage();
+                }
+            };
+            
+            voiceRecognition.onerror = (event) => {
+                console.error("Reconnaissance vocale erreur:", event.error);
+                appendControlChatMessage('Système', "Erreur de reconnaissance vocale : " + event.error);
+            };
+            
+            voiceRecognition.onend = () => {
+                isVoiceListening = false;
+                btn.classList.remove('mic-active');
+                if (pulse) {
+                    pulse.style.opacity = '0';
+                    pulse.style.transform = 'scale(1)';
+                }
+            };
+            
+            voiceRecognition.start();
+        }
+
+        function handleIncomingLLMMessage(sender, text) {
+            // Afficher dans le chat principal de l'IA
+            appendLLMMessage(sender, text);
+            
+            let cleanText = text;
+            
+            // Parser les balises [ACTION: ...]
+            const actionRegex = /\[ACTION:\s*([a-zA-Z]+)\]/g;
+            let actionMatch;
+            while ((actionMatch = actionRegex.exec(text)) !== null) {
+                const action = actionMatch[1].toLowerCase();
+                executeVoiceAction(action);
+            }
+            cleanText = cleanText.replace(actionRegex, '');
+            
+            // Parser les balises [NAV: x, y]
+            const navRegex = /\[NAV:\s*(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)\]/g;
+            let navMatch;
+            while ((navMatch = navRegex.exec(text)) !== null) {
+                const x = parseFloat(navMatch[1]);
+                const y = parseFloat(navMatch[3]);
+                executeVoiceNav(x, y);
+            }
+            cleanText = cleanText.replace(navRegex, '');
+            
+            // Afficher dans le chat de la télécommande
+            appendControlChatMessage(sender, cleanText.trim());
+        }
+
+        function executeVoiceAction(action) {
+            if (['up', 'down', 'left', 'right'].includes(action)) {
+                const btnId = `dpad-${action}`;
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    btn.classList.add('active-dpad');
+                    btn.style.backgroundColor = 'var(--accent)';
+                    btn.style.color = 'white';
+                }
+                startWalking(action);
+                
+                setTimeout(() => {
+                    stopWalking();
+                    if (btn) {
+                        btn.classList.remove('active-dpad');
+                        btn.style.backgroundColor = '';
+                        btn.style.color = '';
+                    }
+                }, 2500);
+            } else if (action === 'stop') {
+                sendControlStop();
+                const btn = document.getElementById('dpad-stop');
+                if (btn) {
+                    btn.style.transform = 'scale(0.9)';
+                    setTimeout(() => btn.style.transform = '', 200);
+                }
+            } else if (action === 'stand') {
+                sendControlCmd('stand');
+            } else if (action === 'sit') {
+                sendControlCmd('sit');
+            }
+        }
+
+        function executeVoiceNav(x, y) {
+            navTarget = { x: x, y: y };
+            
+            document.getElementById('nav-target-x').textContent = x.toFixed(2);
+            document.getElementById('nav-target-y').textContent = y.toFixed(2);
+            
+            const panel = document.getElementById('nav-target-panel');
+            if (panel) {
+                panel.style.opacity = '1';
+                panel.style.pointerEvents = 'auto';
+            }
+            
+            drawControlMap();
+            sendNavGoal();
+        }
+
         function clearJSONConsole() {
             const consoleEl = document.getElementById('json-traffic-console');
             if (consoleEl) consoleEl.textContent = '[Console effacée]';
@@ -3851,6 +4521,22 @@ def dashboard():
                     }
                 }
             });
+
+            if (feature === 'chat') {
+                const llmBadge = document.getElementById('control-llm-badge');
+                if (llmBadge) {
+                    if (target === 'node') {
+                        llmBadge.textContent = 'PC Node';
+                        llmBadge.style.backgroundColor = 'var(--success)';
+                    } else if (target === 'robot') {
+                        llmBadge.textContent = 'Robot Local';
+                        llmBadge.style.backgroundColor = 'var(--accent)';
+                    } else {
+                        llmBadge.textContent = 'Désactivé';
+                        llmBadge.style.backgroundColor = 'var(--danger)';
+                    }
+                }
+            }
         }
 
         // ─── CALIBRATION WINDOW FUNCTIONS ──────────────────────────────────────
@@ -3890,6 +4576,12 @@ def dashboard():
                 }
             } catch (err) {
                 console.error("Erreur lors du chargement des offsets:", err);
+                const badgeCalib = document.getElementById('calib-status-badge');
+                if (badgeCalib) {
+                    badgeCalib.textContent = '⚠️ Offsets non disponibles (Gateway inaccessible?)';
+                    badgeCalib.style.color = 'var(--warning)';
+                    badgeCalib.style.fontWeight = 'bold';
+                }
             }
         }
 
@@ -3964,6 +4656,10 @@ def dashboard():
                     slider.style.cursor = checked ? 'pointer' : 'not-allowed';
                 }
             }
+            // FIX: Arreter le motion_node quand mode manuel actif (evite ecrasement des angles)
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: checked ? "stop" : "stand" }));
+            }
             if (checked) {
                 sendManualJointAngles();
             }
@@ -3975,7 +4671,22 @@ def dashboard():
             sendManualJointAngles();
         }
 
+        let lastSendManualJointTime = 0;
+        let pendingManualJointTimeout = null;
+
         function sendManualJointAngles() {
+            const now = Date.now();
+            if (now - lastSendManualJointTime < 50) {
+                if (!pendingManualJointTimeout) {
+                    pendingManualJointTimeout = setTimeout(() => {
+                        pendingManualJointTimeout = null;
+                        sendManualJointAngles();
+                    }, 50 - (now - lastSendManualJointTime));
+                }
+                return;
+            }
+            lastSendManualJointTime = now;
+
             const angles = [];
             for (let i = 0; i < 12; i++) {
                 const slider = document.getElementById(`joint-slider-${i}`);
@@ -3986,6 +4697,17 @@ def dashboard():
             }
         }
 
+        function resetIMU() {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "reset_imu" }));
+                if (typeof showToast === 'function') showToast("IMU", "Recalibrage BNO085 en cours...", "info");
+                else console.log("[IMU] Recalibrage BNO085 envoye");
+            } else {
+                if (typeof showToast === 'function') showToast("IMU", "WebSocket non connecte", "error");
+                else console.warn("[IMU] WebSocket non connecte");
+            }
+        }
+        
         async function saveCalibrationOffsets() {
             const offsets = [];
             for (let i = 0; i < 12; i++) {
@@ -4026,6 +4748,121 @@ def dashboard():
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "camera_setup", camera: camId, enable: checkbox.checked }));
+            }
+        }
+
+        // ─── SERVO TESTER FUNCTIONS ───────────────────────────────────────────
+        const TESTER_JOINT_NAMES = [
+            'Avant-Droit Abduction', 'Avant-Droit Hanche', 'Avant-Droit Genou',
+            'Avant-Gauche Abduction', 'Avant-Gauche Hanche', 'Avant-Gauche Genou',
+            'Arrière-Droit Abduction', 'Arrière-Droit Hanche', 'Arrière-Droit Genou',
+            'Arrière-Gauche Abduction', 'Arrière-Gauche Hanche', 'Arrière-Gauche Genou'
+        ];
+
+        function openServoTester() {
+            document.getElementById('servo-tester-overlay').classList.add('active');
+            // FIX: Arreter le motion_node pour eviter qu'il ecrase les commandes individuelles
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+            }
+            buildServoTesterList();
+        }
+
+        function closeServoTester() {
+            document.getElementById('servo-tester-overlay').classList.remove('active');
+            testerStopAll();
+            // FIX: Redemarrer le motion_node en mode stand apres le test individuel
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+            }
+        }
+
+        function buildServoTesterList() {
+            const container = document.getElementById('tester-servos-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            for (let i = 0; i < 12; i++) {
+                const name = TESTER_JOINT_NAMES[i];
+                
+                const card = document.createElement('div');
+                card.style.display = 'flex';
+                card.style.flexDirection = 'column';
+                card.style.gap = '0.5rem';
+                card.style.padding = '0.75rem';
+                card.style.border = '1px solid var(--border-color)';
+                card.style.borderRadius = '8px';
+                card.style.background = 'rgba(255,255,255,0.01)';
+                
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">${i + 1}. ${name}</span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" id="tester-btn-attach-${i}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="testerAttach(${i})">Activer</button>
+                            <button class="btn btn-secondary" id="tester-btn-detach-${i}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="testerDetach(${i})">Éteindre</button>
+                        </div>
+                    </div>
+                    <div id="tester-slider-container-${i}" style="display: none; align-items: center; gap: 0.75rem; margin-top: 0.25rem;">
+                        <input type="range" min="0" max="180" value="90" id="tester-slider-${i}" style="flex: 1; height: 4px; accent-color: var(--accent);" oninput="testerWrite(${i}, this.value)">
+                        <span id="tester-val-${i}" style="font-size: 0.8rem; font-family: monospace; min-width: 30px; text-align: right; color: var(--accent);">90°</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function testerAttach(idx) {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "attach", index: idx }));
+                
+                document.getElementById(`tester-btn-attach-${idx}`).style.display = 'none';
+                document.getElementById(`tester-btn-detach-${idx}`).style.display = 'inline-block';
+                document.getElementById(`tester-slider-container-${idx}`).style.display = 'flex';
+                
+                testerWrite(idx, 90);
+            }
+        }
+
+        function testerDetach(idx) {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: idx }));
+                
+                document.getElementById(`tester-btn-attach-${idx}`).style.display = 'inline-block';
+                document.getElementById(`tester-btn-detach-${idx}`).style.display = 'none';
+                document.getElementById(`tester-slider-container-${idx}`).style.display = 'none';
+            }
+        }
+
+        let lastTesterWriteTime = {};
+        let pendingTesterWriteTimeout = {};
+
+        function testerWrite(idx, angle) {
+            document.getElementById(`tester-val-${idx}`).textContent = angle + '°';
+            
+            const now = Date.now();
+            if (now - (lastTesterWriteTime[idx] || 0) < 50) {
+                if (!pendingTesterWriteTimeout[idx]) {
+                    pendingTesterWriteTimeout[idx] = setTimeout(() => {
+                        pendingTesterWriteTimeout[idx] = null;
+                        testerWrite(idx, angle);
+                    }, 50 - (now - (lastTesterWriteTime[idx] || 0)));
+                }
+                return;
+            }
+            lastTesterWriteTime[idx] = now;
+
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parseFloat(angle) }));
+            }
+        }
+
+        function testerStopAll() {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                for (let i = 0; i < 12; i++) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: i }));
+                }
+                sendControlStop();
+                buildServoTesterList();
             }
         }
 
@@ -4075,6 +4912,28 @@ def dashboard():
 
         window.wifiPasswords = {};
         window.wifiCurrentSsid = '';
+
+        function handleWifiScanError(payload) {
+            const errMsg = payload.error || "Erreur inconnue";
+            const iface = payload.interface || "wlan0";
+            const mgr = payload.manager || "inconnu";
+            const known = Array.isArray(payload.known_ssids) ? payload.known_ssids : [];
+            const cur = payload.current_ssid || "";
+            const listContainer = document.getElementById('wifi-list-container');
+            const knownContainer = document.getElementById('wifi-known-container');
+            const btn = document.getElementById('btn-wifi-scan');
+            if (btn) btn.disabled = false;
+            if (listContainer) {
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem; line-height: 1.5;">⚠️ Scan WiFi échoué<br><small style="color: var(--text-secondary);">${errMsg}<br>Interface : ${iface} · Gestionnaire : ${mgr}</small></div>`;
+            }
+            if (knownContainer) {
+                knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.85rem;">Surveillance WiFi indisponible.</div>`;
+            }
+            window.wifiPasswords = payload.known_passwords || {};
+            window.wifiCurrentSsid = cur;
+            // Ré-afficher les réseaux connus (si fournis) même en cas d'échec du scan
+            try { displayWifiNetworks([], known, payload.known_passwords || {}, cur); } catch(e) { /* noop */ }
+        }
 
         function displayWifiNetworks(networks, knownSsids = [], knownPasswords = {}, currentSsid = '') {
             const listContainer = document.getElementById('wifi-list-container');
@@ -4404,8 +5263,7 @@ def dashboard():
                     {x: -1.5, y: -2, w: 3, h: 0.1},
                     {x: -1.5, y: 2, w: 3, h: 0.1},
                     {x: -1.5, y: -2, w: 0.1, h: 4},
-                    {x: 1.5, y: -2, w: 0.1, h: 4},
-                    {x: 0.5, y: -0.5, w: 0.5, h: 1}
+                    {x: 1.5, y: -2, w: 0.1, h: 4}
                 ];
                 walls.forEach(wall => {
                     ctx.fillRect(cx + wall.x * scale, cy - (wall.y + wall.h) * scale, wall.w * scale, wall.h * scale);
@@ -4514,7 +5372,421 @@ def dashboard():
             }
         }
 
-        function saveSLAMParameters() {
+        
+        // ─── SLAM Mode Detection & UI ──────────────────────────────────────
+        
+        // ─── Left/Right Camera Attribution ───────────────────────────────
+        let ecLRPeerA = null;
+        let ecLRPeerB = null;
+        let ecLRAssigned = { left: null, right: null };
+        let ecLRStreamA = null;
+        let ecLRStreamB = null;
+        
+        async function ecStartLRPreviews() {
+            // Show both camera feeds via WebRTC for user to identify left/right
+            ecLRAssigned = { left: null, right: null };
+            document.getElementById('ec-lr-assignment-result').style.display = 'none';
+            
+            // Get camera A (camera 1)
+            await ecStartSinglePreview('a', 1);
+            // Get camera B (camera 2)
+            await ecStartSinglePreview('b', 2);
+        }
+        
+        function ecStartSinglePreview(slot, camId) {
+            const videoEl = document.getElementById(`ec-lr-video-${slot}`);
+            const statusEl = document.getElementById(`ec-lr-status-${slot}`);
+            if (!videoEl || !statusEl) return;
+            
+            statusEl.style.display = 'flex';
+            statusEl.textContent = 'Connexion au flux HLS...';
+            
+            // Use HLS stream via MediaMTX (already working and reliable)
+            const hlsUrl = `http://ha.arthonetwork.fr:48888/robot/cam${camId}/index.m3u8`;
+            
+            // Check if HLS.js is available, otherwise try native HLS (Safari) or show error
+            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                const hls = new Hls({ 
+                    maxBufferLength: 5,
+                    maxMaxBufferLength: 10,
+                    liveDurationInfinity: true,
+                    lowLatencyMode: false
+                });
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(videoEl);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    videoEl.play().catch(() => {});
+                    videoEl.style.display = 'block';
+                    statusEl.style.display = 'none';
+                });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        statusEl.innerHTML = 'Flux HLS indisponible.<br>La camera est peut-etre deconnectee.';
+                    }
+                });
+                // Store for cleanup
+                videoEl._hls = hls;
+            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                // Native HLS (Safari)
+                videoEl.src = hlsUrl;
+                videoEl.play().catch(() => {});
+                videoEl.style.display = 'block';
+                statusEl.style.display = 'none';
+            } else {
+                statusEl.innerHTML = 'Navigateur non compatible HLS.<br>Observez les flux dans le dashboard pour identifier les cameras.';
+            }
+        }
+        
+        function ecStopLRPreviews() {
+            if (ecLRPeerA) { try { ecLRPeerA.close(); } catch(e) {} ecLRPeerA = null; }
+            if (ecLRPeerB) { try { ecLRPeerB.close(); } catch(e) {} ecLRPeerB = null; }
+            const va = document.getElementById('ec-lr-video-a');
+            const vb = document.getElementById('ec-lr-video-b');
+            if (va) { 
+                if (va._hls) { try { va._hls.destroy(); } catch(e) {} va._hls = null; }
+                va.srcObject = null; va.src = ''; va.style.display = 'none'; 
+            }
+            if (vb) { 
+                if (vb._hls) { try { vb._hls.destroy(); } catch(e) {} vb._hls = null; }
+                vb.srcObject = null; vb.src = ''; vb.style.display = 'none'; 
+            }
+            document.getElementById('ec-lr-status-a').style.display = 'flex';
+            document.getElementById('ec-lr-status-a').textContent = 'Chargement...';
+            document.getElementById('ec-lr-status-b').style.display = 'flex';
+            document.getElementById('ec-lr-status-b').textContent = 'Chargement...';
+            // Reset assignment state
+            ecLRAssigned = { left: null, right: null };
+            // Re-enable buttons
+            document.querySelectorAll('#ec-step-lr .ec-lr-assign-btn').forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            });
+        }
+        
+        function ecAssignLR(which, slot) {
+            // Guard against double-assignment
+            if (ecLRAssigned[which] !== null) {
+                if (typeof showToast === 'function') {
+                    showToast("Attention", `La camera ${which.toUpperCase()} est deja assignee`, "warning");
+                }
+                return;
+            }
+            // User clicked "left" or "right" for camera A or B
+            const camId = slot === 'a' ? 1 : 2;
+            ecLRAssigned[which] = camId;
+            
+            // Determine the other camera
+            const otherCam = camId === 1 ? 2 : 1;
+            const otherWhich = which === 'left' ? 'right' : 'left';
+            ecLRAssigned[otherWhich] = otherCam;
+            
+            // Disable all assignment buttons after assignment
+            document.querySelectorAll('#ec-step-lr .ec-lr-assign-btn').forEach(btn => {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+            });
+            
+            // Show result
+            const resultEl = document.getElementById('ec-lr-assignment-result');
+            const resultText = document.getElementById('ec-lr-result-text');
+            if (resultEl && resultText) {
+                resultEl.style.display = 'block';
+                resultText.textContent = `Camera GAUCHE = video${ecLRAssigned.left}, Camera DROITE = video${ecLRAssigned.right}`;
+            }
+            
+            // Save to robot
+            const leftDev = `/dev/video${ecLRAssigned.left}`;
+            const rightDev = `/dev/video${ecLRAssigned.right}`;
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({
+                    type: "save_camera_mapping",
+                    left: leftDev,
+                    right: rightDev
+                }));
+            }
+            
+            if (typeof showToast === 'function') {
+                showToast("Cameras", `Gauche: ${leftDev}, Droite: ${rightDev}`, "success");
+            }
+            
+            // Enable next button
+            document.getElementById('ec-btn-next').disabled = false;
+            document.getElementById('ec-btn-next').textContent = 'Suivant \u2192';
+        }
+        
+        function ecSkipLR() {
+            ecStopLRPreviews();
+            // Use default mapping: video0=left, video2=right
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({
+                    type: "save_camera_mapping",
+                    left: "/dev/video0",
+                    right: "/dev/video2"
+                }));
+            }
+            if (typeof showToast === 'function') {
+                showToast("Cameras", "Mapping par defaut: video0=gauche, video2=droite", "info");
+            }
+            document.getElementById('ec-btn-next').disabled = false;
+        }
+        
+        // Auto-start previews when entering the LR step (called from ecShowStep)
+
+
+        // --- Stereo Calibration ---
+        function ecStartStereoPreviews() {
+            ecStartStereoSinglePreview('left', 1);
+            ecStartStereoSinglePreview('right', 2);
+        }
+        
+        function ecStartStereoSinglePreview(side, camId) {
+            const videoEl = document.getElementById('ec-stereo-video-' + side);
+            const statusEl = document.getElementById('ec-stereo-status-' + side);
+            if (!videoEl || !statusEl) return;
+            
+            statusEl.style.display = 'flex';
+            statusEl.textContent = 'Connexion au flux HLS...';
+            
+            const hlsUrl = 'http://ha.arthonetwork.fr:48888/robot/cam' + camId + '/index.m3u8';
+            
+            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                const hls = new Hls({ 
+                    maxBufferLength: 5,
+                    maxMaxBufferLength: 10,
+                    liveDurationInfinity: true,
+                    lowLatencyMode: false
+                });
+                hls.loadSource(hlsUrl);
+                hls.attachMedia(videoEl);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    videoEl.play().catch(function(){});
+                    videoEl.style.display = 'block';
+                    statusEl.style.display = 'none';
+                });
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        statusEl.innerHTML = 'Flux HLS indisponible.';
+                    }
+                });
+                videoEl._hls = hls;
+            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                videoEl.src = hlsUrl;
+                videoEl.play().catch(function(){});
+                videoEl.style.display = 'block';
+                statusEl.style.display = 'none';
+            } else {
+                statusEl.innerHTML = 'Navigateur non compatible HLS.';
+            }
+        }
+        
+        function ecStopStereoPreviews() {
+            ['left', 'right'].forEach(function(side) {
+                var videoEl = document.getElementById('ec-stereo-video-' + side);
+                if (videoEl) {
+                    if (videoEl._hls) { try { videoEl._hls.destroy(); } catch(e) {} videoEl._hls = null; }
+                    videoEl.srcObject = null;
+                    videoEl.src = '';
+                    videoEl.style.display = 'none';
+                }
+                var statusEl = document.getElementById('ec-stereo-status-' + side);
+                if (statusEl) {
+                    statusEl.style.display = 'flex';
+                    statusEl.textContent = 'Chargement...';
+                }
+            });
+        }
+        
+        // Cleanup function for stereo listeners/intervals
+        var _ecStereoInterval = null;
+        var _ecStereoTimeout = null;
+        var _ecStereoOrigOnMessage = null;
+        
+        function ecCleanupStereoListeners() {
+            if (_ecStereoInterval) { clearInterval(_ecStereoInterval); _ecStereoInterval = null; }
+            if (_ecStereoTimeout) { clearTimeout(_ecStereoTimeout); _ecStereoTimeout = null; }
+            if (_ecStereoOrigOnMessage !== null && appWs) {
+                appWs.onmessage = _ecStereoOrigOnMessage;
+                _ecStereoOrigOnMessage = null;
+            }
+        }
+        
+        function ecRunStereoCalib() {
+            // Clean up any previous run
+            ecCleanupStereoListeners();
+            
+            var btnRun = document.getElementById('btn-ec-run-stereo');
+            var btnSkip = document.getElementById('btn-ec-skip-stereo');
+            var progressDiv = document.getElementById('ec-stereo-progress');
+            var progressText = document.getElementById('ec-stereo-progress-text');
+            var progressBar = document.getElementById('ec-stereo-progress-bar');
+            var resultDiv = document.getElementById('ec-stereo-result');
+            var resultText = document.getElementById('ec-stereo-result-text');
+            
+            if (btnRun) { btnRun.disabled = true; btnRun.style.opacity = '0.5'; }
+            if (btnSkip) { btnSkip.disabled = true; btnSkip.style.opacity = '0.5'; }
+            if (progressDiv) progressDiv.style.display = 'block';
+            if (progressText) progressText.textContent = 'Lancement de la calibration stereo...';
+            if (progressBar) progressBar.style.width = '10%';
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "run_stereo_calib" }));
+                if (typeof showToast === 'function') {
+                    showToast("Stereo", "Calibration stereo lancee sur le robot", "info");
+                }
+            } else {
+                if (progressText) progressText.textContent = 'Erreur: WebSocket non connecte';
+                if (resultDiv) {
+                    resultDiv.style.display = 'block';
+                    resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                    resultDiv.style.border = '1px solid rgba(239,68,68,0.3)';
+                }
+                if (resultText) {
+                    resultText.textContent = 'Impossible de lancer la calibration. Verifiez la connexion au robot.';
+                    resultText.style.color = '#ef4444';
+                }
+                return;
+            }
+            
+            var progress = 10;
+            _ecStereoInterval = setInterval(function() {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                if (progressBar) progressBar.style.width = progress + '%';
+                if (progressText) progressText.textContent = 'Calibration stereo en cours... ' + Math.round(progress) + '%';
+            }, 2000);
+            
+            // Listen for result
+            var origOnMessage = appWs.onmessage;
+            _ecStereoOrigOnMessage = origOnMessage;
+            appWs.onmessage = function(event) {
+                try {
+                    var data = JSON.parse(event.data);
+                    if (data.type === 'stereo_calib_result') {
+                        clearInterval(progressInterval);
+                        if (progressBar) progressBar.style.width = '100%';
+                        if (data.success) {
+                            if (progressText) progressText.textContent = 'Calibration stereo reussie !';
+                            if (resultDiv) {
+                                resultDiv.style.display = 'block';
+                                resultDiv.style.background = 'rgba(34,197,94,0.1)';
+                                resultDiv.style.border = '1px solid rgba(34,197,94,0.3)';
+                            }
+                            if (resultText) {
+                                resultText.textContent = 'Parametres stereo enregistres. Vous pouvez passer a la finalisation.';
+                                resultText.style.color = '#22c55e';
+                            }
+                            document.getElementById('ec-btn-next').disabled = false;
+                            document.getElementById('ec-btn-next').textContent = 'Suivant';
+                        } else {
+                            if (progressText) progressText.textContent = 'Echec de la calibration stereo';
+                            if (resultDiv) {
+                                resultDiv.style.display = 'block';
+                                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                                resultDiv.style.border = '1px solid rgba(239,68,68,0.3)';
+                            }
+                            if (resultText) {
+                                resultText.textContent = data.message || 'Erreur lors de la calibration stereo.';
+                                resultText.style.color = '#ef4444';
+                            }
+                        }
+                        if (btnRun) { btnRun.disabled = true; }
+                        if (btnSkip) { btnSkip.disabled = false; btnSkip.style.opacity = '1'; }
+                        appWs.onmessage = origOnMessage;
+                        _ecStereoOrigOnMessage = null;
+                        _ecStereoInterval = null;
+                        _ecStereoTimeout = null;
+                        _ecStereoOrigOnMessage = null;
+                        _ecStereoInterval = null;
+                        _ecStereoTimeout = null;
+                    }
+                } catch(e) {}
+                if (origOnMessage) origOnMessage.call(this, event);
+            };
+            
+            _ecStereoTimeout = setTimeout(function() {
+                clearInterval(_ecStereoInterval);
+                if (progressBar && parseInt(progressBar.style.width) < 100) {
+                    if (progressText) progressText.textContent = 'Delai depasse. Reessayez.';
+                    if (resultDiv) {
+                        resultDiv.style.display = 'block';
+                        resultDiv.style.background = 'rgba(245,158,11,0.1)';
+                        resultDiv.style.border = '1px solid rgba(245,158,11,0.3)';
+                    }
+                    if (resultText) {
+                        resultText.textContent = 'La calibration a pris trop de temps.';
+                        resultText.style.color = '#f59e0b';
+                    }
+                }
+                if (btnRun) { btnRun.disabled = false; btnRun.style.opacity = '1'; }
+                if (btnSkip) { btnSkip.disabled = false; btnSkip.style.opacity = '1'; }
+            }, 180000);
+        }
+        
+        function ecSkipStereo() {
+            ecCleanupStereoListeners();
+            ecStopStereoPreviews();
+            document.getElementById('ec-btn-next').disabled = false;
+            document.getElementById('ec-btn-next').textContent = 'Suivant';
+            if (typeof showToast === 'function') {
+                showToast("Stereo", "Etape passee. Calibration stereo existante conservee.", "info");
+            }
+        }
+
+function updateSLAMMode() {
+            const badge = document.getElementById('slam-mode-badge');
+            const camerasBadge = document.getElementById('slam-cameras-badge');
+            const overlay = document.getElementById('slam-disabled-overlay');
+            if (!badge) return;
+            
+            let cam1 = false, cam2 = false;
+            if (window.lastTelemetryState && window.lastTelemetryState.sensors) {
+                cam1 = window.lastTelemetryState.sensors.cam1_connected === true;
+                cam2 = window.lastTelemetryState.sensors.cam2_connected === true;
+            }
+            
+            const camCount = (cam1 ? 1 : 0) + (cam2 ? 1 : 0);
+            let mode = 'Aucune cam';
+            let modeColor = '#ef4444';
+            let bgColor = 'rgba(239,68,68,0.12)';
+            
+            if (camCount === 0) {
+                mode = 'Aucune cam\u00e9ra';
+                modeColor = '#ef4444';
+                bgColor = 'rgba(239,68,68,0.12)';
+                if (overlay) overlay.style.display = 'block';
+            } else if (camCount === 1) {
+                mode = 'Mono';
+                modeColor = '#f59e0b';
+                bgColor = 'rgba(245,158,11,0.12)';
+                if (overlay) overlay.style.display = 'none';
+            } else {
+                mode = 'St\u00e9r\u00e9o';
+                modeColor = '#22c55e';
+                bgColor = 'rgba(34,197,94,0.12)';
+                if (overlay) overlay.style.display = 'none';
+            }
+            
+            badge.textContent = mode;
+            badge.style.color = modeColor;
+            badge.style.background = bgColor;
+            if (camerasBadge) {
+                camerasBadge.textContent = camCount + ' cam\u00e9ra' + (camCount > 1 ? 's' : '') + ' d\u00e9tect\u00e9e' + (camCount > 1 ? 's' : '');
+            }
+        }
+        
+        // Update SLAM mode on telemetry update and tab switch
+        const _origSwitchTab = switchTab;
+        switchTab = function(tabId) {
+            _origSwitchTab(tabId);
+            if (tabId === 'map') updateSLAMMode();
+        };
+        
+        // Also update when telemetry changes
+        setInterval(() => {
+            if (activeTab === 'map') updateSLAMMode();
+        }, 2000);
+function saveSLAMParameters() {
             alert("Paramètres SLAM appliqués temporairement au visualiseur.");
             drawSLAMMap();
         }
@@ -4562,10 +5834,12 @@ def dashboard():
                 targetContent.classList.add('active');
                 targetNav.classList.add('active');
                 activeTab = tabId;
+                localStorage.setItem('bastetActiveTab', tabId);
             }
 
             const titles = {
                 'dashboard': { title: "Vue d'ensemble", subtitle: "Statistiques en direct et flux caméras du robot Bastet." },
+                'control': { title: "Télécommande & Navigation", subtitle: "Contrôle manuel des mouvements, de la posture et des objectifs du robot." },
                 'users': { title: "Comptes & MyGES", subtitle: "Gérer les profils utilisateurs et leurs identifiants d'agenda." },
                 'faces': { title: "Galerie Visages", subtitle: "Gérer les visages enregistrés pour la reconnaissance faciale." },
                 'system': { title: "Système & Updates", subtitle: "Suivi des mises à jour logicielles et des services ROS." },
@@ -4587,6 +5861,8 @@ def dashboard():
                 setTimeout(drawMinimap, 100);
             } else if (tabId === 'map') {
                 setTimeout(drawSLAMMap, 100);
+            } else if (tabId === 'control') {
+                setTimeout(initControlTab, 100);
             }
         }
 
@@ -4605,16 +5881,35 @@ def dashboard():
                     
                     robotBadge.className = `status-badge ${robotStatus}`;
                     if (robotStatus === 'online') {
-                        robotBadge.textContent = 'En ligne';
+                        robotBadge.textContent = '🟢 En ligne';
                     } else if (robotStatus === 'hibernating') {
-                        robotBadge.textContent = 'Hibernation';
+                        robotBadge.textContent = '🟠 Hibernation';
                     } else if (robotStatus === 'idle') {
-                        robotBadge.textContent = 'Inactif';
+                        robotBadge.textContent = '🟡 Inactif';
                     } else {
-                        robotBadge.textContent = 'Hors-ligne';
+                        robotBadge.textContent = '🔴 Hors-ligne';
                     }
 
                     const sensors = state.sensors || {};
+                    
+                    // Mise à jour du statut Arduino Mega depuis les capteurs de l'état
+                    const arduinoBadge = document.getElementById('arduino-status-badge');
+                    const arduinoOfflineMsg = document.getElementById('arduino-offline-msg');
+                    const arduinoContent = document.getElementById('arduino-telemetry-content');
+                    const isArduinoConnected = sensors.arduino_connected === true;
+                    if (arduinoBadge) {
+                        if (isArduinoConnected) {
+                            arduinoBadge.className = 'status-badge active';
+                            arduinoBadge.textContent = 'En ligne';
+                            if (arduinoOfflineMsg) arduinoOfflineMsg.style.display = 'none';
+                            if (arduinoContent) arduinoContent.style.display = '';
+                        } else {
+                            arduinoBadge.className = 'status-badge offline';
+                            arduinoBadge.textContent = 'Hors-ligne';
+                            if (arduinoOfflineMsg) arduinoOfflineMsg.style.display = '';
+                            if (arduinoContent) arduinoContent.style.display = 'none';
+                        }
+                    }
                     const cpu = sensors.cpu_percent || 0;
                     const ram = sensors.ram_percent || 0;
                     const temp = sensors.temp_c || 0;
@@ -4732,6 +6027,11 @@ def dashboard():
                     } else {
                         document.getElementById('sensor-last-seen').textContent = '--';
                     }
+
+                    // FIX V4: Maintient le watchdog arduinoOfflineChecker en vie via le polling REST 2s
+                    // (en cas de robot statique, l agent WS n envoie plus de message puisque latest_telemetry
+                    // est identique, mais le dashboard reste vu comme vivant grace aux polls /core/state).
+                    window.lastArduinoTelemetry = Date.now();
 
                     const serviceBadge = document.getElementById('spotbot-service-badge');
                     const isSpotbotActive = sensors.spotbot_service_active;
@@ -6020,6 +7320,10 @@ def dashboard():
                     const ardUpToDate = ard.current_version && ard.latest_version && ard.current_version === ard.latest_version;
                     const ardStatusLower = (ard.status || '').toLowerCase();
                     const ardStatusLabels = {
+
+        failed_launch: "❌ Échec lancement (voir logs agent)",
+        failed_launch_msg: "Le robot n'a pas pu démarrer la màj Arduino.",
+        stale_starting: "⚠️ Blocage dès le lancement (60 s sans progrès)",
                         'stopping_services': '⏹ Arrêt services...',
                         'checking_tools': '🔍 Vérification arduino-cli...',
                         'installing_core': '📦 Installation core AVR...',
@@ -6049,7 +7353,7 @@ def dashboard():
                         ard.percent < 100;
 
                     const telemetryState = window.lastTelemetryState || {};
-                    const robotOnline = telemetryState.robot_status === 'online';
+                    const robotOnline = telemetryState.robot_status === 'online' || telemetryState.robot_status === 'hibernating';
                     const telemetrySensors = telemetryState.sensors || {};
                     const arduinoConnected = telemetrySensors.arduino_connected === true;
 
@@ -6076,7 +7380,7 @@ def dashboard():
 
                 // Update zone opacity & interaction based on connection status
                 const telemetryState = window.lastTelemetryState || {};
-                const robotOnline = telemetryState.robot_status === 'online';
+                const robotOnline = telemetryState.robot_status === 'online' || telemetryState.robot_status === 'hibernating';
                 const telemetrySensors = telemetryState.sensors || {};
                 const arduinoConnected = telemetrySensors.arduino_connected === true;
 
@@ -6106,7 +7410,79 @@ def dashboard():
             }
         }
 
-        async function triggerUpdate(target) {
+        async 
+        // ─── Release Rollback ────────────────────────────────────────────
+        let cachedReleases = { gateway: [], robot: [] };
+        
+        async function fetchAllReleases(repo) {
+            try {
+                const resp = await fetch(`https://api.github.com/repos/Bot-Bastet/${repo}/releases?per_page=20`);
+                if (resp.ok) {
+                    const releases = await resp.json();
+                    const key = repo === 'CORE-Gateway' ? 'gateway' : 'robot';
+                    cachedReleases[key] = releases.map(r => ({
+                        tag: r.tag_name,
+                        name: r.name || r.tag_name,
+                        published: r.published_at,
+                        body: (r.body || '').substring(0, 100)
+                    }));
+                    return cachedReleases[key];
+                }
+            } catch(e) {
+                console.error('fetchAllReleases error:', e);
+            }
+            return [];
+        }
+        
+        async function populateReleaseDropdown(repo, targetSelectId) {
+            const releases = await fetchAllReleases(repo);
+            const select = document.getElementById(targetSelectId);
+            if (!select) return;
+            select.innerHTML = '<option value="">-- Sélectionner une version --</option>';
+            releases.forEach(r => {
+                select.innerHTML += `<option value="${r.tag}">${r.tag} - ${r.name || ''}</option>`;
+            });
+        }
+        
+        function applySelectedRelease(repo) {
+            const selectId = repo === 'CORE-Gateway' ? 'gateway-release-select' : 'robot-release-select';
+            const select = document.getElementById(selectId);
+            if (!select || !select.value) {
+                alert('Veuillez sélectionner une version.');
+                return;
+            }
+            const version = select.value;
+            if (repo === 'CORE-Gateway') {
+                // Gateway update
+                fetch('/system/update/gateway/rollback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Token': apiToken },
+                    body: JSON.stringify({ version: version })
+                }).then(r => r.json()).then(data => {
+                    if (typeof showToast === 'function') showToast('Gateway', `Déploiement ${version} lancé`, 'info');
+                });
+            } else {
+                // Robot update (Pi + Arduino linked)
+                fetch('/system/update/robot/rollback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-API-Token': apiToken },
+                    body: JSON.stringify({ version: version })
+                }).then(r => r.json()).then(data => {
+                    if (typeof showToast === 'function') showToast('Robot', `Déploiement ${version} lancé (Pi + Arduino)`, 'info');
+                });
+            }
+        }
+        
+        // Load releases on tab switch
+        const _origSwitchTab2 = switchTab;
+        switchTab = function(tabId) {
+            _origSwitchTab2(tabId);
+            if (tabId === 'system') {
+                populateReleaseDropdown('CORE-Gateway', 'gateway-release-select');
+                populateReleaseDropdown('CORE', 'robot-release-select');
+            }
+        };
+function triggerUpdate(target) {
             const btnText = document.getElementById(`btn-update-${target}-text`);
             const isReinstall = btnText && btnText.textContent.toLowerCase().includes('réinstaller');
             const label = target === 'gateway' ? 'Gateway' : target === 'arduino' ? 'Arduino Mega' : 'Robot Pi';
@@ -6129,16 +7505,197 @@ def dashboard():
 
         // ─── EASYCONFIG FUNCTIONS ──────────────────────────────────────────────
         let ecCurrentStep = 1;
+        // Joint calibration wizard state (EasyConfig Step 1)
+        let ecJointIndex = 0;
+        let ecTempOffsets = new Array(12).fill(0);
+        let ecJointServoAttached = false;
+        const EC_JOINT_ORDER = [
+            { leg: "Arrière Gauche", joint: "Hanche", idx: 9, icon: "🦵" },
+            { leg: "Arrière Gauche", joint: "Tibia", idx: 10, icon: "🦵" },
+            { leg: "Arrière Gauche", joint: "Genou", idx: 11, icon: "🦵" },
+            { leg: "Arrière Droite", joint: "Hanche", idx: 6, icon: "🦵" },
+            { leg: "Arrière Droite", joint: "Tibia", idx: 7, icon: "🦵" },
+            { leg: "Arrière Droite", joint: "Genou", idx: 8, icon: "🦵" },
+            { leg: "Avant Gauche", joint: "Hanche", idx: 3, icon: "🦵" },
+            { leg: "Avant Gauche", joint: "Tibia", idx: 4, icon: "🦵" },
+            { leg: "Avant Gauche", joint: "Genou", idx: 5, icon: "🦵" },
+            { leg: "Avant Droite", joint: "Hanche", idx: 0, icon: "🦵" },
+            { leg: "Avant Droite", joint: "Tibia", idx: 1, icon: "🦵" },
+            { leg: "Avant Droite", joint: "Genou", idx: 2, icon: "🦵" },
+        ];
+        
         let ecCalibratedMotors = false;
         let ecCalibratedCam1 = false;
         let ecCalibratedCam2 = false;
         let ecPeerConnections = { 1: null, 2: null };
 
-        function openEasyConfig() {
+
+        function ecInitJointCalibration() {
+            ecJointIndex = 0;
+            ecTempOffsets = new Array(12).fill(0);
+            ecJointServoAttached = false;
+            ecAllJointsValidated = false;
+            document.getElementById('ec-joint-calibration-view').style.display = 'flex';
+            document.getElementById('ec-joint-final-view').style.display = 'none';
+            
+            // Detect camera count from telemetry
+            if (window.lastTelemetryState && window.lastTelemetryState.sensors) {
+                const s = window.lastTelemetryState.sensors;
+                ecCameraCount = (s.cam1_connected ? 1 : 0) + (s.cam2_connected ? 1 : 0);
+            } else {
+                ecCameraCount = 0;
+            }
+            ecUpdateStepIndicators();
+            ecShowJoint(0);
+        }
+        
+        function ecShowJoint(index) {
+            if (index >= EC_JOINT_ORDER.length) return;
+            const joint = EC_JOINT_ORDER[index];
+            ecJointServoAttached = false;
+            
+            document.getElementById('ec-joint-leg-name').textContent = joint.leg;
+            document.getElementById('ec-joint-name').textContent = joint.joint;
+            document.getElementById('ec-joint-progress').textContent = `Articulation ${index + 1}/12`;
+            document.getElementById('ec-joint-icon').textContent = joint.icon;
+            
+            const slider = document.getElementById('ec-joint-slider');
+            slider.value = ecTempOffsets[joint.idx] || 0;
+            document.getElementById('ec-joint-slider-value').textContent = slider.value;
+            document.getElementById('ec-joint-slider-value').style.color = 'var(--accent)';
+            const limitWarnInit = document.getElementById('ec-joint-limit-warning');
+            if (limitWarnInit) limitWarnInit.style.display = 'none';
+            // Re-evaluer l'indicateur pour le nouvel offset (oninput ne se declenche pas sur .value = ...)
+            ecUpdateJointSlider(slider.value);
+            
+            const btn = document.getElementById('ec-btn-attach-servo');
+            btn.disabled = false;
+            btn.textContent = '🔌 Allumer le servo';
+            btn.onclick = ecAttachCurrentJoint;
+            document.getElementById('ec-btn-validate-joint').disabled = true;
+            document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
+            // Update footer navigation for joint calibration
+            document.getElementById('ec-btn-prev').disabled = (index === 0);
+            document.getElementById('ec-btn-next').disabled = false;
+            document.getElementById('ec-btn-next').textContent = 'Suivant \u2192';
+            document.getElementById('ec-btn-next').onclick = ecNextStep;
+            document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
+        }
+        
+        function ecAttachCurrentJoint() {
+            const joint = EC_JOINT_ORDER[ecJointIndex];
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "attach", index: joint.idx }));
+                const curVal = parseInt(document.getElementById('ec-joint-slider').value) || 0;
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: joint.idx, angle: 90 + curVal }));
+                ecJointServoAttached = true;
+                document.getElementById('ec-btn-attach-servo').disabled = false;
+                document.getElementById('ec-btn-attach-servo').textContent = '🔌 Éteindre le servo';
+                document.getElementById('ec-btn-attach-servo').onclick = ecDetachCurrentJoint;
+                document.getElementById('ec-btn-validate-joint').disabled = false;
+                document.getElementById('ec-btn-validate-joint').style.opacity = '1';
+                if (typeof showToast === 'function') {
+                    showToast("Servo", `${joint.joint} allumé - utilisez le curseur`, "info");
+                }
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast("Erreur", "WebSocket non connecté", "error");
+                }
+            }
+        }
+        
+        function ecDetachCurrentJoint() {
+            const joint = EC_JOINT_ORDER[ecJointIndex];
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: joint.idx }));
+            }
+            ecJointServoAttached = false;
+            document.getElementById('ec-btn-attach-servo').textContent = '🔌 Allumer le servo';
+            document.getElementById('ec-btn-attach-servo').onclick = ecAttachCurrentJoint;
+            document.getElementById('ec-btn-validate-joint').disabled = true;
+            document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
+            // Update footer navigation for joint calibration
+            document.getElementById('ec-btn-prev').disabled = (index === 0);
+            document.getElementById('ec-btn-next').disabled = false;
+            document.getElementById('ec-btn-next').textContent = 'Suivant \u2192';
+            document.getElementById('ec-btn-next').onclick = ecNextStep;
+            document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
+            if (typeof showToast === 'function') {
+                showToast("Servo", `${joint.joint} éteint`, "info");
+            }
+        }
+        
+        let ecSliderThrottle = null;
+        function ecUpdateJointSlider(value) {
+            const joint = EC_JOINT_ORDER[ecJointIndex];
+            const intVal = parseInt(value) || 0;
+            const valueEl = document.getElementById('ec-joint-slider-value');
+            const limitWarn = document.getElementById('ec-joint-limit-warning');
+            valueEl.textContent = intVal;
+            ecTempOffsets[joint.idx] = intVal;
+            
+            // Indicateur visuel de limite servo
+            const angle = 90 + intVal;
+            if (angle <= 0 || angle >= 180) {
+                valueEl.style.color = '#f59e0b';  // orange warning
+                if (limitWarn) limitWarn.style.display = 'inline-block';
+            } else {
+                valueEl.style.color = 'var(--accent)';
+                if (limitWarn) limitWarn.style.display = 'none';
+            }
+            
+            // Throttle a 50ms pour eviter la saturation du buffer serie Arduino (64 octets)
+            if (ecSliderThrottle) clearTimeout(ecSliderThrottle);
+            ecSliderThrottle = setTimeout(() => {
+                if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: joint.idx, angle: 90 + ecTempOffsets[joint.idx] }));
+                }
+            }, 50);
+        }
+        
+        function ecValidateJoint() {
+            const joint = EC_JOINT_ORDER[ecJointIndex];
+            // Ensure offset is saved in ecTempOffsets (already done in ecUpdateJointSlider)
+            ecTempOffsets[joint.idx] = parseInt(document.getElementById('ec-joint-slider').value) || 0;
+            
+            // Detach servo before moving to next joint
+            if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: joint.idx }));
+            }
+            ecJointServoAttached = false;
+            const joint = EC_JOINT_ORDER[ecJointIndex];
+            
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: joint.idx }));
+            }
+            
+            ecJointServoAttached = false;
+            
+            if (ecJointIndex < 11) {
+                ecJointIndex++;
+                ecShowJoint(ecJointIndex);
+            } else {
+                // All 12 joints calibrated!
+                ecAllJointsValidated = true;
+                document.getElementById('ec-joint-calibration-view').style.display = 'none';
+                document.getElementById('ec-joint-final-view').style.display = 'flex';
+                document.getElementById('ec-btn-prev').disabled = false;
+                document.getElementById('ec-btn-next').disabled = false;
+                document.getElementById('ec-progress-text').textContent = 'Toutes les articulations calibrées';
+            } else {
+                document.getElementById('ec-joint-calibration-view').style.display = 'none';
+                document.getElementById('ec-joint-final-view').style.display = 'flex';
+            }
+        }
+
+                function openEasyConfig() {
             ecCurrentStep = 1;
             ecCalibratedMotors = false;
             ecCalibratedCam1 = false;
             ecCalibratedCam2 = false;
+            ecJointIndex = 0;
+            ecTempOffsets = new Array(12).fill(0);
+            ecJointServoAttached = false;
             
             for (let id of [1, 2]) {
                 if (ecPeerConnections[id]) {
@@ -6148,6 +7705,7 @@ def dashboard():
             }
             
             document.getElementById('easyconfig-overlay').classList.add('active');
+            ecInitJointCalibration();
             ecShowStep(1);
             
             ecUpdateMotorFeedback();
@@ -6191,10 +7749,115 @@ def dashboard():
             }
         }
 
-        function ecShowStep(step) {
+        // Clickable step navigation
+    function ecGoToStep(targetStep) {
+        const maxGoto = ecCameraCount >= 2 ? 6 : 4;
+        if (targetStep < 1 || targetStep > maxGoto) return;
+        // Cannot skip joint calibration if not completed
+        if (targetStep > 1 && !ecAllJointsValidated && ecCurrentStep === 1) {
+            if (typeof showToast === 'function') {
+                showToast("Navigation", "Terminez la calibration des 12 articulations avant de continuer", "warning");
+            }
+            return;
+        }
+        // Close any open camera streams when leaving step 2/3
+        if (ecCurrentStep === 2 || ecCurrentStep === 3) {
+            for (let id of [1, 2]) {
+                if (ecPeerConnections[id]) {
+                    try { ecPeerConnections[id].close(); } catch(e) {}
+                    ecPeerConnections[id] = null;
+                }
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "release_camera", camera: id }));
+                }
+            }
+        }
+        // If going back to step 1 from later steps, reset joint calibration
+        if (targetStep === 1 && ecCurrentStep > 1 && !ecAllJointsValidated) {
+            ecInitJointCalibration();
+        }
+        ecShowStep(targetStep);
+    }
+        function ecUpdateStepIndicators() {
+            const step2 = document.getElementById('step-dot-2');
+            const step3 = document.getElementById('step-dot-3');
+            const step4 = document.getElementById('step-dot-4');
+            
+            if (ecCameraCount === 0) {
+                if (step2) step2.style.display = 'none';
+                if (step3) step3.style.display = 'none';
+                const stepLR = document.getElementById('step-dot-lr');
+                if (stepLR) stepLR.style.display = 'none';
+                const sepAfter1 = step2 ? step2.previousElementSibling : null;
+                const sepAfter2 = step3 ? step3.previousElementSibling : null;
+                if (sepAfter1 && sepAfter1.tagName === 'DIV') sepAfter1.style.display = 'none';
+                if (sepAfter2 && sepAfter2.tagName === 'DIV') sepAfter2.style.display = 'none';
+                if (step4) {
+                    const numSpan = step4.querySelector('span:first-child');
+                    const labelSpan = step4.querySelector('span:last-child');
+                    if (numSpan) numSpan.textContent = '2';
+                    if (labelSpan) labelSpan.textContent = 'Finalisation';
+                }
+            } else if (ecCameraCount === 1) {
+                if (step2) {
+                    step2.style.display = 'flex';
+                    const label2 = step2.querySelector('span:last-child');
+                    if (label2) label2.textContent = 'Calibration Camera';
+                    const numSpan2 = step2.querySelector('span:first-child');
+                    if (numSpan2) numSpan2.textContent = '2';
+                }
+                if (step3) step3.style.display = 'none';
+                const stepLR = document.getElementById('step-dot-lr');
+                if (stepLR) stepLR.style.display = 'none';
+                const sepAfter2 = step3 ? step3.previousElementSibling : null;
+                if (sepAfter2 && sepAfter2.tagName === 'DIV') sepAfter2.style.display = 'none';
+                if (step4) {
+                    const numSpan = step4.querySelector('span:first-child');
+                    const labelSpan = step4.querySelector('span:last-child');
+                    if (numSpan) numSpan.textContent = '3';
+                    if (labelSpan) labelSpan.textContent = 'Finalisation';
+                }
+            } else {
+                // 2 cameras: show LR step, renumber all
+                const stepLR = document.getElementById('step-dot-lr');
+                if (stepLR) {
+                    stepLR.style.display = 'flex';
+                    const numLR = stepLR.querySelector('span:first-child');
+                    const labelLR = stepLR.querySelector('span:last-child');
+                    if (numLR) numLR.textContent = '2';
+                    if (labelLR) labelLR.textContent = 'Attribution G/D';
+                }
+                if (step2) {
+                    step2.style.display = 'flex';
+                    const num2 = step2.querySelector('span:first-child');
+                    const label2 = step2.querySelector('span:last-child');
+                    if (num2) num2.textContent = '3';
+                    if (label2) label2.textContent = 'Camera Gauche';
+                }
+                if (step3) {
+                    step3.style.display = 'flex';
+                    const num3 = step3.querySelector('span:first-child');
+                    const label3 = step3.querySelector('span:last-child');
+                    if (num3) num3.textContent = '4';
+                    if (label3) label3.textContent = 'Camera Droite';
+                }
+                if (step4) {
+                    const numSpan = step4.querySelector('span:first-child');
+                    const labelSpan = step4.querySelector('span:last-child');
+                    if (numSpan) numSpan.textContent = '5';
+                    if (labelSpan) labelSpan.textContent = 'Finalisation';
+                }
+            }
+        }
+
+
+    // Cleanup camera WebRTC connections when jumping steps
+    function ecShowStep(step) {
             ecCurrentStep = step;
             
-            for (let i = 1; i <= 4; i++) {
+            // Handle up to 5 steps (includes step-lr for 2 cameras)
+            const maxStep = ecCameraCount >= 2 ? 5 : 4;
+            for (let i = 1; i <= maxStep; i++) {
                 const div = document.getElementById(`ec-step-${i}`);
                 if (div) div.style.display = 'none';
                 
@@ -6209,13 +7872,52 @@ def dashboard():
                 }
             }
             
-            const currentDiv = document.getElementById(`ec-step-${step}`);
+            // For 2 cameras: step 2 is the LR attribution step
+            // Map step IDs based on camera count
+            let stepId;
+            if (ecCameraCount >= 2 && step === 2) {
+                stepId = 'ec-step-lr';
+            } else if (ecCameraCount >= 2 && step === 5) {
+                stepId = 'ec-step-stereo';
+            
+            } else if (ecCameraCount === 1 && step === 3) {
+                stepId = 'ec-step-4'; // Finalisation for 1 camera
+            } else if (ecCameraCount === 0 && step === 2) {
+                stepId = 'ec-step-4'; // Finalisation for 0 cameras
+            } else if (ecCameraCount >= 2 && step === 6) {
+                stepId = 'ec-step-4'; // Finalisation for 2 cameras
+            } else {
+                stepId = `ec-step-${step}`;
+            }
+            // Explicitly hide specially-named step divs
+            ['ec-step-lr', 'ec-step-stereo'].forEach(function(id) {
+                var d = document.getElementById(id);
+                if (d) d.style.display = 'none';
+            });
+            
+            const currentDiv = document.getElementById(stepId);
             if (currentDiv) {
                 currentDiv.style.display = 'flex';
             }
             
             for (let i = 1; i <= step; i++) {
-                const dot = document.getElementById(`step-dot-${i}`);
+                // Map dot IDs based on camera count
+                let dotId;
+                if (ecCameraCount >= 2 && i === 2) {
+                    dotId = 'step-dot-lr';
+                } else if (ecCameraCount >= 2 && i === 5) {
+                    dotId = 'step-dot-stereo';
+                
+                } else if (ecCameraCount === 1 && i === 3) {
+                    dotId = 'step-dot-4'; // Final dot for 1 camera
+                } else if (ecCameraCount === 0 && i === 2) {
+                    dotId = 'step-dot-4'; // Final dot for 0 cameras
+                } else if (ecCameraCount >= 2 && i === 6) {
+                    dotId = 'step-dot-4'; // Final dot for 2 cameras
+                } else {
+                    dotId = `step-dot-${i}`;
+                }
+                const dot = document.getElementById(dotId);
                 if (dot) {
                     dot.style.color = i === step ? 'var(--accent)' : 'var(--success)';
                     dot.style.fontWeight = i === step ? '600' : 'normal';
@@ -6229,11 +7931,30 @@ def dashboard():
                 }
             }
             
-            document.getElementById('ec-progress-text').textContent = `Étape ${step} sur 4`;
+            // Dynamic total steps based on camera count
+            const totalSteps = ecCameraCount === 0 ? 2 : (ecCameraCount === 1 ? 3 : 5);
+            document.getElementById('ec-progress-text').textContent = `Étape ${step} sur ${totalSteps}`;
             document.getElementById('ec-btn-prev').disabled = (step === 1);
             
-            if (step === 2 || step === 3) {
-                const camId = step === 2 ? 1 : 2;
+            // Start LR previews when entering step 2 for 2 cameras
+            if (ecCameraCount >= 2 && step === 2) {
+                ecStartLRPreviews();
+                document.getElementById('ec-btn-next').disabled = true;
+                document.getElementById('ec-btn-next').textContent = 'Attribuez G/D puis Suivant';
+            }
+            // Start stereo previews when entering step 5 for 2 cameras
+            if (ecCameraCount >= 2 && step === 5) {
+                ecStartStereoPreviews();
+                document.getElementById('ec-btn-next').disabled = true;
+                document.getElementById('ec-btn-next').textContent = 'Lancez la calibration ou passez';
+            
+            }
+            
+            // Camera calibration steps: 2/3 for 1 cam, 3/4 for 2 cams
+            const camStep2 = ecCameraCount >= 2 ? 3 : 2;
+            const camStep3 = ecCameraCount >= 2 ? 4 : 3;
+            if (step === camStep2 || step === camStep3) {
+                const camId = step === camStep2 ? 1 : 2;
                 const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
                 const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
                 const overlayEl = document.getElementById(`ec-cam-status-overlay-${camId}`);
@@ -6268,6 +7989,22 @@ def dashboard():
                 }
             }
             
+            // Resume joint calibration when returning to step 1 (don't reset)
+            if (step === 1) {
+                const calView = document.getElementById('ec-joint-calibration-view');
+                const finalView = document.getElementById('ec-joint-final-view');
+                if (calView && finalView) {
+                    if (ecJointIndex >= EC_JOINT_ORDER.length) {
+                        calView.style.display = 'none';
+                        finalView.style.display = 'flex';
+                    } else if (ecJointIndex > 0) {
+                        calView.style.display = 'flex';
+                        finalView.style.display = 'none';
+                        ecShowJoint(ecJointIndex);
+                    }
+                }
+            }
+            
             let canGoNext = false;
             if (step === 1 && ecCalibratedMotors) canGoNext = true;
             if (step === 2 && ecCalibratedCam1) canGoNext = true;
@@ -6279,7 +8016,8 @@ def dashboard():
 
         function ecPrevStep() {
             if (ecCurrentStep > 1) {
-                if (ecCurrentStep === 2 || ecCurrentStep === 3) {
+                if (ecCurrentStep >= 2 && ecCurrentStep <= 5) {
+                ecCleanupStereoListeners();
                     for (let id of [1, 2]) {
                         if (ecPeerConnections[id]) {
                             try { ecPeerConnections[id].close(); } catch(e) {}
@@ -6290,21 +8028,52 @@ def dashboard():
                         }
                     }
                 }
+                // If going back from step 3 to step 2 (LR step), stop previews
+                if (ecCurrentStep === 3 && ecCameraCount >= 2) {
+                    ecStopLRPreviews();
+                }
+                // If going back from step 6 to step 5 (stereo step), stop previews
+                if (ecCurrentStep === 6 && ecCameraCount >= 2) {
+                    ecStopStereoPreviews();
+                    ecCleanupStereoListeners();
+                }
+                if (ecCurrentStep === 5 && ecCameraCount >= 2) {
+                    ecStopStereoPreviews();
+                    ecCleanupStereoListeners();
+                }
                 ecShowStep(ecCurrentStep - 1);
             }
         }
 
         function ecNextStep(targetStep = null) {
             let next = targetStep !== null ? targetStep : ecCurrentStep + 1;
+            const maxSteps = ecCameraCount >= 2 ? 6 : (ecCameraCount === 1 ? 3 : 2);
             
-            if (next === 3) {
+            // For 2 cameras: step 2 is LR attribution, step 3/4 are camera cals, step 5 is final
+            // For 1 camera: step 2 is camera cal, step 3 is final
+            // For 0 cameras: step 2 is final (skip all camera)
+            if (next === 2 && ecCameraCount === 2) {
+                // Going to LR step: start camera previews
+                ecStartLRPreviews();
+            }
+            if (next === 5 && ecCameraCount >= 2) {
+                // Going to stereo step: start dual camera previews
+                ecStartStereoPreviews();
+            }
+            if (next === 4 && ecCameraCount >= 2) {
+                // Step 4 is Camera Droite - skip if cam2 not connected
                 const cam2Connected = window.lastTelemetryState && window.lastTelemetryState.sensors && window.lastTelemetryState.sensors.cam2_connected === true;
                 if (!cam2Connected) {
-                    next = 4;
+                    next = 5;
                 }
             }
+            if (next === 3 && ecCameraCount === 1) {
+                // 1 camera: step 3 doesn't exist, go to final
+                next = 3; // step 3 IS final for 1 camera (mapped to ec-step-4)
+            }
             
-            if (ecCurrentStep === 2 || ecCurrentStep === 3) {
+            if (ecCurrentStep >= 2 && ecCurrentStep <= 5) {
+                ecCleanupStereoListeners();
                 for (let id of [1, 2]) {
                     if (ecPeerConnections[id]) {
                         try { ecPeerConnections[id].close(); } catch(e) {}
@@ -6316,32 +8085,17 @@ def dashboard():
                 }
             }
             
-            if (next <= 4) {
+            if (next <= maxSteps) {
                 ecShowStep(next);
             }
         }
 
-        function ecCalculateOffsets() {
-            let currentJoints = window.lastTelemetryState && window.lastTelemetryState.joints ? window.lastTelemetryState.joints : [90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90, 90];
-            let targetAngles = [
-                90, 90, 0,
-                90, 90, 0,
-                90, 90, 0,
-                90, 90, 0
-            ];
-            
+        function ecCalculateOffsets(activateMotors = true) {
             const offsets = [];
             for (let i = 0; i < 12; i++) {
                 const slider = document.getElementById(`calib-slider-${i}`);
                 let currentOffset = slider ? parseInt(slider.value) : 0;
-                let delta = targetAngles[i] - currentJoints[i];
-                let newOffset = Math.max(-30, Math.min(30, Math.round(currentOffset + delta)));
-                
-                if (slider) {
-                    slider.value = newOffset;
-                    updateCalibSliderVal(i);
-                }
-                offsets.push(newOffset);
+                offsets.push(currentOffset);
             }
             
             fetch('/core/calibration', {
@@ -6351,10 +8105,23 @@ def dashboard():
                     'X-API-Token': apiToken
                 },
                 body: JSON.stringify({ offsets: offsets })
-            }).catch(err => console.error(err));
+            }).then(res => {
+                if (res.ok) {
+                    alert("Offsets sauvegardes avec succes.");
+                    loadSavedOffsets();
+                } else {
+                    alert("Erreur sauvegarde offsets (code " + res.status + "). Verifiez le token API.");
+                }
+            }).catch(err => {
+                console.error(err);
+                alert("Erreur reseau lors de la sauvegarde des offsets.");
+            });
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+                if (activateMotors) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+                }
             }
             
             ecCalibratedMotors = true;
@@ -6575,6 +8342,7 @@ def dashboard():
         function ecStartRobotAndClose() {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "start_robot" }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
             }
             closeEasyConfig();
         }
@@ -6779,6 +8547,382 @@ def dashboard():
             }
         }
 
+        // ─── TELECOMMANDE & NAVIGATION CONTROLS ──────────────────────────────────
+        let controlWalkInterval = null;
+        let controlActiveDir = null;
+        let controlSpeed = 0.15; // default speed in m/s
+        let navTarget = null; // { x, y } in meters
+        let keysPressed = {};
+
+        function initControlTab() {
+            // Setup canvas interaction
+            const canvas = document.getElementById('control-map-canvas');
+            if (canvas) {
+                canvas.removeEventListener('mousedown', onControlMapClick);
+                canvas.addEventListener('mousedown', onControlMapClick);
+            }
+            
+            // Setup keyboard listeners (once globally)
+            if (!window.controlKeyboardInitialized) {
+                window.controlKeyboardInitialized = true;
+                window.addEventListener('keydown', (e) => {
+                    if (activeTab !== 'control') return;
+                    
+                    const keyMap = {
+                        'z': 'up', 'KeyW': 'up', 'ArrowUp': 'up',
+                        's': 'down', 'KeyS': 'down', 'ArrowDown': 'down',
+                        'q': 'left', 'KeyA': 'left', 'ArrowLeft': 'left',
+                        'd': 'right', 'KeyD': 'right', 'ArrowRight': 'right'
+                    };
+                    
+                    const dir = keyMap[e.key] || keyMap[e.code];
+                    if (dir && !keysPressed[dir]) {
+                        e.preventDefault();
+                        keysPressed[dir] = true;
+                        startWalking(dir);
+                    }
+                    if (e.key === ' ' || e.key === 'x' || e.key === 'Escape') {
+                        e.preventDefault();
+                        sendControlStop();
+                    }
+                });
+                
+                window.addEventListener('keyup', (e) => {
+                    if (activeTab !== 'control') return;
+                    const keyMap = {
+                        'z': 'up', 'KeyW': 'up', 'ArrowUp': 'up',
+                        's': 'down', 'KeyS': 'down', 'ArrowDown': 'down',
+                        'q': 'left', 'KeyA': 'left', 'ArrowLeft': 'left',
+                        'd': 'right', 'KeyD': 'right', 'ArrowRight': 'right'
+                    };
+                    const dir = keyMap[e.key] || keyMap[e.code];
+                    if (dir) {
+                        keysPressed[dir] = false;
+                        // If no direction key is pressed, stop walking
+                        if (!Object.values(keysPressed).includes(true)) {
+                            stopWalking();
+                        }
+                    }
+                });
+            }
+            
+            // Initial drawing
+            drawControlMap();
+        }
+
+        function updateControlSpeed() {
+            const val = document.getElementById('control-speed-slider').value;
+            controlSpeed = parseFloat((val / 100).toFixed(2));
+            document.getElementById('control-speed-val').textContent = controlSpeed + ' m/s';
+        }
+
+        function sendControlCmd(cmd) {
+        if (appWs && appWs.readyState === WebSocket.OPEN) {
+            appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: cmd }));
+            if (typeof showToast === 'function') {
+                const labels = { stand: 'Se lever', sit: "S'asseoir", stop: 'Stop' };
+                showToast("Télécommande", labels[cmd] || cmd + " envoyé", "info");
+            }
+        } else {
+            if (typeof showToast === 'function') {
+                showToast("Erreur", "WebSocket non connecté. Le robot est peut-être hors ligne.", "error");
+            }
+        }
+    }));
+            }
+        }
+
+        function sendControlStop() {
+            stopWalking();
+            keysPressed = {};
+            // Send direct zero velocity and stop cmd
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, angular: 0.0 }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+            }
+            // Reset D-Pad button styles
+            document.querySelectorAll('.dpad-btn').forEach(btn => {
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+            });
+            const stopBtn = document.getElementById('dpad-stop');
+            if (stopBtn) {
+                stopBtn.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+            }
+        }
+
+        function startWalking(dir) {
+            if (controlActiveDir === dir) return;
+            controlActiveDir = dir;
+            
+            // Highlight button
+            document.querySelectorAll('.dpad-btn').forEach(btn => {
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+            });
+            const activeBtn = document.getElementById(`dpad-${dir}`);
+            if (activeBtn) {
+                activeBtn.style.backgroundColor = 'var(--accent)';
+                activeBtn.style.color = 'white';
+            }
+
+            if (controlWalkInterval) clearInterval(controlWalkInterval);
+            
+            // Periodically send cmd_vel
+            function sendVel() {
+                if (!appWs || appWs.readyState !== WebSocket.OPEN) return;
+                let vx = 0.0;
+                let wz = 0.0;
+                
+                if (dir === 'up') vx = controlSpeed;
+                else if (dir === 'down') vx = -controlSpeed;
+                else if (dir === 'left') wz = 1.0; // rotate left rad/s
+                else if (dir === 'right') wz = -1.0; // rotate right rad/s
+                
+                appWs.send(JSON.stringify({
+                    type: "cmd_vel",
+                    linear: vx,
+                    angular: wz
+                }));
+            }
+            
+            sendVel();
+            controlWalkInterval = setInterval(sendVel, 100);
+        }
+
+        function stopWalking() {
+            if (controlWalkInterval) {
+                clearInterval(controlWalkInterval);
+                controlWalkInterval = null;
+            }
+            controlActiveDir = null;
+            
+            // Highlight reset
+            document.querySelectorAll('.dpad-btn').forEach(btn => {
+                btn.style.backgroundColor = '';
+                btn.style.color = '';
+            });
+            const stopBtn = document.getElementById('dpad-stop');
+            if (stopBtn) {
+                stopBtn.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            }
+            
+            // Send zero velocity to stop
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, angular: 0.0 }));
+            }
+        }
+
+        // Map Click interaction
+        function onControlMapClick(e) {
+            const canvas = document.getElementById('control-map-canvas');
+            if (!canvas) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            const w = rect.width;
+            const h = rect.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = 40; // px/m
+            
+            // Calculate coordinates in meters relative to base_link/odom (centered)
+            const targetX = (clickX - cx) / scale;
+            const targetY = -(clickY - cy) / scale; // invert Y for Cartesian
+            
+            navTarget = { x: parseFloat(targetX.toFixed(2)), y: parseFloat(targetY.toFixed(2)) };
+            
+            // Update panel
+            document.getElementById('nav-target-x').textContent = navTarget.x.toFixed(2);
+            document.getElementById('nav-target-y').textContent = navTarget.y.toFixed(2);
+            
+            const panel = document.getElementById('nav-target-panel');
+            if (panel) {
+                panel.style.opacity = '1';
+                panel.style.pointerEvents = 'auto';
+            }
+            
+            drawControlMap();
+        }
+
+        function clearNavGoal() {
+            navTarget = null;
+            const panel = document.getElementById('nav-target-panel');
+            if (panel) {
+                panel.style.opacity = '0';
+                panel.style.pointerEvents = 'none';
+            }
+            drawControlMap();
+        }
+
+        function sendNavGoal() {
+            if (!navTarget) return;
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                // Send nav goal target to robot
+                appWs.send(JSON.stringify({
+                    type: "nav_goal",
+                    x: navTarget.x,
+                    y: navTarget.y
+                }));
+                
+                // Show notification or visual feedback
+                const btn = document.querySelector('#nav-target-panel .btn-primary');
+                if (btn) {
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '⚡ Objectif Envoyé !';
+                    btn.style.backgroundColor = 'var(--success)';
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.style.backgroundColor = '';
+                        clearNavGoal();
+                    }, 1500);
+                }
+            } else {
+                alert("Erreur : Le robot est hors-ligne.");
+            }
+        }
+
+        function drawControlMap() {
+            const canvas = document.getElementById('control-map-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            
+            const w = rect.width;
+            const h = rect.height;
+            
+            ctx.clearRect(0, 0, w, h);
+            ctx.fillStyle = '#07070a';
+            ctx.fillRect(0, 0, w, h);
+            
+            const scale = 40;
+            const cx = w / 2;
+            const cy = h / 2;
+            
+            // Grid lines
+            ctx.strokeStyle = '#101015';
+            ctx.lineWidth = 0.5;
+            const gridStep = scale * 0.5;
+            for (let x = cx % gridStep; x < w; x += gridStep) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+            }
+            for (let y = cy % gridStep; y < h; y += gridStep) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+            }
+            
+            // Walls/Occupancy Grid representation
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            const walls = [
+                {x: -1.5, y: -2, w: 3, h: 0.1},
+                {x: -1.5, y: 2, w: 3, h: 0.1},
+                {x: -1.5, y: -2, w: 0.1, h: 4},
+                {x: 1.5, y: -2, w: 0.1, h: 4},
+                {x: 0.5, y: -0.5, w: 0.5, h: 1}
+            ];
+            walls.forEach(wall => {
+                ctx.fillRect(cx + wall.x * scale, cy - (wall.y + wall.h) * scale, wall.w * scale, wall.h * scale);
+            });
+            
+            // Points (laser scan)
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#10b981';
+            if (window.slamPoints && window.slamPoints.length > 0) {
+                window.slamPoints.forEach(pt => {
+                    ctx.beginPath();
+                    ctx.arc(cx + pt.x * scale, cy - pt.y * scale, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            } else {
+                for (let angle = 0; angle < Math.PI * 2; angle += 0.05) {
+                    const dist = 1.8 + Math.sin(angle * 4) * 0.1;
+                    const px = cx + Math.cos(angle) * dist * scale;
+                    const py = cy - Math.sin(angle) * dist * scale;
+                    ctx.beginPath();
+                    ctx.arc(px, py, 1.5, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+            
+            // Path trajectory
+            if (window.slamPath && window.slamPath.length > 0) {
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                window.slamPath.forEach((pt, idx) => {
+                    const px = cx + pt.x * scale;
+                    const py = cy - pt.y * scale;
+                    if (idx === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                });
+                ctx.stroke();
+            }
+            
+            // Draw Waypoint navigation goal (if set)
+            if (navTarget) {
+                const tx = cx + navTarget.x * scale;
+                const ty = cy - navTarget.y * scale;
+                
+                // Pulsing target halo
+                ctx.save();
+                ctx.strokeStyle = 'var(--accent)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(tx, ty, 8 + (Date.now() % 500) / 100, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Outer target circle
+                ctx.strokeStyle = 'var(--accent)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(tx, ty, 6, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Center dot
+                ctx.fillStyle = 'var(--accent)';
+                ctx.beginPath();
+                ctx.arc(tx, ty, 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+            
+            // Robot Pose triangle
+            const rx = cx + (window.robotPose ? window.robotPose.x : 0) * scale;
+            const ry = cy - (window.robotPose ? window.robotPose.y : 0) * scale;
+            const rtheta = -(window.robotPose ? window.robotPose.theta : 0);
+            
+            ctx.save();
+            ctx.translate(rx, ry);
+            ctx.rotate(rtheta);
+            
+            ctx.fillStyle = 'var(--accent)';
+            ctx.beginPath();
+            ctx.moveTo(14, 0);
+            ctx.lineTo(-8, -8);
+            ctx.lineTo(-4, 0);
+            ctx.lineTo(-8, 8);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Glowing orientation indicator
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.5)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            ctx.restore();
+            
+            // Request animation frame for continuous animation of pulses
+            if (activeTab === 'control') {
+                requestAnimationFrame(drawControlMap);
+            }
+        }
+
         checkAuth();
     </script>
 </body>
@@ -6951,16 +9095,67 @@ def get_accounts():
 
 @app.post("/core/state", tags=["CORE State"], summary="Mettre à jour l'état du robot", dependencies=[Depends(verify_token)])
 def update_state(state: CoreState):
+    global _last_robot_state, _last_robot_state_time
     """Le robot publie son état courant (ce qu'il voit, le chat, etc)."""
     data = state.model_dump()
-    data["updated_at"] = time.time()
-    save_json(STATE_FILE, data)
+    now = time.time()
+    data["updated_at"] = now
+    
+    # IMPORTANT: Protéger contre les "hibernating" intempestifs
+    # L'agent envoie parfois "hibernating" même si le robot est en vie.
+    # On IGNORE ces transitions: on garde le dernier état "online" connu.
+    rs_new = data.get("robot_status", "")
+    if rs_new in ("hibernating", "idle") and _last_robot_state is not None:
+        prev_rs = _last_robot_state.get("robot_status", "")
+        if prev_rs in ("online",):  # Ne pas écraser "online" par "hibernating"
+            # On garde les capteurs et l'état, mais on force robot_status = "online"
+            data["robot_status"] = "online"
+            data["sensors"] = _last_robot_state.get("sensors", {})
+            data["robot_version"] = _last_robot_state.get("robot_version", "v0.0.0")
+            data["arduino_version"] = _last_robot_state.get("arduino_version", "v0.0.0")
+            data["ai_state"] = _last_robot_state.get("ai_state", {})
+            print(f"[Gateway] Protected: ignored 'hibernating' from agent, kept 'online'")
+    
+    # Mettre à jour le cache mémoire
+    _last_robot_state = data
+    _last_robot_state_time = now
+    
+    # Sauvegarder sur disque (best-effort)
+    try:
+        save_json(STATE_FILE, data)
+    except Exception as e:
+        print(f"[Gateway] STATE_FILE save error: {e}")
+    
+    if int(now) % 10 == 0:
+        print(f"[Gateway] State: robot_status={data.get('robot_status','?')} temp_c={data.get('sensors',{}).get('temp_c','?')}")
     return {"status": "updated"}
 
 @app.get("/core/state", tags=["CORE State"], summary="Récupérer l'état du robot", dependencies=[Depends(verify_token)])
 def get_state():
+    global _last_robot_state, _last_robot_state_time
     """L'app mobile appelle ceci pour afficher ce que fait/voit le robot."""
-    state = load_json(STATE_FILE, default={"robot_status": "offline"})
+    now = time.time()
+    state = None
+    
+    # 1. Utiliser le cache mémoire si disponible et frais (< 30s)
+    if _last_robot_state is not None and (now - _last_robot_state_time) < 30:
+        state = _last_robot_state.copy()
+        # Mettre à jour updated_at dans la réponse
+        state["updated_at"] = _last_robot_state_time
+    
+    # 2. Fallback: lire depuis le fichier
+    if state is None:
+        state = load_json(STATE_FILE, default={"robot_status": "offline"})
+        if _last_robot_state is not None and (now - _last_robot_state_time) < 30:
+            # Le cache est plus récent que le fichier
+            state = _last_robot_state.copy()
+            state["updated_at"] = _last_robot_state_time
+    
+    # 3. Vérifier la fraîcheur
+    updated_at = state.get("updated_at", 0)
+    if now - updated_at > 25:
+        state["robot_status"] = "offline"
+    
     state["active_streams"] = {
         "1": stream_active[1],
         "2": stream_active[2]
@@ -7048,9 +9243,10 @@ async def update_gateway_progress(progress: UpdateProgress):
 @app.post("/system/update/robot", tags=["System Update"], summary="Lancer la mise à jour du robot", dependencies=[Depends(verify_token)])
 async def trigger_robot_update():
     """Lancer instantanément la mise à jour du robot."""
-    save_json(ROBOT_UPDATE_FILE, {"status": "starting", "percent": 0})
+    initial = {"status": "starting", "percent": 0}
+    save_json(ROBOT_UPDATE_FILE, initial)
+    await manager.broadcast(json.dumps({"type": "robot_update_progress", **initial}), "app")
     await manager.broadcast(json.dumps({"type": "trigger_update"}), "robot")
-    await manager.broadcast(json.dumps({"type": "robot_update_progress", "status": "starting", "percent": 0}), "app")
     return {"status": "triggered"}
 
 @app.post("/system/update/robot/progress", tags=["System Update"], summary="Mettre à jour le progrès du robot", dependencies=[Depends(verify_token)])
@@ -7065,10 +9261,12 @@ def get_robot_update_progress(force: bool = False):
     progress = load_json(ROBOT_UPDATE_FILE, default={"status": "idle", "percent": 100})
     if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and ROBOT_UPDATE_FILE.exists():
         mtime = ROBOT_UPDATE_FILE.stat().st_mtime
-        if time.time() - mtime > 600:
-            progress = {"status": "failed", "percent": 0, "error": "Timeout (10 min sans réponse)"}
+        if time.time() - mtime > 60:
+            progress = {"status": "failed", "percent": 0, "error": "Timeout (60 s sans progrès)"}
             save_json(ROBOT_UPDATE_FILE, progress)
     state = load_json(STATE_FILE, default={})
+    if not isinstance(state, dict):
+        state = {}
     progress["current_version"] = state.get("robot_version", "v0.0.0")
     progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE", force=force)
     return progress
@@ -7076,9 +9274,10 @@ def get_robot_update_progress(force: bool = False):
 @app.post("/system/update/arduino", tags=["System Update"], summary="Lancer la mise à jour de l'Arduino", dependencies=[Depends(verify_token)])
 async def trigger_arduino_update():
     """Lancer instantanément le flashage de l'Arduino."""
-    save_json(ARDUINO_UPDATE_FILE, {"status": "starting", "percent": 0})
+    initial = {"status": "starting", "percent": 0}
+    save_json(ARDUINO_UPDATE_FILE, initial)
+    await manager.broadcast(json.dumps({"type": "arduino_update_progress", **initial}), "app")
     await manager.broadcast(json.dumps({"type": "trigger_arduino_flash"}), "robot")
-    await manager.broadcast(json.dumps({"type": "arduino_update_progress", "status": "starting", "percent": 0}), "app")
     return {"status": "triggered"}
 
 @app.post("/system/update/arduino/progress", tags=["System Update"], summary="Mettre à jour le progrès de l'Arduino", dependencies=[Depends(verify_token)])
@@ -7093,13 +9292,49 @@ def get_arduino_update_progress(force: bool = False):
     progress = load_json(ARDUINO_UPDATE_FILE, default={"status": "idle", "percent": 100})
     if progress.get("status") not in ["idle", "failed"] and "failed" not in progress.get("status", "") and ARDUINO_UPDATE_FILE.exists():
         mtime = ARDUINO_UPDATE_FILE.stat().st_mtime
-        if time.time() - mtime > 600:
-            progress = {"status": "failed", "percent": 0, "error": "Timeout (10 min sans réponse)"}
+        if time.time() - mtime > 60:
+            progress = {"status": "failed", "percent": 0, "error": "Timeout (60 s sans progrès)"}
             save_json(ARDUINO_UPDATE_FILE, progress)
     state = load_json(STATE_FILE, default={})
+    if not isinstance(state, dict):
+        state = {}
     progress["current_version"] = state.get("arduino_version", "v0.0.0")
     progress["latest_version"] = get_cached_latest_release("Bot-Bastet/CORE", force=force)
     return progress
+
+
+# ─── Rollback Endpoints ──────────────────────────────────────────────────────
+@app.post("/system/update/gateway/rollback", tags=["System Update"], summary="Rollback Gateway to a specific release", dependencies=[Depends(verify_token)])
+async def trigger_gateway_rollback(data: dict):
+    version = data.get("version", "")
+    if not version:
+        raise HTTPException(status_code=400, detail="Version required")
+    def run_rollback():
+        try:
+            save_json(GATEWAY_UPDATE_FILE, {"status": "rollback_starting", "percent": 0, "version": version})
+            from updater import apply_specific_release
+            apply_specific_release(version)
+            save_json(GATEWAY_UPDATE_FILE, {"status": "done", "percent": 100})
+            import os, signal
+            os.kill(os.getpid(), signal.SIGTERM)
+        except Exception as e:
+            save_json(GATEWAY_UPDATE_FILE, {"status": f"failed: {e}", "percent": 0})
+    threading.Thread(target=run_rollback, daemon=True).start()
+    return {"status": "triggered", "version": version}
+
+@app.post("/system/update/robot/rollback", tags=["System Update"], summary="Rollback Robot + Arduino to a specific release", dependencies=[Depends(verify_token)])
+async def trigger_robot_rollback(data: dict):
+    version = data.get("version", "")
+    if not version:
+        raise HTTPException(status_code=400, detail="Version required")
+    initial = {"status": "rollback_starting", "percent": 0, "version": version}
+    save_json(ROBOT_UPDATE_FILE, initial)
+    await manager.broadcast(json.dumps({"type": "robot_update_progress", **initial}), "app")
+    # Send versioned update trigger to robot
+    await manager.broadcast(json.dumps({"type": "trigger_update", "version": version}), "robot")
+    # Also trigger Arduino flash with the same version
+    await manager.broadcast(json.dumps({"type": "trigger_arduino_flash", "version": version}), "robot")
+    return {"status": "triggered", "version": version}
 
 # ─── System ───────────────────────────────────────────────────────────────────
 

@@ -19,33 +19,55 @@ Toutes les requêtes (REST et WebSockets) doivent inclure l'authentification :
 
 ## 1. Hub WebSockets (Communication Temps-Réel)
 
-Pour garantir une latence minimale (< 50ms), les flux principaux utilisent des WebSockets.
+Pour garantir une latence minimale (< 50ms), les flux principaux utilisent des WebSockets. Toutes les connexions nécessitent le paramètre `?token=votre_token`.
 
 ### `wss://ha.arthonetwork.fr:44888/ws/robot` (Connexion Robot)
 Canal bidirectionnel exclusif pour le robot.
+- **Routage** : Les messages reçus du robot sont diffusés à `node` et `app`.
+- **Injection contextuelle MyGES** : Si le robot envoie un message de type `"chat"`, la Gateway charge automatiquement les identifiants MyGES enregistrés pour l'utilisateur, interroge l'API MyGES pour récupérer son emploi du temps des 7 prochains jours, et l'injecte dans le champ `"context"` du JSON avant de le diffuser aux autres clients.
+- **Mise à jour de la télémétrie** : Si le robot envoie un message de type `"telemetry_diagnostics"`, la Gateway intercepte le message et met à jour ses variables globales internes (accessibles via `GET /core/diagnostics`).
 
 ### `wss://ha.arthonetwork.fr:44888/ws/node` (Connexion CORE-Node)
-Canal bidirectionnel exclusif pour le serveur de calcul.
+Canal bidirectionnel pour le serveur de traitement.
+- **Routage** : Les messages reçus du Node sont diffusés à `robot` et `app`.
+- **Commandes caméras** :
+  - **Démarrer un flux** :
+    ```json
+    {
+      "type": "request_camera",
+      "camera": 1,
+      "v_slam": false
+    }
+    ```
+    Active la caméra demandée, ajoute la connexion à la liste des auditeurs actifs, annule tout minuteur d'arrêt en cours, et notifie le robot (`start_camera`) ainsi que l'application mobile (`stream_status`).
+  - **Arrêter un flux** :
+    ```json
+    {
+      "type": "release_camera",
+      "camera": 1
+    }
+    ```
+    Retire la connexion de la liste des auditeurs de la caméra. Si aucun auditeur n'est actif, un minuteur d'extinction de 10 secondes est lancé pour couper le flux de la caméra sur le robot.
 
 ### `wss://ha.arthonetwork.fr:44888/ws/app` (Connexion Application Mobile)
-Canal pour l'utilisateur (État du robot, télécommande).
-
-#### Messages WebSockets Importants
-- **`telemetry_diagnostics`** : Envoyé périodiquement par le robot. Contient :
-  - `joints` : Liste des 12 angles de servomoteurs (de 0 à 11).
-  - `imu` : Données gyroscopiques (`roll`, `pitch`, `yaw`).
-  - `topics` : Liste des topics ROS 2 actifs (`name`, `type`, `hz`).
-  - `pose` & `path` : Coordonnées de localisation SLAM.
-  - `ai_state` : État actif des modules IA.
-- **`scan_wifi`** : Envoyé par l'App pour demander la recherche des réseaux à proximité.
-- **`wifi_list`** : Renvoyé par le robot avec les réseaux triés par force de signal décroissante.
-- **`camera_setup`** : Active ou désactive un flux caméra sur le robot (`camera`: 1 ou 2, `enable`: true/false).
+Canal bidirectionnel pour l'utilisateur (Application mobile / Dashboard).
+- À la connexion, la Gateway renvoie immédiatement un message d'état initial pour chaque caméra :
+  ```json
+  {
+    "type": "stream_status",
+    "camera": 1,
+    "active": true
+  }
+  ```
+- **Routage** : Les commandes et messages reçus de l'App sont diffusés à `robot`.
+- **Commandes caméras** :
+  - Identique à l'interface `node`, supporte le message `request_camera` pour démarrer et s'abonner à un flux, et `release_camera` pour s'en désabonner.
 
 ---
 
 ## 2. Authentification & Comptes (REST)
 
-L'API utilise des endpoints dédiés pour l'authentification, tout en conservant la gestion des profils.
+L'API utilise des endpoints dédiés pour l'authentification et la gestion des profils.
 
 ### **POST `/auth/register`** (ou `/accounts`)
 Crée ou met à jour un compte utilisateur.
@@ -72,7 +94,21 @@ Vérifie les identifiants et retourne les informations de l'utilisateur.
 ```
 
 ### **GET `/accounts`**
-Liste tous les comptes enregistrés (nécessite d'être Admin).
+Liste tous les comptes enregistrés.
+
+### **DELETE `/accounts/{full_name}`**
+Supprime un compte utilisateur par son nom complet. Supprime également les identifiants MyGES associés et les photos de visage de la base de données.
+
+### **POST `/preferences`**
+Met à jour les préférences de l'utilisateur.
+```json
+{
+  "full_name": "Nom Utilisateur",
+  "preferences": {
+    "dark_mode": true
+  }
+}
+```
 
 ---
 
@@ -107,7 +143,7 @@ Géré par MediaMTX (intégré à la Gateway). L'encodage vidéo H.264 utilise o
 
 ## 6. État du Robot (CORE State)
 
-Permet de suivre en temps réel ce que voit et fait le robot.
+Permet de suivre en temps réel ce que voit et fait le robot et de gérer la calibration.
 
 - **POST `/core/state`** : Mise à jour de l'état (par le robot).
 - **GET `/core/state`** : Récupération de l'état (par l'app).
@@ -152,44 +188,69 @@ Permet de suivre en temps réel ce que voit et fait le robot.
 }
 ```
 
+### **GET `/core/calibration`**
+Récupère les offsets de calibration des 12 servos de Bastet sous forme de liste.
+```json
+{
+  "offsets": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}
+```
+
+### **POST `/core/calibration`**
+Sauvegarde les offsets de calibration.
+```json
+{
+  "offsets": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+}
+```
+
+### **GET `/core/diagnostics`**
+Récupère les diagnostics de télémétrie temps-réel reçus du robot (`telemetry_diagnostics` via WebSocket).
+
 ---
 
 ## 7. Mises à Jour & Télémétrie (REST + WebSockets)
 
-Permet de contrôler et surveiller les mises à jour de la Gateway, du Robot et de l'Arduino. Un mécanisme de sécurité réinitialise le statut à `failed` en cas d'absence de progression pendant plus de 10 minutes (anti-blocage).
+Permet de contrôler et surveiller les mises à jour de la Gateway, du Robot et de l'Arduino.
 
 ### **POST `/system/update/gateway`**
 Lance la mise à jour sur la Gateway (redémarre le conteneur).
 
 ### **GET `/system/update/gateway/progress`**
 Récupère le statut de progression de la Gateway.
-- **Query Parameter (facultatif)** : `?force=true` (force le contournement du cache local et interroge l'API GitHub directement pour actualiser la version).
-```json
-{
-  "status": "idle / downloading / extracting / done / failed",
-  "percent": 100
-}
-```
+- **Query Parameter (facultatif)** : `?force=true` (force l'interrogation de l'API GitHub).
 
 ### **POST `/system/update/gateway/progress`**
-Permet de mettre à jour la progression de la mise à jour de la Gateway.
+Met à jour la progression de la mise à jour de la Gateway.
 
 ### **POST `/system/update/robot`**
-Déclenche la mise à jour du robot via WebSocket.
+Déclenche la mise à jour du robot.
 
 ### **GET `/system/update/robot/progress`**
-Récupère la progression de la mise à jour du robot (compilation `colcon build`).
-- **Query Parameter (facultatif)** : `?force=true` (force le contournement du cache local et interroge l'API GitHub directement).
+Récupère la progression de la mise à jour du robot.
+- **Query Parameter (facultatif)** : `?force=true`.
 
 ### **POST `/system/update/robot/progress`**
-Permet au robot de notifier son état et sa progression de mise à jour.
+Met à jour la progression de la mise à jour du robot.
 
 ### **POST `/system/update/arduino`**
-Déclenche le flashage du code sur l'Arduino Mega (uniquement si le robot est en ligne et l'Arduino connecté).
+Déclenche le flashage de l'Arduino Mega.
 
 ### **GET `/system/update/arduino/progress`**
-Récupère le statut et la progression du flashage Arduino.
-- **Query Parameter (facultatif)** : `?force=true` (force le contournement du cache local).
+Récupère la progression du flashage Arduino.
+- **Query Parameter (facultatif)** : `?force=true`.
 
 ### **POST `/system/update/arduino/progress`**
-Permet au robot de notifier l'avancement du flash de l'Arduino.
+Met à jour la progression du flash de l'Arduino.
+
+---
+
+## 8. Diagnostic Santé (REST)
+
+### **GET `/health`**
+Endpoint de vérification de l'état de l'API. Retourne un statut de santé.
+```json
+{
+  "status": "healthy"
+}
+```
