@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Bastet — Administration</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest/dist/hls.min.js"></script>
+    
+
+
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+    <!-- Mobile Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Login screen -->
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-card">
+            <img src="/logo.webp" alt="Bastet" style="width: 64px; height: 64px; border-radius: 12px; margin-bottom: 1.25rem; object-fit: contain;" />
+            <h2 class="font-outfit" style="font-size: 1.5rem; margin-bottom: 0.25rem;">Bastet Gateway</h2>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 2rem;">Connectez-vous avec votre compte</p>
+            <form onsubmit="return false;">
+                <div class="form-group" style="text-align: left;">
+                    <label class="form-label" for="loginEmail">Adresse email</label>
+                    <input type="email" id="loginEmail" class="form-input" placeholder="utilisateur@email.fr" required autocomplete="email" style="margin-bottom: 0.75rem;"/>
+                </div>
+                <div class="form-group" style="text-align: left;">
+                    <label class="form-label" for="loginPassword">Mot de passe</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required autocomplete="current-password" style="margin-bottom: 0.75rem;"/>
+                </div>
+                <div id="loginError" style="color: var(--danger); font-size: 0.8rem; margin-bottom: 0.5rem; display: none;"></div>
+                <button type="submit" id="loginSubmitBtn" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 0.5rem;">Se connecter</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sidebar navigation -->
+    <div class="sidebar">
+        <div class="brand">
+            <img src="/logo.webp" alt="Bastet" class="brand-logo"/>
+            <span class="brand-name font-outfit">BASTET GATEWAY</span>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Basculer le thème">
+                <svg id="theme-icon-dark" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg id="theme-icon-light" viewBox="0 0 24 24" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item active" onclick="switchTab('dashboard')" id="nav-dashboard">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
+                </svg>
+                <span>Vue d'ensemble</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('control')" id="nav-control">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>
+                </svg>
+                <span>Télécommande</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('users')" id="nav-users">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span>Comptes & MyGES</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('faces')" id="nav-faces">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <span>Galerie Visages</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('system')" id="nav-system">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>Système & Updates</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('chat')" id="nav-chat">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Chat & Contrôle IA</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('diagnostics')" id="nav-diagnostics">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                <span>Arduino & Calib</span>
+            </li>
+            <li class="nav-item" onclick="switchTab('map')" id="nav-map">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+                </svg>
+                <span>SLAM & Map</span>
+            </li>
+        </ul>
+        <div style="margin-top: auto; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Statut Robot :</span>
+                <span id="robot-status-badge" class="status-badge offline">Hors-ligne</span>
+            </div>
+            <button class="btn btn-secondary" onclick="logout()" style="width: 100%; justify-content: center; gap: 0.5rem;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+                </svg>
+                Déconnexion
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Header Bar -->
+    <div class="mobile-header-bar">
+        <button class="hamburger-btn" onclick="toggleSidebar()">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </button>
+                <div class="mobile-brand" style="display: flex; align-items: center; gap: 0.5rem;">
+            <img src="/logo.webp" alt="Bastet" class="brand-logo" style="width:28px;height:28px;"/>
+            <span class="brand-name font-outfit" style="font-size: 1.15rem; font-weight: 700; letter-spacing: 0.05em; background: var(--brand-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">BASTET GATEWAY</span>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Basculer le theme">
+            <svg id="theme-icon-dark-m" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg id="theme-icon-light-m" viewBox="0 0 24 24" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button> <!-- spacer -->
+    </div>
+
+    <!-- Main Content Panel -->
+    <div class="content-wrapper">
+        <!-- HEADER -->
+        <div class="header-bar">
+            <div>
+                <h1 id="tab-title" class="header-title font-outfit">Vue d'ensemble</h1>
+                <p id="tab-subtitle" class="header-subtitle">Statistiques en direct et flux caméras du robot Bastet.</p>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 1: DASHBOARD ─────────────────── -->
+        <div id="tab-dashboard-content" class="tab-content active">
+            <!-- Telemetry Gauges -->
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-title">Télémétrie Robot</div>
+                    <div class="gauge-container">
+                        <div class="gauge-item">
+                            <div class="gauge-circle cpu-gauge">
+                                <svg viewBox="0 0 36 36" class="circular-chart">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    <path id="gauge-cpu" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                </svg>
+                                <span id="gauge-cpu-val" class="gauge-value">--%</span>
+                            </div>
+                            <span class="gauge-label">Processeur (CPU)</span>
+                        </div>
+                        <div class="gauge-item">
+                            <div class="gauge-circle ram-gauge">
+                                <svg viewBox="0 0 36 36" class="circular-chart">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    <path id="gauge-ram" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                </svg>
+                                <span id="gauge-ram-val" class="gauge-value">--%</span>
+                            </div>
+                            <span class="gauge-label">Mémoire (RAM)</span>
+                        </div>
+                        <div class="gauge-item">
+                            <div class="gauge-circle temp-gauge">
+                                <svg viewBox="0 0 36 36" class="circular-chart">
+                                    <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    <path id="gauge-temp" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                </svg>
+                                <span id="gauge-temp-val" class="gauge-value">--°C</span>
+                            </div>
+                            <span class="gauge-label">Température SoC</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Capteurs embarqués</div>
+                    <div id="sensors-container" style="display: flex; flex-direction: column; gap: 0.25rem;">
+                        <div class="sensor-item"><span class="sensor-label">Dernière personne détectée</span><span id="sensor-seen-person" class="sensor-val">--</span></div>
+                        <div class="sensor-item"><span class="sensor-label">Objets repérés</span><span id="sensor-seen-objects" class="sensor-val">--</span></div>
+                        <div class="sensor-item"><span class="sensor-label">Version Logiciel Robot</span><span id="sensor-version" class="sensor-val">--</span></div>
+                        <div class="sensor-item"><span class="sensor-label">Dernière mise à jour</span><span id="sensor-last-seen" class="sensor-val">--</span></div>
+                    </div>
+                </div>
+
+                <!-- Gateway Telemetry Card -->
+                <div class="card" id="gateway-card">
+                    <div class="card-title">
+                        <span>Télémétrie Gateway</span>
+                        <span id="gateway-status-badge" class="status-badge online">En ligne</span>
+                    </div>
+                    <div id="gateway-telemetry-content">
+                        <div class="gauge-container">
+                            <div class="gauge-item">
+                                <div class="gauge-circle gw-cpu-gauge">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                        <path id="gw-gauge-cpu" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    </svg>
+                                    <span id="gw-gauge-cpu-val" class="gauge-value">--%</span>
+                                </div>
+                                <span class="gauge-label">CPU</span>
+                            </div>
+                            <div class="gauge-item">
+                                <div class="gauge-circle gw-ram-gauge">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                        <path id="gw-gauge-ram" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    </svg>
+                                    <span id="gw-gauge-ram-val" class="gauge-value">--%</span>
+                                </div>
+                                <span class="gauge-label">RAM</span>
+                            </div>
+                            <div class="gauge-item">
+                                <div class="gauge-circle gw-disk-gauge">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                        <path id="gw-gauge-disk" class="circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    </svg>
+                                    <span id="gw-gauge-disk-val" class="gauge-value">--%</span>
+                                </div>
+                                <span class="gauge-label">Disque</span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div class="sensor-item"><span class="sensor-label">Température</span><span id="gw-temp-val" class="sensor-val">--°C</span></div>
+                            <div class="sensor-item"><span class="sensor-label">Uptime</span><span id="gw-uptime-val" class="sensor-val">--</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Arduino Mega Card -->
+                <div class="card" id="arduino-card">
+                    <div class="card-title">
+                        <span>Arduino Mega</span>
+                        <span id="arduino-status-badge" class="status-badge offline">Hors-ligne</span>
+                    </div>
+                    <div id="arduino-telemetry-content">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <div class="sensor-item"><span class="sensor-label">IMU Roll</span><span id="arduino-roll" class="sensor-val">--</span></div>
+                            <div class="sensor-item"><span class="sensor-label">IMU Pitch</span><span id="arduino-pitch" class="sensor-val">--</span></div>
+                            <div class="sensor-item"><span class="sensor-label">IMU Yaw</span><span id="arduino-yaw" class="sensor-val">--</span></div>
+                        </div>
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color);">
+                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem; font-weight: 600;">Servos (12 joints)</div>
+                            <div id="arduino-joints-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.3rem;">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="arduino-offline-msg" style="display: none; text-align: center; padding: 1.5rem 0; color: var(--text-secondary); font-size: 0.85rem;">
+                        Arduino Mega non connecté
+                    </div>
+                </div>
+
+                <!-- Live Chat Card -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 280px; max-height: 280px;">
+                    <div class="card-title">Conversation Live avec Bastet</div>
+                    <div id="chat-messages-box" style="flex: 1; overflow-y: auto; padding-right: 0.5rem; margin-top: 0.5rem; display: flex; flex-direction: column;">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;">Aucune conversation en cours.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Caméras on-demand -->
+            <div class="section-header">
+                <h2 class="font-outfit" style="font-size: 1.3rem;">Flux Caméras en Direct (À la demande)</h2>
+            </div>
+            <div class="stream-grid">
+                <!-- Caméra 1 -->
+                <div id="stream-card-1" class="stream-card">
+                    <div id="stream-placeholder-1" class="stream-placeholder" onclick="toggleStream(1, true)">
+                        <svg viewBox="0 0 24 24">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span>Cliquer pour activer Caméra Gauche</span>
+                    </div>
+                    <div id="video-container-1" class="video-container">
+                        <video id="video-cam-1" class="stream-video" autoplay playsinline muted></video>
+                        <div id="stream-loader-1" class="stream-loader">
+                            <div class="spinner"></div>
+                            <span style="font-size: 0.9rem; font-weight: 500;">Connexion au flux WebRTC...</span>
+                        </div>
+                        <button id="video-fs-btn-1" class="video-fs-btn" onclick="toggleFullscreen(1)" title="Plein écran">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="stream-controls">
+                        <div style="display: flex; flex-direction: column; gap: 4px;">
+                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra Gauche</h4>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span id="stream-status-1" class="status-badge">Inactif</span>
+                                <label class="vslam-toggle" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                                    <input type="checkbox" id="stream-v-slam-1" style="accent-color: var(--accent); width:14px; height:14px;" onchange="handleVSlamToggleChange()">
+                                    <span id="vslam-text-mode">Superposer V-SLAM Mono</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button id="keep-btn-1" class="btn-keep" style="margin-right: 8px;" onclick="toggleKeepStream(1)" title="Garder le flux actif indéfiniment">📌 Keep Stream : OFF</button><button class="btn btn-secondary" onclick="toggleStream(1, true)">
+                            <span id="stream-btn-text-1">Démarrer le flux</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Caméra 2 -->
+                <div id="stream-card-2" class="stream-card">
+                    <div id="stream-placeholder-2" class="stream-placeholder" onclick="toggleStream(2, true)">
+                        <svg viewBox="0 0 24 24">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                        </svg>
+                        <span>Cliquer pour activer Caméra Droite</span>
+                    </div>
+                    <div id="video-container-2" class="video-container">
+                        <video id="video-cam-2" class="stream-video" autoplay playsinline muted></video>
+                        <div id="stream-loader-2" class="stream-loader">
+                            <div class="spinner"></div>
+                            <span style="font-size: 0.9rem; font-weight: 500;">Connexion au flux WebRTC...</span>
+                        </div>
+                        <button id="video-fs-btn-2" class="video-fs-btn" onclick="toggleFullscreen(2)" title="Plein écran">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="stream-controls">
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra Droite</h4>
+                            <span id="stream-status-2" class="status-badge">Inactif</span>
+                        </div>
+                        <button id="keep-btn-2" class="btn-keep" style="margin-right: 8px;" onclick="toggleKeepStream(2)" title="Garder le flux actif indéfiniment">📌 Keep Stream : OFF</button><button class="btn btn-secondary" onclick="toggleStream(2, true)">
+                            <span id="stream-btn-text-2">Démarrer le flux</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 2: USERS & MYGES ─────────────────── -->
+        <div id="tab-users-content" class="tab-content">
+            <div class="section-header">
+                <h2 class="font-outfit" style="font-size: 1.3rem;">Liste des Utilisateurs Enregistrés</h2>
+                <button class="btn btn-primary" onclick="openAddUserModal()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Ajouter un utilisateur
+                </button>
+            </div>
+            <div id="users-container" class="user-grid">
+                <!-- User Cards will be loaded here dynamically -->
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 3: FACES GALLERY ─────────────────── -->
+        <div id="tab-faces-content" class="tab-content">
+            <div id="faces-folders-view">
+                <div class="folders-grid" id="folders-container">
+                    <!-- User folders will be loaded here dynamically -->
+                </div>
+            </div>
+
+            <div id="faces-details-view" class="folder-open-view">
+                <div class="back-btn-wrapper">
+                    <button class="btn btn-secondary" onclick="closeFolderDetails()">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 0.25rem;">
+                            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+                        </svg>
+                        Retour aux dossiers
+                    </button>
+                </div>
+                
+                <div class="upload-box" onclick="triggerFaceUpload()">
+                    <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent); margin: 0 auto 0.75rem;">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                    </svg>
+                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem;">Charger une nouvelle photo pour <span id="current-folder-username-label">l'utilisateur</span></h4>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem;">Glissez-déposez ou cliquez ici pour ajouter une image (Max 8 photos)</p>
+                    <input type="file" id="face-file-input" style="display: none;" accept="image/*" onchange="handleFaceUploadSelected(event)"/>
+                </div>
+
+                <div class="faces-section" style="border: none; padding: 0; background: transparent;">
+                    <div class="face-user-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.5rem;">
+                        <span id="details-folder-name" style="font-size: 1.25rem; font-weight: 700;">Nom</span>
+                        <span id="details-folder-count" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">0 / 8 photos</span>
+                    </div>
+                    <div class="faces-grid" id="details-faces-grid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 4: SYSTEM & UPDATES ─────────────────── -->
+        <div id="tab-system-content" class="tab-content">
+            <div class="card-grid">
+                <!-- Gateway Update Card -->
+                <div class="card">
+                    <div class="card-title">Mise à jour — Gateway Serveur</div>
+                    <div style="margin: 1rem 0;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Version actuelle :</span>
+                            <span id="gateway-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Dernière version dispo :</span>
+                            <span id="gateway-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
+                            <span>Statut de la Gateway :</span>
+                            <span id="gateway-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="gateway-update-bar" class="progress-bar-value progress-bar-fill"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
+                            <span>Progression</span>
+                            <span id="gateway-update-percent">0%</span>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Version à déployer :</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="gateway-release-select" class="form-input" style="flex: 1; font-size: 0.8rem; padding: 0.3rem 0.5rem;">
+                                    <option value="">-- Chargement... --</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="applySelectedRelease('CORE-Gateway')" style="font-size: 0.75rem; padding: 0.3rem 0.75rem; white-space: nowrap;">
+                                    Appliquer
+                                </button>
+                            </div>
+                        </div>
+                        <button id="btn-update-gateway" class="btn btn-secondary" onclick="triggerUpdate('gateway')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                        </svg>
+                        <span id="btn-update-gateway-text">Lancer la mise à jour Gateway</span>
+                    </button>
+                </div>
+
+                <!-- Robot Update Card -->
+                <div class="card">
+                    <div class="card-title">Mise à jour — Robot Pi & Arduino</div>
+                    
+                    <div id="update-zone-robot" style="margin: 1rem 0; transition: opacity 0.3s ease;">
+                        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Système Principal (Pi 5)</h4>
+                        <div style="margin: 1rem 0;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                <span>Version actuelle :</span>
+                                <span id="robot-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                                <span>Dernière version dispo :</span>
+                                <span id="robot-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
+                                <span>Statut de l'agent :</span>
+                                                                <span id="robot-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div id="robot-update-bar" class="progress-bar-value progress-bar-fill"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
+                                <span>Progression</span>
+                                <span id="robot-update-percent">0%</span>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 0.75rem;">
+                            <label style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Version à déployer (Pi + Arduino liés) :</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="robot-release-select" class="form-input" style="flex: 1; font-size: 0.8rem; padding: 0.3rem 0.5rem;">
+                                    <option value="">-- Chargement... --</option>
+                                </select>
+                                <button class="btn btn-secondary" onclick="applySelectedRelease('CORE')" style="font-size: 0.75rem; padding: 0.3rem 0.75rem; white-space: nowrap;">
+                                    Appliquer
+                                </button>
+                            </div>
+                        </div>
+                        <button id="btn-update-robot" class="btn btn-secondary" onclick="triggerUpdate('robot')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            <span id="btn-update-robot-text">Lancer la mise à jour Robot</span>
+                        </button>
+                    </div>
+
+                    <!-- Partie 2 : Arduino Mega -->
+                    <div id="update-zone-arduino" style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; transition: opacity 0.3s ease;">
+                        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);">Microcontrôleur (Arduino Mega)</h4>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Version actuelle flashée :</span>
+                            <span id="arduino-current-version" style="font-weight: 600; color: var(--text-primary);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+                            <span>Dernière version dispo :</span>
+                            <span id="arduino-latest-version" style="font-weight: 600; color: var(--success);">v0.0.0</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-secondary);">
+                            <span>Statut du flash :</span>
+                            <span id="arduino-update-status" style="font-weight: 600; color: var(--text-primary);">Prêt</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="arduino-update-bar" class="progress-bar-value progress-bar-fill"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 500;">
+                            <span>Progression</span>
+                            <span id="arduino-update-percent">0%</span>
+                        </div>
+                        <button id="btn-update-arduino" class="btn btn-secondary" onclick="triggerUpdate('arduino')" style="width: 100%; justify-content: center; gap: 0.5rem; margin-top: 1rem;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            <span id="btn-update-arduino-text">Reflasher l'Arduino</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Gestion des services ROS / spotbot.service</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid var(--border-color);">
+                    <div>
+                        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem;">Service SpotBot ROS Core</h4>
+                        <p style="color: var(--text-secondary); font-size: 0.8rem;">Gère la navigation, les moteurs et la détection d'obstacles du robot.</p>
+                    </div>
+                    <span id="spotbot-service-badge" class="status-badge">Statut inconnu</span>
+                </div>
+                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                    <button id="btn-start-spotbot" class="btn btn-success" onclick="controlRobotService('start')" style="gap: 0.5rem;">
+                        ▶ Démarrer SpotBot
+                    </button>
+                    <button id="btn-stop-spotbot" class="btn btn-danger" onclick="controlRobotService('stop')" style="gap: 0.5rem;">
+                        ■ Arrêter SpotBot
+                    </button>
+                    <button id="btn-restart-spotbot" class="btn btn-secondary" onclick="controlRobotService('restart')" style="gap: 0.5rem;">
+                        🔄 Redémarrer
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 5: CHAT & CONTROL IA ─────────────────── -->
+        <div id="tab-chat-content" class="tab-content">
+            <div class="card-grid">
+                <!-- Live Conversation Box -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 450px;">
+                    <div class="card-title">
+                        <span>Discussion en Direct avec le LLM</span>
+                        <span class="status-badge active" id="llm-status-badge">Prêt</span>
+                    </div>
+                    <div id="chat-tab-messages" style="flex: 1; overflow-y: auto; padding: 1rem; background-color: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem; min-height: 250px; max-height: 300px;">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.85rem; padding: 2rem 0;">Aucun message échangé. Saisissez un texte ci-dessous pour démarrer.</div>
+                    </div>
+                    <form onsubmit="sendChatMessage(event)" style="display: flex; gap: 0.5rem;">
+                        <input type="text" id="chat-tab-input" class="form-input" aria-label="Message a Bastet" placeholder="Parlez à Bastet..." autocomplete="off"/>
+                        <button type="submit" class="btn btn-primary">Envoyer</button>
+                    </form>
+                </div>
+
+                <!-- AI Modules Control -->
+                <div class="card">
+                    <div class="card-title">Contrôle des Modules d'IA</div>
+                    <div style="display: flex; flex-direction: column; gap: 1.25rem; margin-top: 1rem;">
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Contrôle de la Parole (TTS)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="tts-ctrl-robot" onclick="setAIControl('tts', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="tts-ctrl-node" onclick="setAIControl('tts', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="tts-ctrl-off" onclick="setAIControl('tts', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Écoute Vocale (STT)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="stt-ctrl-robot" onclick="setAIControl('stt', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="stt-ctrl-node" onclick="setAIControl('stt', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="stt-ctrl-off" onclick="setAIControl('stt', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Moteur de Chat (LLM)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary" id="chat-ctrl-robot" onclick="setAIControl('chat', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary active-control" id="chat-ctrl-node" onclick="setAIControl('chat', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="chat-ctrl-off" onclick="setAIControl('chat', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Détection d'Objets (YOLO)</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="yolo-ctrl-robot" onclick="setAIControl('yolo', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="yolo-ctrl-node" onclick="setAIControl('yolo', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="yolo-ctrl-disabled" onclick="setAIControl('yolo', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-primary);">Reconnaissance Faciale</h4>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+                                <button class="btn btn-secondary active-control" id="face_rec-ctrl-robot" onclick="setAIControl('face_rec', 'robot')">Robot Local</button>
+                                <button class="btn btn-secondary" id="face_rec-ctrl-node" onclick="setAIControl('face_rec', 'node')">PC Node</button>
+                                <button class="btn btn-secondary" id="face_rec-ctrl-disabled" onclick="setAIControl('face_rec', 'disabled')">Désactivé</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- WebSocket debug live JSON traffic -->
+            <div class="card" style="margin-top: 1.5rem;">
+                <div class="card-title">
+                    <span>Console de Flux de Données WebSocket (Live JSON)</span>
+                    <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="clearJSONConsole()">Effacer</button>
+                </div>
+                <div id="json-traffic-console" style="height: 250px; overflow-y: auto; background-color: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; font-family: monospace; font-size: 0.8rem; padding: 1rem; color: var(--success); white-space: pre-wrap; margin-top: 1rem;">
+[Console démarrée - En attente de trafic WebSocket...]
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 6: ARDUINO & CALIBRATION ─────────────────── -->
+        <div id="tab-diagnostics-content" class="tab-content">
+            <div class="card-grid">
+                <!-- 12 Servomotor Angles -->
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+                        <div class="card-title" style="margin:0;">Angles en Direct des 12 Servomoteurs (Arduino Mega)</div>
+                        <div style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem;">
+                            <input type="checkbox" id="joint-manual-toggle" onchange="toggleManualJointControl(this.checked)" style="accent-color:var(--accent); cursor:pointer; width:16px; height:16px;"/>
+                            <label for="joint-manual-toggle" style="cursor:pointer; font-weight:600; color: var(--accent); user-select:none;">Activer le contrôle manuel (Mode Test)</label>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-top: 1.5rem;">
+                        <!-- FR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte FR (Avant Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad (Hanche)</span><span id="joint-val-0">90°</span></div>
+                                    <input type="range" id="joint-slider-0" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(0, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper (Cuisse)</span><span id="joint-val-1">90°</span></div>
+                                    <input type="range" id="joint-slider-1" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(1, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower (Tibia)</span><span id="joint-val-2">90°</span></div>
+                                    <input type="range" id="joint-slider-2" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(2, this.value)"/>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- FL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte FL (Avant Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad (Hanche)</span><span id="joint-val-3">90°</span></div>
+                                    <input type="range" id="joint-slider-3" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(3, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper (Cuisse)</span><span id="joint-val-4">90°</span></div>
+                                    <input type="range" id="joint-slider-4" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(4, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower (Tibia)</span><span id="joint-val-5">90°</span></div>
+                                    <input type="range" id="joint-slider-5" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(5, this.value)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte BR (Arrière Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad (Hanche)</span><span id="joint-val-6">90°</span></div>
+                                    <input type="range" id="joint-slider-6" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(6, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper (Cuisse)</span><span id="joint-val-7">90°</span></div>
+                                    <input type="range" id="joint-slider-7" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(7, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower (Tibia)</span><span id="joint-val-8">90°</span></div>
+                                    <input type="range" id="joint-slider-8" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(8, this.value)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem; margin-bottom: 0.75rem; color: var(--accent);">Patte BL (Arrière Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad (Hanche)</span><span id="joint-val-9">90°</span></div>
+                                    <input type="range" id="joint-slider-9" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(9, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper (Cuisse)</span><span id="joint-val-10">90°</span></div>
+                                    <input type="range" id="joint-slider-10" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(10, this.value)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower (Tibia)</span><span id="joint-val-11">90°</span></div>
+                                    <input type="range" id="joint-slider-11" min="0" max="180" value="90" disabled style="width:100%; margin:0.25rem 0; height:6px; accent-color:var(--accent); background:rgba(255,255,255,0.08); border-radius:3px; outline:none; border:none; cursor:not-allowed;" oninput="onJointSliderInput(11, this.value)"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- IMU Gyro -->
+                <div class="card">
+                    <div class="card-title">Gyroscope & Orientation IMU</div>
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height: 180px; position:relative;">
+                        
+                        <div id="imu-visual-cube" style="width: 80px; height: 80px; transform-style: preserve-3d; transition: transform 0.1s linear; transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);">
+                            <div class="spot-model">
+                                <!-- Main Chassis (Body) -->
+                                <div class="spot-box chassis" style="transform: translate3d(0, -5px, 0);">
+                                    <!-- Front -->
+                                    <div class="spot-face face-front" style="width: 32px; height: 18px; left: -16px; top: -9px; transform: translateZ(35px);"></div>
+                                    <!-- Back -->
+                                    <div class="spot-face face-back" style="width: 32px; height: 18px; left: -16px; top: -9px; transform: rotateY(180deg) translateZ(35px);"></div>
+                                    <!-- Left -->
+                                    <div class="spot-face face-left" style="width: 70px; height: 18px; left: -35px; top: -9px; transform: rotateY(-90deg) translateZ(16px);"></div>
+                                    <!-- Right -->
+                                    <div class="spot-face face-right" style="width: 70px; height: 18px; left: -35px; top: -9px; transform: rotateY(90deg) translateZ(16px);"></div>
+                                    <!-- Top -->
+                                    <div class="spot-face face-top" style="width: 32px; height: 70px; left: -16px; top: -35px; transform: rotateX(90deg) translateZ(9px);"></div>
+                                    <!-- Bottom -->
+                                    <div class="spot-face face-bottom" style="width: 32px; height: 70px; left: -16px; top: -35px; transform: rotateX(-90deg) translateZ(9px);"></div>
+                                </div>
+
+                                <!-- Head -->
+                                <div class="spot-box head" style="transform: translate3d(0, -18px, 38px);">
+                                    <div class="spot-face face-front" style="width: 20px; height: 12px; left: -10px; top: -6px; transform: translateZ(8px);"></div>
+                                    <div class="spot-face face-back" style="width: 20px; height: 12px; left: -10px; top: -6px; transform: rotateY(180deg) translateZ(8px);"></div>
+                                    <div class="spot-face face-left" style="width: 16px; height: 12px; left: -8px; top: -6px; transform: rotateY(-90deg) translateZ(10px);"></div>
+                                    <div class="spot-face face-right" style="width: 16px; height: 12px; left: -8px; top: -6px; transform: rotateY(90deg) translateZ(10px);"></div>
+                                    <div class="spot-face face-top" style="width: 20px; height: 16px; left: -10px; top: -8px; transform: rotateX(90deg) translateZ(6px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 20px; height: 16px; left: -10px; top: -8px; transform: rotateX(-90deg) translateZ(6px);"></div>
+                                </div>
+
+                                <!-- Leg Front Left -->
+                                <div class="spot-box thigh" style="transform: translate3d(-18px, 2px, 22px) rotateX(15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(-30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Leg Front Right -->
+                                <div class="spot-box thigh" style="transform: translate3d(18px, 2px, 22px) rotateX(15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(-30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Leg Back Left -->
+                                <div class="spot-box thigh" style="transform: translate3d(-18px, 2px, -22px) rotateX(-15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Leg Back Right -->
+                                <div class="spot-box thigh" style="transform: translate3d(18px, 2px, -22px) rotateX(-15deg);">
+                                    <div class="spot-face face-front" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: translateZ(5px);"></div>
+                                    <div class="spot-face face-back" style="width: 6px; height: 24px; left: -3px; top: -12px; transform: rotateY(180deg) translateZ(5px);"></div>
+                                    <div class="spot-face face-left" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(-90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-right" style="width: 10px; height: 24px; left: -5px; top: -12px; transform: rotateY(90deg) translateZ(3px);"></div>
+                                    <div class="spot-face face-top" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(90deg) translateZ(12px);"></div>
+                                    <div class="spot-face face-bottom" style="width: 6px; height: 10px; left: -3px; top: -5px; transform: rotateX(-90deg) translateZ(12px);"></div>
+                                    <!-- Shin -->
+                                    <div class="spot-box shin" style="transform: translate3d(0, 12px, 0) rotateX(30deg);">
+                                        <div class="spot-face face-front" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: translateZ(3px);"></div>
+                                        <div class="spot-face face-back" style="width: 4px; height: 24px; left: -2px; top: 0px; transform: rotateY(180deg) translateZ(3px);"></div>
+                                        <div class="spot-face face-left" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(-90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-right" style="width: 6px; height: 24px; left: -3px; top: 0px; transform: rotateY(90deg) translateZ(2px);"></div>
+                                        <div class="spot-face face-top" style="width: 4px; height: 6px; left: -2px; top: -3px; transform: rotateX(90deg) translateZ(0px);"></div>
+                                        <div class="spot-face face-bottom" style="width: 4px; height: 6px; left: -2px; top: 21px; transform: rotateX(-90deg) translateZ(0px);"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; text-align: center; margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                        <div><div style="font-size:0.75rem; color:var(--text-secondary);">Roulis</div><span id="imu-val-roll" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
+                        <div><div style="font-size:0.75rem; color:var(--text-secondary);">Tangage</div><span id="imu-val-pitch" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
+                        <div><div style="font-size:0.75rem; color:var(--text-secondary);">Lacet</div><span id="imu-val-yaw" style="font-weight:600; font-size:0.9rem;">0.0°</span></div>
+                    </div>
+                    <div style="margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: center;">
+                        <button class="btn btn-secondary" onclick="resetIMU()" style="gap: 0.5rem; font-size:0.8rem;">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21.5 2v6h-6"/><path d="M2.5 12a9 9 0 0 1 15.4-5.8L21.5 8M2.5 22v-6h6"/><path d="M21.5 12a9 9 0 0 1-15.4 5.8L2.5 16"/>
+                            </svg>
+                            Recalibrer l'IMU (BNO085)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ROS 2 Topics -->
+                <div class="card ros2-topics-card" style="display:flex; flex-direction:column; height: 365px; min-width: 0; overflow: hidden;">
+                    <div class="card-title">Flux de Topics ROS 2 Actifs</div>
+                    <div style="flex:1; overflow: auto; margin-top: 0.5rem; max-width: 100%; width: 100%;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.8rem; text-align: left; min-width: 450px;">
+                            <thead>
+                                <tr style="color: var(--text-secondary); border-bottom: 1px solid var(--border-color); font-weight: 600;">
+                                    <th style="padding: 0.4rem 0; white-space: nowrap;">Nom du Topic</th>
+                                    <th style="padding: 0.4rem 0; white-space: nowrap; padding-left: 0.5rem; padding-right: 0.5rem;">Type</th>
+                                    <th style="padding: 0.4rem 0; text-align: right; white-space: nowrap;">Hz</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ros2-topics-list">
+                                <tr><td colspan="3" style="text-align: center; padding: 2rem 0; color: var(--text-secondary);">Aucun topic actif reporté.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Calibration Section Overview -->
+            <div class="card" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                <div>
+                    <h3 class="font-outfit" style="font-size: 1.15rem; margin-bottom: 0.25rem;">Section Calibration & Configuration WiFi</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Ajuster les angles des moteurs, configurer le WiFi et observer la minimap.</p>
+                    <div id="calib-status-badge" style="font-size: 0.8rem; margin-top: 0.4rem; color: var(--text-secondary);">Chargement du statut des moteurs...</div>
+                </div>
+                <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" onclick="openWifiModal()">
+                        📶 Configuration WiFi
+                    </button>
+                    <button class="btn btn-secondary" style="border-color: var(--accent); color: var(--success); background: rgba(255, 111, 97, 0.1);" onclick="openEasyConfig()">
+                        ✨ Configuration Guidée (EasyConfig)
+                    </button>
+                    <button class="btn btn-primary" onclick="openCalibrationOverlay()">
+                        ⚙️ Ouvrir la Calibration
+                    </button>
+                    <button class="btn btn-secondary" style="border-color: var(--accent); color: var(--accent); background-color: rgba(99, 102, 241, 0.05);" onclick="openServoTester()">
+                        🔧 Test Individuel
+                    </button>
+                    <button class="btn btn-secondary" style="background-color: rgba(255, 255, 255, 0.05);" onclick="resetAndSendZeroOffsets()">
+                        🔄 Remettre à zéro les offsets
+                    </button>
+                    <button class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger); background-color: rgba(239, 68, 68, 0.05);" onclick="sendStopServos()">
+                        🚫 Désactiver servos
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB: TELECOMMANDE & NAVIGATION ─────────────────── -->
+        <div id="tab-control-content" class="tab-content">
+            <div class="card-grid" style="grid-template-columns: 1.6fr 1.1fr 1fr; gap: 1.5rem;">
+                
+                <!-- Localisation & Waypoint Canvas -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 550px; margin: 0;">
+                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Carte de Navigation Interactive</span>
+                        <div style="font-size:0.75rem; color:var(--text-secondary);">
+                            Cliquez sur la carte pour définir une destination (Objectif)
+                        </div>
+                    </div>
+                    <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: #07070a; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-top: 1rem; cursor: crosshair;">
+                        <canvas id="control-map-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                        
+                        <!-- Navigation overlay info -->
+                        <div id="nav-target-panel" style="position: absolute; bottom: 1rem; left: 1rem; right: 1rem; background: rgba(24,24,27,0.92); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;">
+                            <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                                <span style="font-size:0.7rem; color:var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Objectif Sélectionné</span>
+                                <span style="font-size:0.85rem; font-family: monospace; font-weight: bold; color: var(--accent);">X: <span id="nav-target-x">0.00</span> m, Y: <span id="nav-target-y">0.00</span> m</span>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.35rem 0.75rem;" onclick="clearNavGoal()">Annuler</button>
+                                <button class="btn btn-primary" style="font-size:0.75rem; padding: 0.35rem 1rem;" onclick="sendNavGoal()">🚀 Aller à ce point</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat & Contrôle Vocal LLM -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 550px; margin: 0;">
+                    <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Contrôle Vocal & IA</span>
+                        <span class="status-badge active" id="control-llm-badge" style="background-color: var(--success); color: var(--bg-main); font-weight: bold; font-size: 0.75rem;">Node</span>
+                    </div>
+                    
+                    <!-- Chat Messages Box -->
+                    <div id="control-chat-messages" style="flex: 1; overflow-y: auto; padding: 0.75rem; background-color: var(--bg-main); border: 1px solid var(--border-color); border-radius: 8px; margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 380px; min-height: 250px;">
+                        <div style="text-align: center; color: var(--text-secondary); font-size: 0.8rem; padding: 2rem 0;">
+                            Parlez à Bastet par texte ou par voix pour le piloter.
+                        </div>
+                    </div>
+                    
+                    <!-- Chat Input & Mic Box -->
+                    <div style="display: flex; gap: 0.5rem; margin-top: 1rem; align-items: center;">
+                        <button class="btn btn-secondary" id="control-mic-btn" onclick="toggleVoiceRecognition()" style="width: 42px; height: 42px; min-width: 42px; padding: 0; justify-content: center; border-radius: 50%; background: rgba(255,111,97,0.1); border: 1px solid rgba(255,111,97,0.3); color: var(--accent); transition: all 0.3s ease; position: relative;">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                                <line x1="12" y1="19" x2="12" y2="23"/>
+                                <line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                            <span id="mic-pulse" style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background: rgba(255,111,97,0.4); top: 0; left: 0; transform: scale(1); opacity: 0; transition: all 0.3s ease; pointer-events: none;"></span>
+                        </button>
+                        <form onsubmit="sendControlChatMessage(event)" style="display: flex; gap: 0.5rem; flex: 1;">
+                            <input type="text" id="control-chat-input" class="form-input" aria-label="Commande au robot" style="flex: 1; height: 42px;" placeholder="Dites au robot d'avancer..." autocomplete="off"/>
+                            <button type="submit" class="btn btn-primary" style="height: 42px; padding: 0 1rem;">Envoyer</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Manual controls column -->
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    
+                    <!-- Posture card -->
+                    <div class="card" style="margin:0;">
+                        <div class="card-title" style="font-size: 1rem;">Posture & Hauteur</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+                            <button class="btn btn-primary" onclick="sendControlCmd('stand')" style="justify-content: center; gap: 0.5rem; padding: 0.6rem 0.5rem; font-size: 0.8rem;">
+                                ⬆ Se Lever (Stand)
+                            </button>
+                            <button class="btn btn-secondary" onclick="sendControlCmd('sit')" style="justify-content: center; gap: 0.5rem; padding: 0.6rem 0.5rem; font-size: 0.8rem; background-color: rgba(255,255,255,0.05);">
+                                ⬇ S'Asseoir (Sit)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- D-Pad card -->
+                    <div class="card" style="margin:0; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <div class="card-title" style="font-size: 1rem; width: 100%; text-align: left; margin-bottom: 1.5rem;">Télécommande Moteur</div>
+                        
+                        <!-- Visual D-Pad Layout -->
+                        <div style="display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(3, 70px); gap: 0.75rem; margin: auto;">
+                            <div></div>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-up" onmousedown="startWalking('up')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+                            </button>
+                            <div></div>
+                            
+                            <button class="btn btn-secondary dpad-btn" id="dpad-left" onmousedown="startWalking('left')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                            </button>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-stop" onclick="sendControlStop()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/></svg>
+                            </button>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-right" onmousedown="startWalking('right')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                            </button>
+                            
+                            <div></div>
+                            <button class="btn btn-secondary dpad-btn" id="dpad-down" onmousedown="startWalking('down')" onmouseup="stopWalking()" onmouseleave="stopWalking()" style="width: 70px; height: 70px; justify-content: center; border-radius: 12px; padding: 0; background: var(--bg-card); border: 1px solid var(--border-color);">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div></div>
+                        </div>
+
+                        <!-- Keyboard guidance -->
+                        <div style="font-size:0.75rem; color:var(--text-secondary); text-align:center; margin-top: 1.5rem;">
+                            💡 Astuce : Utilisez les touches <b style="color:var(--text-primary);">Z / Q / S / D</b> ou les <b style="color:var(--text-primary);">flèches</b> de votre clavier lorsque l'onglet est actif.
+                        </div>
+                    </div>
+
+                    <!-- Speed card -->
+                    <div class="card" style="margin:0;">
+                        <div class="card-title" style="font-size: 1rem;">Facteur de Vitesse</div>
+                        <div style="margin-top: 1rem;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.5rem;">
+                                <span>Vitesse de déplacement</span>
+                                <span id="control-speed-val" style="font-weight: bold; color: var(--accent);">0.15 m/s</span>
+                            </div>
+                            <input type="range" min="5" max="30" value="15" class="form-input" style="padding:0; height:4px;" id="control-speed-slider" aria-label="Vitesse de deplacement" autocomplete="off" oninput="updateControlSpeed()"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─────────────────── TAB 7: SLAM & MAP ─────────────────── -->
+        <div id="tab-map-content" class="tab-content">
+            
+            <!-- SLAM Mode Indicator -->
+            <div id="slam-mode-bar" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; background: rgba(99,102,241,0.08); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 0.75rem;">
+                <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Mode SLAM :</span>
+                <span id="slam-mode-badge" style="font-weight: 700; font-size: 0.85rem; padding: 0.2rem 0.6rem; border-radius: 4px; background: rgba(99,102,241,0.15); color: var(--accent);">--</span>
+                <span id="slam-cameras-badge" style="font-size: 0.75rem; color: var(--text-secondary); margin-left: auto;"></span>
+            </div>
+            <!-- SLAM disabled overlay -->
+            <div id="slam-disabled-overlay" style="display: none; position: relative;">
+                <div class="card-grid" style="opacity: 0.3; pointer-events: none;"><div class="card-grid" style="grid-template-columns: 2.5fr 1fr;">
+                <!-- SLAM Visualizer -->
+                <div class="card" style="display: flex; flex-direction: column; min-height: 500px;">
+                    <div class="card-title">
+                        <span>Visualiseur SLAM & Nuage de Points</span>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetSLAMMap()">Réinitialiser Pose</button>
+                    </div>
+                    <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: #07070a; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-top: 1rem;">
+                        <canvas id="slam-map-canvas" style="width:100%; height:100%; display:block;"></canvas>
+                        <div style="position: absolute; top: 0.75rem; right: 0.75rem; background: rgba(24,24,27,0.85); padding: 0.5rem 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem; display:flex; flex-direction:column; gap:0.25rem; pointer-events:none;">
+                            <div style="display:flex; justify-content:space-between; gap:1rem;"><span style="color:var(--text-secondary);">Résolution :</span><span id="slam-res-label">0.05 m/px</span></div>
+                            <div style="display:flex; justify-content:space-between; gap:1rem;"><span style="color:var(--text-secondary);">Nuage de points :</span><span id="slam-cloud-count-label">0 pts</span></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- SLAM Options -->
+                <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                    <div class="card" style="margin: 0;">
+                        <div class="card-title" style="font-size: 1rem;">Calques d'Affichage</div>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem;">
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:16px; height:16px;" id="layer-grid" onchange="drawSLAMMap()"/>
+                                Grille d'occupation 2D
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:16px; height:16px;" id="layer-trajectory" onchange="drawSLAMMap()"/>
+                                Trajectoire du Robot (Path)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:16px; height:16px;" id="layer-points" onchange="drawSLAMMap()"/>
+                                Nuage de points laser
+                            </label>
+                            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; cursor:pointer;">
+                                <input type="checkbox" style="accent-color: var(--accent); width:16px; height:16px;" id="layer-sonar" onchange="drawSLAMMap()"/>
+                                Cônes Sonars & Obstacles
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="max-height: fit-content; padding: 0.75rem 1rem; margin: 0; flex:1;">
+                        <div class="card-title" style="font-size: 1rem;">Paramètres SLAM</div>
+                        <div style="display:flex; flex-direction:column; gap:1rem; margin-top: 1rem;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.25rem;">
+                                    <span>Résolution de la Carte</span>
+                                    <span id="param-val-resolution">0.05m</span>
+                                </div>
+                                <input type="range" min="1" max="20" value="5" class="form-input" style="padding:0; height:4px;" id="param-slider-resolution" aria-label="Resolution SLAM" autocomplete="off" oninput="updateSLAMParam('resolution')"/>
+                            </div>
+                            
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.25rem;">
+                                    <span>Rayon d'Évitement</span>
+                                    <span id="param-val-inflation">0.30m</span>
+                                </div>
+                                <input type="range" min="10" max="100" value="30" class="form-input" style="padding:0; height:4px;" id="param-slider-inflation" aria-label="Rayon inflation" autocomplete="off" oninput="updateSLAMParam('inflation')"/>
+                            </div>
+
+                            <div>
+                                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom: 0.25rem;">
+                                    <span>Seuil Détection Laser</span>
+                                    <span id="param-val-laser-threshold">85%</span>
+                                </div>
+                                <input type="range" min="50" max="100" value="85" class="form-input" style="padding:0; height:4px;" id="param-slider-laser-threshold" aria-label="Seuil laser" autocomplete="off" oninput="updateSLAMParam('laser-threshold')"/>
+                            </div>
+                            
+                            <button class="btn btn-primary" onclick="saveSLAMParameters()" style="width: 100%; margin-top: 0.5rem;">
+                                Appliquer Paramètres
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Console de Test V-SLAM -->
+                    <div class="card" style="margin: 1.5rem 0 0 0; display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="card-title" style="font-size: 1rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span>🔍 Console de Test V-SLAM</span>
+                            <span id="vslam-badge" class="status-badge" style="font-size:0.65rem; padding: 0.1rem 0.4rem;">Inactif</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                            Testez la localisation visuelle (ORB-SLAM3) en direct, même en portant le robot à la main.
+                        </div>
+                        
+                        <!-- Mini video stream area -->
+                        <div id="vslam-test-video-container" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative; aspect-ratio: 4/3; margin-bottom: 0.5rem;">
+                            <video id="vslam-test-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                            <div id="vslam-test-loader" style="position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.75rem;">
+                                <div style="width: 20px; height: 20px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                                <span>Initialisation flux WebRTC...</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Controls -->
+                        <button id="btn-vslam-test-toggle" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 0.85rem; padding: 0.5rem;" onclick="toggleVSlamTest()">
+                            🚀 Lancer le Test V-SLAM
+                        </button>
+                        
+                        <!-- Telemetry Stats -->
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem; font-size: 0.75rem; margin-top: 0.25rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">État du Tracking :</span>
+                                <span id="vslam-status-val" style="font-weight: bold; color: var(--text-secondary);">Non démarré</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Vitesse de Pose :</span>
+                                <span id="vslam-rate-val" style="font-weight: bold;">0.0 Hz</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: var(--text-secondary);">Qualité Environnement :</span>
+                                <span id="vslam-quality-val" style="font-weight: bold; color: var(--success);">Optimale</span>
+                            </div>
+                            <div id="vslam-warning-box" style="display: none; padding: 0.4rem; background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); border-radius: 4px; color: var(--danger); font-size: 0.7rem; line-height: 1.2;">
+                                ⚠️ Attention: Mouvements trop brusques ou luminosité faible détectée.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EasyConfig Overlay -->
+    
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+
+<script>
+        // Redundant inline code removed - loaded from /static/js/dashboard.js
+    </script>
+
+
+
+
+<!-- ===== MODAL OVERLAYS (moved outside tab-content to fix display:none trap) ===== -->
+<!-- Menu Test Servos Individuel Modal -->
+    <div id="servo-tester-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 500px; max-width: 95vw; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.3rem; color: var(--text-primary);">Test Moteur Individuel</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Activez et testez chaque servo un par un sans allumer le reste.</p>
+                </div>
+                <button class="btn btn-secondary" onclick="closeServoTester()">&times; Fermer</button>
+            </div>
+            
+            <div style="padding: 1.5rem; overflow-y: auto; max-height: 70vh; display: flex; flex-direction: column; gap: 1rem;">
+                <!-- General control -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Tous les moteurs :</span>
+                    <button class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger); font-size: 0.8rem; padding: 0.4rem 0.8rem; background-color: rgba(239, 68, 68, 0.05);" onclick="testerStopAll()">
+                        🚫 Tout éteindre (Limp)
+                    </button>
+                </div>
+
+                <!-- 12 Servos list -->
+                <div id="tester-servos-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Dynamically populated via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Full page Calibration Overlay -->
+    <div id="calibration-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 95vw; height: 95vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.5rem; color: var(--text-primary);">Console de Calibration Système</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Ajustez les offsets des moteurs, testez les caméras et observez la minimap.</p>
+                </div>
+                <button class="btn btn-secondary" onclick="closeCalibrationOverlay()">&times; Fermer la Console</button>
+            </div>
+            
+            <div style="flex: 1; display: grid; grid-template-columns: 1.5fr 1fr; overflow: hidden;">
+                <!-- Offsets sliders -->
+                <div style="padding: 1.5rem; overflow-y: auto; border-right: 1px solid var(--border-color);">
+                    <h3 class="font-outfit" style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Offsets des Angles Moteurs (-90° à +90°)</span>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetMotorCalibration()">Réinitialiser</button>
+                    </h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <!-- FR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">FR (Avant Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad Offset</span><span id="calib-val-0">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper Offset</span><span id="calib-val-1">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower Offset</span><span id="calib-val-2">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)"/>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- FL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">FL (Avant Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad Offset</span><span id="calib-val-3">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper Offset</span><span id="calib-val-4">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower Offset</span><span id="calib-val-5">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">BR (Arrière Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad Offset</span><span id="calib-val-6">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper Offset</span><span id="calib-val-7">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower Offset</span><span id="calib-val-8">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">BL (Arrière Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad Offset</span><span id="calib-val-9">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper Offset</span><span id="calib-val-10">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower Offset</span><span id="calib-val-11">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                        <button class="btn btn-primary" onclick="saveCalibrationOffsets()" style="flex:1;">
+                            💾 Sauvegarder & Transmettre les Offsets
+                        </button>
+                        <button class="btn btn-secondary" onclick="sendCalibrationOffsets()" style="flex:1;">
+                            ⚡ Tester Directement
+                        </button>
+                    </div>
+                    <div style="margin-top: 0.75rem; display: flex; gap: 1rem;">
+                        <button class="btn btn-secondary" onclick="resetAndSendZeroOffsets()" style="flex:1; border-color: #f59e0b; color: #f59e0b;">
+                            🔄 Remettre à zéro les offsets
+                        </button>
+                        <button class="btn btn-secondary" onclick="sendStopServos()" style="flex:1; border-color: #ef4444; color: #ef4444;">
+                            🚫 Désactiver servos
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Camera and Minimap -->
+                <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto;">
+                    <div class="card" style="margin: 0; background-color: rgba(255,255,255,0.01);">
+                        <div class="card-title" style="font-size:0.95rem;">Configuration des Caméras</div>
+                        
+                        <!-- Mapping Selection -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+                            <div>
+                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
+                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="saveCameraPortsMapping()">
+                                    <option value="/dev/video0">/dev/video0</option>
+                                    <option value="/dev/video1">/dev/video1</option>
+                                    <option value="/dev/video2">/dev/video2</option>
+                                    <option value="/dev/video3">/dev/video3</option>
+                                    <option value="/dev/video4">/dev/video4</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Droite</label>
+                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="saveCameraPortsMapping()">
+                                    <option value="/dev/video0">/dev/video0</option>
+                                    <option value="/dev/video1">/dev/video1</option>
+                                    <option value="/dev/video2">/dev/video2</option>
+                                    <option value="/dev/video3">/dev/video3</option>
+                                    <option value="/dev/video4">/dev/video4</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.75rem;">
+                            <div id="calib-cam-container-1" style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
+                                    <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
+                                        <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(1)">📷 Calibrer</button>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.05);" onclick="openCameraConfigModal(1)">👁️ Voir</button>
+                                    </div>
+                                </div>
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
+                            </div>
+                            
+                            <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                                <div>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Droite</span>
+                                    <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
+                                        <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(2)">📷 Calibrer</button>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.05);" onclick="openCameraConfigModal(2)">👁️ Voir</button>
+                                    </div>
+                                </div>
+                                <input type="checkbox" style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-2" onchange="toggleCalibCamera(2)"/>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin: 0; flex: 1; display: flex; flex-direction: column; background-color: rgba(255,255,255,0.01); min-height: 280px;">
+                        <div class="card-title" style="font-size:0.95rem;">Minimap de Localisation (Position XY)</div>
+                        <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-main); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <canvas id="minimap-canvas" style="width:100%; height:100%; min-height:200px; display:block;"></canvas>
+                            <div style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.7); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                Pose: <span id="minimap-pose-text">x: 0.00, y: 0.00, θ: 0°</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- Modal : Ajouter / Éditer un utilisateur -->
+    <div id="userModal" class="modal-overlay" onclick="closeUserModalOnClick(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-user-title" class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">Ajouter un Compte</h3>
+                <button class="modal-close" onclick="closeUserModal()">&times;</button>
+            </div>
+            <form onsubmit="handleUserSubmit(event)">
+                <input type="hidden" id="form-old-fullname" aria-label="Ancien nom complet"/>
+                <div class="form-row-layout">
+                    <div class="form-group">
+                        <label class="form-label" for="form-firstname">Prénom</label>
+                        <input type="text" id="form-firstname" class="form-input" required/>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="form-lastname">Nom</label>
+                        <input type="text" id="form-lastname" class="form-input" required/>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-pseudo">Pseudo</label>
+                    <input type="text" id="form-pseudo" class="form-input" required/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-email">Adresse E-mail</label>
+                    <input type="email" id="form-email" class="form-input" required/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-phone">Téléphone</label>
+                    <input type="tel" id="form-phone" class="form-input" placeholder="06..." autocomplete="tel"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-password">Mot de passe (Laisser vide pour ne pas modifier)</label>
+                    <input type="password" id="form-password" class="form-input" autocomplete="new-password"/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-preferences">Configuration / Préférences (JSON)</label>
+                    <textarea id="form-preferences" class="form-input" rows="3" placeholder='{"unit": "metric"}' style="font-family: monospace; font-size: 0.85rem; resize: vertical;"></textarea>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="form-is-admin" style="accent-color: var(--accent); width: 16px; height: 16px;"/>
+                    <label for="form-is-admin" style="font-size: 0.85rem; cursor: pointer; font-weight: 500;">Définir comme Administrateur</label>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 1.5rem;">Sauvegarder l'utilisateur</button>
+            </form>
+        </div>
+    </div>
+
+<!-- Modal : Identifiants MyGES -->
+    <div id="mygesModal" class="modal-overlay" onclick="closeMygesModalOnClick(event)">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">Identifiants MyGES — <span id="myges-modal-username">User</span></h3>
+                <button class="modal-close" onclick="closeMygesModal()">&times;</button>
+            </div>
+            <form onsubmit="handleMygesSubmit(event)">
+                <input type="hidden" id="form-myges-name"/>
+                <div class="form-group">
+                    <label class="form-label" for="form-myges-username">Nom d'utilisateur MyGES</label>
+                    <input type="text" id="form-myges-username" class="form-input" placeholder="nom.prenom" required/>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="form-myges-password">Mot de passe MyGES</label>
+                    <input type="password" id="form-myges-password" class="form-input" placeholder="••••••••" required autocomplete="current-password"/>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 1.5rem;">Enregistrer les identifiants</button>
+            </form>
+        </div>
+    </div>
+
+<!-- Modal : WiFi -->
+    <div id="wifiModal" class="modal-overlay" onclick="closeWifiModalOnClick(event)">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">Réseaux WiFi aux Alentours</h3>
+                <button class="modal-close" onclick="closeWifiModal()">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.85rem; color:var(--text-secondary);">Sélectionnez un réseau à configurer sur le robot.</span>
+                <button class="btn btn-secondary" onclick="scanWifiNetworks()" id="btn-wifi-scan">
+                    🔄 Rafraîchir
+                </button>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom: 1.25rem;">
+                <h4 style="font-size:0.8rem; font-weight:600; color:var(--accent);">Réseaux WiFi Enregistrés (Connus)</h4>
+                <div id="wifi-known-container" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-main); padding: 0.5rem;">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">Aucun réseau enregistré configuré.</div>
+                </div>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom: 1.5rem;">
+                <h4 style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">Réseaux à Proximité Scannés</h4>
+                <div id="wifi-list-container" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-main); padding: 0.5rem;">
+                    <div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.8rem;">Aucun réseau scanné. Cliquez sur Rafraîchir.</div>
+                </div>
+            </div>
+            
+            <form id="wifi-connect-form" onsubmit="handleWifiConnectSubmit(event)" style="display: none; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <input type="hidden" id="form-wifi-ssid"/>
+                <div class="form-group">
+                    <label class="form-label" style="font-weight: 600;">Se connecter à : <span id="wifi-selected-ssid-label" style="color:var(--accent);">SSID</span></label>
+                </div>
+                <div class="form-group" id="wifi-password-group">
+                    <label class="form-label" for="form-wifi-password">Mot de passe du réseau</label>
+                    <input type="password" id="form-wifi-password" class="form-input" placeholder="••••••••" autocomplete="current-password"/>
+                </div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button type="submit" class="btn btn-primary" style="flex:1;">Se connecter au WiFi</button>
+                    <button type="button" class="btn btn-secondary" id="btn-wifi-forget-form" style="border-color: var(--danger); color: var(--danger); background: transparent; display: none;" onclick="handleForgetFromForm()">🗑️ Oublier</button>
+                    <button type="button" class="btn btn-secondary" onclick="cancelWifiConnection()">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+<!-- Modal : Camera Calibration -->
+    <div id="cameraCalibModal" class="modal-overlay" onclick="closeCameraCalibModalOnClick(event)">
+        <div class="modal-content" style="max-width: 650px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;" id="mcc-modal-title">Calibration Caméra</h3>
+                <button class="modal-close" onclick="closeCameraCalibModal()">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1rem;">
+                <p style="font-size:0.85rem; color:var(--text-secondary);">Placez la feuille de calibration (damier noir et blanc) bien à plat devant la caméra.</p>
+            </div>
+            
+            <!-- Video Container -->
+            <div style="width: 100%; height: 320px; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-main); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 1.25rem;">
+                <video id="mcc-cam-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                
+                <div id="mcc-cam-hud" style="position: absolute; top:0; left:0; width:100%; height:100%; border: 2px dashed rgba(99, 102, 241, 0.4); box-sizing: border-box; display:none; pointer-events:none;">
+                    <div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); color:rgba(99, 102, 241, 0.6); font-family:monospace; font-size:0.75rem; border:1px solid rgba(99,102,241,0.6); padding:0.25rem 0.5rem; background:rgba(0,0,0,0.5);">MIRE DE CALIBRATION EN COURS D'ANALYSE</div>
+                </div>
+                
+                <div id="mcc-cam-status-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(9,9,11,0.85); padding:1rem; text-align:center;">
+                    <div id="mcc-cam-status-text" style="color: var(--text-primary); font-size: 0.85rem;">
+                        <span>Cliquez sur Lancer pour vous connecter à la caméra.</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display:flex; gap:0.5rem;">
+                <button id="btn-mcc-run-calib" class="btn btn-primary" style="flex:2;" onclick="runIndividualCameraCalib()">
+                    📷 Lancer la Caméra
+                </button>
+                <button class="btn btn-secondary" style="flex:1;" onclick="closeCameraCalibModal()">
+                    Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+
+<!-- Modal : Camera Config View -->
+    <div id="cameraConfigModal" class="modal-overlay" onclick="closeCameraConfigModalOnClick(event)">
+        <div class="modal-content" style="max-width: 600px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;" id="mcv-modal-title">Configuration Caméra</h3>
+                <button class="modal-close" onclick="closeCameraConfigModal()">&times;</button>
+            </div>
+            
+            <div style="margin-bottom: 1.25rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; padding-bottom:0.75rem; border-bottom:1px solid var(--border-color);">
+                    <div>
+                        <span style="font-size:0.8rem; color:var(--text-secondary);">Statut du Profil</span>
+                        <div id="mcv-profile-badge" class="status-badge" style="margin-top:0.25rem; padding: 0.25rem 0.5rem; font-size: 0.75rem;">Default</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="font-size:0.8rem; color:var(--text-secondary);">Résolution</span>
+                        <div id="mcv-resolution" style="font-weight:600; font-size:0.9rem; margin-top:0.25rem; color:var(--text-primary);">640 x 480</div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-size:0.8rem; margin-bottom:0.25rem; color:var(--text-secondary);">Nom du modèle</label>
+                    <input type="text" id="mcv-camera-name" class="form-input" style="background-color:rgba(0,0,0,0.2); font-size:0.85rem;" readonly />
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size:0.8rem; margin-bottom:0.25rem; color:var(--text-secondary);">Modèle de Distorsion</label>
+                        <input type="text" id="mcv-distortion-model" class="form-input" style="background-color:rgba(0,0,0,0.2); font-size:0.85rem;" readonly />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size:0.8rem; margin-bottom:0.25rem; color:var(--text-secondary);">Dernière Calibration</label>
+                        <input type="text" id="mcv-calibrated-at" class="form-input" style="background-color:rgba(0,0,0,0.2); font-size:0.85rem;" readonly />
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-size:0.8rem; margin-bottom:0.25rem; color:var(--text-secondary);">Matrice de Distorsion D (Coefficients)</label>
+                    <div id="mcv-distortion-matrix" style="font-family:monospace; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); border-radius:6px; padding:0.5rem; font-size:0.75rem; color:var(--text-primary); text-align:center;">
+                        [0.00000, 0.00000, 0.00000, 0.00000, 0.00000]
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size:0.8rem; margin-bottom:0.25rem; color:var(--text-secondary);">Matrice Intrinsèque K (3x3)</label>
+                        <div id="mcv-camera-matrix" style="font-family:monospace; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); border-radius:6px; padding:0.5rem; font-size:0.75rem; color:var(--text-primary); line-height:1.4;">
+                            1.0, 0.0, 0.0<br/>
+                            0.0, 1.0, 0.0<br/>
+                            0.0, 0.0, 1.0
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size:0.8rem; margin-bottom:0.25rem; color:var(--text-secondary);">Matrice de Projection P (3x4)</label>
+                        <div id="mcv-projection-matrix" style="font-family:monospace; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); border-radius:6px; padding:0.5rem; font-size:0.75rem; color:var(--text-primary); line-height:1.4;">
+                            1.0, 0.0, 0.0, 0.0<br/>
+                            0.0, 1.0, 0.0, 0.0<br/>
+                            0.0, 0.0, 1.0, 0.0
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display:flex; justify-content:flex-end;">
+                <button class="btn btn-secondary" onclick="closeCameraConfigModal()">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+<!-- Screen lightbox overlay -->
+    <div id="lightbox" class="modal-overlay" onclick="closeLightbox()" style="background-color: rgba(0,0,0,0.95); cursor: zoom-out;">
+        <img id="lightbox-img" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);"/>
+    </div>
+
+
+
+<div id="easyconfig-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 800px; max-width: 95vw; max-height: 90vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <!-- Header -->
+            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.3rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>✨ Assistant de Configuration Guidée</span>
+                        <span style="font-size: 0.75rem; background: var(--accent); color: white; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: normal;">EasyConfig</span>
+                    </h2>
+                </div>
+                <button class="modal-close" style="position: static;" onclick="closeEasyConfig()">&times;</button>
+            </div>
+            
+            <!-- Steps Indicator -->
+            <div style="display: flex; background: var(--bg-main); border-bottom: 1px solid var(--border-color); padding: 0.75rem 1.5rem; justify-content: space-between; font-size: 0.8rem;">
+                <div id="step-dot-1" onclick="ecGoToStep(1)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--accent); font-weight: 600;">
+                    <span style="width:20px; height:20px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem;">1</span>
+                    <span>Offsets Moteurs</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-lr" onclick="ecGoToStep(2)" style="display:none; cursor:pointer; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
+                    <span>Attribution G/D</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-2" onclick="ecGoToStep(2)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
+                    <span>Caméra Gauche</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-3" onclick="ecGoToStep(3)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">3</span>
+                    <span>Caméra Droite</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-stereo" onclick="ecGoToStep(5)" style="display:none; cursor:pointer; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">5</span>
+                    <span>Stereo</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-4" onclick="ecGoToStep(4)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">4</span>
+                    <span>Finalisation</span>
+                </div>
+            </div>
+            
+            <!-- Content Area -->
+            <div style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; min-height: 350px;">
+                
+                <!-- STEP 1 CONTENT -->
+                <div id="ec-step-1" style="display: none; flex-direction: column; gap: 1.5rem; padding: 1.5rem; flex: 1;">
+        <!-- ===== Joint Calibration Wizard View ===== -->
+        <div id="ec-joint-calibration-view" style="display: flex; flex-direction: column; gap: 1.5rem; flex: 1;">
+            <!-- Leg banner -->
+            <div id="ec-joint-leg-banner" style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05)); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 600; color: var(--accent); text-align: center;">
+                Patte <span id="ec-joint-leg-name">Arrière Gauche</span>
+            </div>
+            
+            <!-- Joint name and progress -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="ec-joint-name" style="margin: 0; font-size: 1.4rem;">Hanche</h3>
+                <span id="ec-joint-progress" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 0.35rem 0.85rem; border-radius: 20px; border: 1px solid var(--border-color);">Articulation 1/12</span>
+            </div>
+            
+            <!-- Instruction text -->
+            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
+                1. Cliquez sur <strong>"Allumer le servo"</strong> pour activer l'articulation<br>
+                2. Utilisez le curseur pour positionner l'articulation à sa <strong>position neutre</strong><br>
+                3. Cliquez sur <strong>"Valider"</strong> pour enregistrer l'offset et passer à la suivante
+            </p>
+            
+            <!-- Joint visualization & slider area -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Servo icon -->
+                <div style="text-align: center; font-size: 3rem; opacity: 0.6;" id="ec-joint-icon">🦵</div>
+                
+                <!-- Slider -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-30</span>
+                    <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" aria-label="Angle du joint" autocomplete="off" 
+                           oninput="ecUpdateJointSlider(this.value)" 
+                           style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+30</span>
+                </div>
+                
+                <!-- Value display -->
+                <div style="text-align: center;">
+                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
+                    <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
+                </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 1rem; justify-content: center; align-items: center;">
+                <button id="ec-btn-attach-servo" class="btn btn-secondary" onclick="ecAttachCurrentJoint()" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    🔌 Allumer le servo
+                </button>
+                <button id="ec-btn-validate-joint" class="btn btn-primary" onclick="ecValidateJoint()" disabled style="gap: 0.5rem; padding: 0.75rem 1.5rem; opacity: 0.5;">
+                    ✅ Valider cet offset
+                </button>
+            </div>
+        </div>
+        
+        <!-- ===== Final View (all 12 joints done) ===== -->
+        <div id="ec-joint-final-view" style="display: none; flex-direction: column; gap: 1.5rem; align-items: center; justify-content: center; flex: 1; padding: 2rem;">
+            <div style="font-size: 4rem; line-height: 1;">✅</div>
+            <h3 style="margin: 0; font-size: 1.3rem;">Offset de toutes les articulations définis !</h3>
+            <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">
+                12 offsets collectés. Vous pouvez maintenant enregistrer la configuration pour activer les moteurs ou garder le robot éteint.
+            </p>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                <button class="btn btn-primary" onclick="ecCalculateOffsets(true)" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    ⚡ Enregistrer & Activer les Moteurs
+                </button>
+                <button class="btn btn-secondary" onclick="ecCalculateOffsets(false)" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    💾 Enregistrer Uniquement (Garder Éteint)
+                </button>
+            </div>
+        </div>
+        
+        <!-- Success animation (kept for compatibility) -->
+        <div id="ec-motor-success-anim" style="display: none;">
+                
+                <!-- STEP LR: Attribution Gauche/Droite (2 cameras only) -->
+                <div id="ec-step-lr" style="display: none; flex-direction: column; gap: 1.5rem; height: 100%; padding: 1.5rem;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1.1rem; margin-bottom:0.5rem;">Attribution des Cameras : Gauche / Droite</p>
+                        <p style="color: var(--text-secondary);">Deux cameras sont detectees. Regardez les flux ci-dessous et indiquez laquelle est la <strong>gauche</strong> et laquelle est la <strong>droite</strong>.</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Camera A preview -->
+                        <div style="border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; background: #000; position: relative; display: flex; flex-direction: column;">
+                            <div style="padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 1px solid var(--border-color);">
+                                Camera A
+                            </div>
+                            <div style="flex: 1; position: relative; min-height: 150px;">
+                                <video id="ec-lr-video-a" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <div id="ec-lr-status-a" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Chargement...
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; padding: 0.5rem;">
+                                <button class="btn btn-primary" onclick="ecAssignLR('left', 'a')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a GAUCHE
+                                </button>
+                                <button class="btn btn-secondary" onclick="ecAssignLR('right', 'a')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a DROITE
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Camera B preview -->
+                        <div style="border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; background: #000; position: relative; display: flex; flex-direction: column;">
+                            <div style="padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 1px solid var(--border-color);">
+                                Camera B
+                            </div>
+                            <div style="flex: 1; position: relative; min-height: 150px;">
+                                <video id="ec-lr-video-b" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <div id="ec-lr-status-b" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Chargement...
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; padding: 0.5rem;">
+                                <button class="btn btn-primary" onclick="ecAssignLR('left', 'b')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a GAUCHE
+                                </button>
+                                <button class="btn btn-secondary" onclick="ecAssignLR('right', 'b')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a DROITE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="ec-lr-assignment-result" style="display: none; text-align: center; padding: 0.75rem; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px;">
+                        <span style="color: var(--success); font-weight: 600;" id="ec-lr-result-text"></span>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: center; gap: 1rem; padding-top: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="ecSkipLR()" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
+                            Passer (garder defaut : video0=gauche, video2=droite)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2 CONTENT (CAMERA GAUCHE) -->
+                <div id="ec-step-2" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 2 : Alignement & Calibration Caméra Gauche (1)</p>
+                        Placez la feuille de calibration (damier noir et blanc) bien à plat devant la caméra gauche.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Live stream frame -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative;">
+                            <video id="ec-cam-video-1" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            
+                            <!-- Scanner HUD Overlay -->
+                            <div id="ec-cam-hud-1" style="display: none; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--accent); animation: pulse 2s infinite;">
+                                <div style="position: absolute; top: 10%; left: 10%; right: 10%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: scanLine 2s linear infinite;"></div>
+                                <div style="position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.65rem; color: var(--accent); background: rgba(0,0,0,0.8); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                    MIRE DE CALIBRATION EN COURS D'ANALYSE
+                                </div>
+                            </div>
+                            
+                            <!-- Initial state / loader / Success / Failure overlay -->
+                            <div id="ec-cam-status-overlay-1" style="position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                <span id="ec-cam-status-text-1" style="color: var(--text-secondary);">Le flux vidéo de la caméra s'affiche dès le lancement.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Calibration details and buttons -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+                            <button id="btn-ec-run-calib-1" class="btn btn-primary" onclick="ecRunCameraCalib(1)" style="width:100%; justify-content:center;">
+                                📷 Lancer la Calibration Cam1
+                            </button>
+                            <button id="btn-ec-skip-1" class="btn btn-secondary" onclick="ecNextStep(3)" style="width:100%; justify-content:center;">
+                                Passer cette étape (Conserver l'ancienne)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 3 CONTENT (CAMERA DROITE) -->
+                <div id="ec-step-3" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 3 : Alignement & Calibration Caméra Droite (2)</p>
+                        Placez la feuille de calibration devant la caméra droite.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Live stream frame -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative;">
+                            <video id="ec-cam-video-2" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            
+                            <!-- Scanner HUD Overlay -->
+                            <div id="ec-cam-hud-2" style="display: none; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--accent); animation: pulse 2s infinite;">
+                                <div style="position: absolute; top: 10%; left: 10%; right: 10%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: scanLine 2s linear infinite;"></div>
+                                <div style="position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.65rem; color: var(--accent); background: rgba(0,0,0,0.8); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                    MIRE DE CALIBRATION EN COURS D'ANALYSE
+                                </div>
+                            </div>
+                            
+                            <!-- Initial state / loader / Success / Failure overlay -->
+                            <div id="ec-cam-status-overlay-2" style="position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                <span id="ec-cam-status-text-2" style="color: var(--text-secondary);">Le flux vidéo de la caméra s'affiche dès le lancement.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Calibration details and buttons -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+                            <button id="btn-ec-run-calib-2" class="btn btn-primary" onclick="ecRunCameraCalib(2)" style="width:100%; justify-content:center;">
+                                📷 Lancer la Calibration Cam2
+                            </button>
+                            <button id="btn-ec-skip-2" class="btn btn-secondary" onclick="ecNextStep(4)" style="width:100%; justify-content:center;">
+                                Passer cette étape
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4 CONTENT (FINALISATION) -->
+                <div id="ec-step-4" style="display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1.5rem; height: 100%; padding: 2rem 0;">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(72, 209, 204, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--success); animation: scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                        ✓
+                    </div>
+                    <div>
+                        <h3 class="font-outfit" style="font-size: 1.4rem; color: var(--text-primary); margin-bottom: 0.5rem;">Configuration Guidée Réussie !</h3>
+                        <p style="color: var(--text-secondary); max-width: 500px; line-height: 1.5; font-size: 0.9rem;">
+                            Tous les offsets des moteurs et les réglages des caméras ont été enregistrés avec succès. Le robot Bastet est parfaitement initialisé et prêt à démarrer.
+                        </p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; width: 100%; max-width: 500px; margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="ecStartRobotAndClose()" style="flex: 1; justify-content: center; padding: 0.75rem;">
+                            🚀 Démarrer & Allumer le Robot
+                        </button>
+                        <button class="btn btn-secondary" onclick="closeEasyConfig()" style="flex: 1; justify-content: center; padding: 0.75rem;">
+                            Fermer l'Assistant
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-main);">
+                <button id="ec-btn-prev" class="btn btn-secondary" disabled onclick="ecPrevStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    ← Précédent
+                </button>
+                <span id="ec-progress-text" style="font-size:0.75rem; color: var(--text-secondary);">Étape 1 sur 4</span>
+                <button id="ec-btn-next" class="btn btn-primary" disabled onclick="ecNextStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    Suivant →
+                </button>
+            </div>
+        </div>
+</body>
+</html>
