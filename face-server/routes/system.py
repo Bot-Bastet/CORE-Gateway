@@ -31,7 +31,7 @@ def health():
 # ─── Core State ────────────────────────────────────────────────────────────
 
 @router.post("/core/state", summary="Mettre à jour l'état du robot", dependencies=[Depends(verify_token)])
-def update_state(state: CoreState):
+async def update_state(state: CoreState):
     import config
     data = state.model_dump()
     now = time.time()
@@ -54,6 +54,13 @@ def update_state(state: CoreState):
         save_json(STATE_FILE, data)
     except Exception as e:
         print(f"[Gateway] STATE_FILE save error: {e}")
+
+    # Broadcast state to all connected app clients so the dashboard
+    # shows 🟢 En ligne in real-time instead of stale "Hors ligne".
+    await manager.broadcast(json.dumps({
+        "type": "state",
+        "payload": data
+    }), "app")
 
     if int(now) % 10 == 0:
         print(f"[Gateway] State: robot_status={data.get('robot_status','?')} temp_c={data.get('sensors',{}).get('temp_c','?')}")
@@ -86,6 +93,24 @@ def get_state():
 def get_gateway_telemetry():
     return gateway_telemetry
 
+
+# ─── Stream Quality Config ───────────────────────────────────────────────────
+
+STREAM_CONFIG_FILE = DATA_DIR / "stream_config.json"
+DEFAULT_STREAM_CONFIG = {
+    "cam1": {"stream_res": "1280x720", "stream_fps": 20, "vslam_res": "640x480", "codec": "auto"},
+    "cam2": {"stream_res": "1280x720", "stream_fps": 20, "vslam_res": "640x480", "codec": "auto"},
+}
+
+@router.get("/core/stream/config", summary="Récupérer la config qualité stream", dependencies=[Depends(verify_token)])
+def get_stream_config():
+    return load_json(STREAM_CONFIG_FILE, default=DEFAULT_STREAM_CONFIG)
+
+@router.post("/core/stream/config", summary="Sauvegarder la config qualité stream", dependencies=[Depends(verify_token)])
+async def save_stream_config(data: dict):
+    save_json(STREAM_CONFIG_FILE, data)
+    await manager.broadcast(json.dumps({"type": "stream_quality_config", "config": data}), "robot")
+    return {"status": "saved"}
 
 # ─── Diagnostics ───────────────────────────────────────────────────────────
 
@@ -140,6 +165,25 @@ def get_myges():
     if not data:
         raise HTTPException(status_code=404, detail="No credentials stored")
     return data
+
+
+@router.post("/myges/test", summary="Tester les identifiants MyGES", dependencies=[Depends(verify_token)])
+def test_myges(creds: MyGESCredentials):
+    """Teste si les identifiants MyGES sont valides en tentant de récupérer l'agenda."""
+    try:
+        api = MyGesAPI(creds.username, creds.password)
+        if not api.token:
+            return {"status": "error", "message": "Authentification échouée — identifiants invalides."}
+        agenda = api.get_upcoming_agenda_text(days=7)
+        # Count courses
+        courses_count = agenda.count("- De") if "- De" in agenda else 0
+        return {
+            "status": "success",
+            "message": f"Connexion réussie ! {courses_count} cours trouvés pour les 7 prochains jours.",
+            "agenda_preview": agenda[:500]
+        }
+    except Exception as e:
+        return {"status": "error", "message": f"Erreur: {str(e)}"}
 
 
 # ─── Version Helpers ───────────────────────────────────────────────────────

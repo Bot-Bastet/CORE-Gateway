@@ -103,16 +103,51 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
                     stream_v_slam[cam_id] = v_slam
                     if not stream_active[cam_id] or v_slam_changed:
                         stream_active[cam_id] = True
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
+                        # V-SLAM gatekeeping: check calibration status before sending to robot
+                        if v_slam:
+                            cal_status = latest_diagnostics.get("sensors", {}).get("calibration_status", {})
+                            cam_cal = cal_status.get(str(cam_id), cal_status.get(cam_id, {}))
+                            if cam_cal and not cam_cal.get("calibrated", False):
+                                await websocket.send_json({
+                                    "type": "vslam_blocked",
+                                    "camera": cam_id,
+                                    "reason": "Calibration requise avant V-SLAM."
+                                })
+                                stream_active[cam_id] = False
+                            else:
+                                await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
+                                await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
+                        else:
+                            await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
+                            await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
                         await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
                 elif msg_type == "release_camera":
                     cam_id = msg_json.get("camera", 1)
+                    # Idempotent : si deja arrete explicitement par stop_camera, no-op
+                    # (evite aussi un delayed-stop redondant quand toggleStream envoie stop_camera + release_camera).
+                    if not stream_active[cam_id]:
+                        continue
                     if websocket in active_camera_listeners[cam_id]:
                         active_camera_listeners[cam_id].remove(websocket)
                         if len(active_camera_listeners[cam_id]) == 0:
                             if camera_stop_timers[cam_id] is not None:
                                 camera_stop_timers[cam_id].cancel()
                             camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id, manager))
+                elif msg_type == "stop_camera":
+                    # FIX: Bouton "Couper Camera" doit couper IMMEDIATEMENT cote robot.
+                    # Idempotent : stream_active[cam_id] False = deja arrete, no-op
+                    # (le robot re-diffuse via catch-all -> echoes casses par ce garde).
+                    # stream_keep_alive ignore ici : fermeture explicite prime.
+                    cam_id = msg_json.get("camera", 1)
+                    if not stream_active[cam_id]:
+                        continue
+                    if camera_stop_timers[cam_id] is not None:
+                        camera_stop_timers[cam_id].cancel()
+                        camera_stop_timers[cam_id] = None
+                    stream_active[cam_id] = False
+                    await manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot")
+                    await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": False}), "app")
+                    continue
                 elif msg_type == "toggle_keep_stream":
                     cam_id = msg_json.get("camera", 1)
                     keep = msg_json.get("keep", False)
@@ -131,6 +166,10 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
                             from config import stop_camera_delayed
                             camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id, manager))
                     await manager.broadcast(json.dumps({"type": "keep_stream_status", "camera": cam_id, "keep": keep}), "app")
+                elif msg_type == "camera_resolutions":
+                    await manager.broadcast(data, "app")
+                elif msg_type == "vslam_blocked":
+                    await manager.broadcast(data, "app")
             except Exception:
                 pass
 
@@ -175,12 +214,31 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
                 elif msg_type == "release_camera":
                     cam_id = msg_json.get("camera", 1)
+                    # Idempotent : si deja arrete explicitement par stop_camera, no-op
+                    # (evite aussi un delayed-stop redondant quand toggleStream envoie stop_camera + release_camera).
+                    if not stream_active[cam_id]:
+                        continue
                     if websocket in active_camera_listeners[cam_id]:
                         active_camera_listeners[cam_id].remove(websocket)
                         if len(active_camera_listeners[cam_id]) == 0:
                             if camera_stop_timers[cam_id] is not None:
                                 camera_stop_timers[cam_id].cancel()
                             camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id, manager))
+                elif msg_type == "stop_camera":
+                    # FIX: Bouton "Couper Camera" doit couper IMMEDIATEMENT cote robot.
+                    # Idempotent : stream_active[cam_id] False = deja arrete, no-op
+                    # (le robot re-diffuse via catch-all -> echoes casses par ce garde).
+                    # stream_keep_alive ignore ici : fermeture explicite prime.
+                    cam_id = msg_json.get("camera", 1)
+                    if not stream_active[cam_id]:
+                        continue
+                    if camera_stop_timers[cam_id] is not None:
+                        camera_stop_timers[cam_id].cancel()
+                        camera_stop_timers[cam_id] = None
+                    stream_active[cam_id] = False
+                    await manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot")
+                    await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": False}), "app")
+                    continue
                 elif msg_type == "toggle_keep_stream":
                     cam_id = msg_json.get("camera", 1)
                     keep = msg_json.get("keep", False)
@@ -211,6 +269,8 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         msg_json["target"] = active_target
                         data = json.dumps(msg_json)
                 elif msg_type == "arduino_cmd":
+                    await manager.broadcast(data, "robot")
+                elif msg_type == "query_camera_resolutions":
                     await manager.broadcast(data, "robot")
             except Exception:
                 pass

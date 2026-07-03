@@ -11,6 +11,36 @@
     
 
 
+    <style>
+        /* ===== Calibration overlay scroll (FIX1) =====
+           Right-side subpanel rows must remain visible when new rows
+           are appended. All inner modal cards flex + subpanels overflow. */
+        #calibration-overlay,
+        #cameraConfigModal,
+        #camAssignModal { display: flex !important; align-items: center !important; justify-content: center !important; }
+        #calibration-overlay > div,
+        #cameraConfigModal > div,
+        #camAssignModal > div { max-height: 95vh !important; height: 95vh !important; display: flex !important; flex-direction: column !important; overflow: hidden !important; }
+        #calibration-overlay > div > *,
+        #cameraConfigModal > div > *,
+        #camAssignModal > div > * { min-height: 0; }
+        #calibration-overlay .modal-body,
+        #calibration-overlay .form-grid,
+        #calibration-overlay .right-column,
+        #calibration-overlay .panel-list,
+        #calibration-overlay > div > .modal-body,
+        #calibration-overlay > div > div:not(.modal-header):not(.modal-footer) { overflow-y: auto !important; flex: 1 1 auto !important; max-height: 100% !important; }
+        #camAssignModal .preview-pane,
+        #camAssignModal .assign-grid { overflow-y: auto !important; max-height: 60vh !important; }
+        /* ===== Smart camera-port dropdowns helper text ===== */
+        #cam-port-single-info {
+            display:none; font-size:0.75rem; color:var(--text-secondary);
+            margin-top:0.25rem; font-style:italic;
+        }
+        #cam-port-right:disabled {
+            opacity:0.45; cursor:not-allowed;
+        }
+    </style>
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
 <body>
@@ -869,7 +899,7 @@
             <div class="card" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
                 <div>
                     <h3 class="font-outfit" style="font-size: 1.15rem; margin-bottom: 0.25rem;">Section Calibration & Configuration WiFi</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Ajuster les angles des moteurs, configurer le WiFi et observer la minimap.</p>
+                    <p style="color: var(--text-secondary); font-size: 0.85rem;">Ajuster les angles des moteurs et configurer le WiFi.</p>
                     <div id="calib-status-badge" style="font-size: 0.8rem; margin-top: 0.4rem; color: var(--text-secondary);">Chargement du statut des moteurs...</div>
                 </div>
                 <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
@@ -1032,8 +1062,9 @@
                 <span id="slam-cameras-badge" style="font-size: 0.75rem; color: var(--text-secondary); margin-left: auto;"></span>
             </div>
             <!-- SLAM disabled overlay -->
-            <div id="slam-disabled-overlay" style="display: none; position: relative;">
-                <div class="card-grid" style="opacity: 0.3; pointer-events: none;"><div class="card-grid" style="grid-template-columns: 2.5fr 1fr;">
+                        <!-- SLAM Content Wrapper -->
+            <div id="slam-content-wrapper" style="position: relative;">
+<div class="card-grid" style="opacity: 1; pointer-events: auto;"><div class="card-grid" style="grid-template-columns: 2.5fr 1fr;">
                 <!-- SLAM Visualizer -->
                 <div class="card" style="display: flex; flex-direction: column; min-height: 500px;">
                     <div class="card-title">
@@ -1109,11 +1140,14 @@
                     <!-- Console de Test V-SLAM -->
                     <div class="card" style="margin: 1.5rem 0 0 0; display: flex; flex-direction: column; gap: 0.75rem;">
                         <div class="card-title" style="font-size: 1rem; display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                            <span>🔍 Console de Test V-SLAM</span>
-                            <span id="vslam-badge" class="status-badge" style="font-size:0.65rem; padding: 0.1rem 0.4rem;">Inactif</span>
+                            <span>🔍 Console de Test V-SLAM <span class="status-badge" style="font-size:0.6rem;padding:0.15rem 0.45rem;margin-left:0.5rem;background:rgba(99,102,241,0.18);color:var(--accent);font-weight:600;" title="Processus local sur le robot - indépendant du streaming utilisateur">ROBOT LOCAL</span></span>
+                            <span style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span id="vslam-test-mode-badge" class="status-badge" style="font-size: 0.65rem; padding: 0.1rem 0.4rem; background: rgba(99,102,241,0.15); color: var(--accent); font-weight: 600;" title="Mode SLAM déterminé par les caméras connectées au robot.">Mode: —</span>
+                                <span id="vslam-badge" class="status-badge" style="font-size:0.65rem; padding: 0.1rem 0.4rem;">Inactif</span>
+                            </span>
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
-                            Testez la localisation visuelle (ORB-SLAM3) en direct, même en portant le robot à la main.
+                            <b>LOCAL</b> · Processus local sur le robot (ORB-SLAM3). <b>Indépendant</b> du streaming caméra de l'onglet Vue d'ensemble (le streaming sert uniquement à visualiser). (ORB-SLAM3) en direct, même en portant le robot à la main.
                         </div>
                         
                         <!-- Mini video stream area -->
@@ -1152,7 +1186,18 @@
                 </div>
             </div>
         </div>
-    </div>
+    
+                <!-- SLAM Disabled Message Overlay (covers content when no cameras) -->
+                <div id="slam-disabled-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(9, 9, 11, 0.92); z-index: 10; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.75rem; border-radius: 8px;">
+                    <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                        <line x1="1" y1="1" x2="23" y2="23"/>
+                    </svg>
+                    <span style="font-size: 1.1rem; font-weight: 600; color: white;">SLAM désactivé</span>
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Aucune caméra détectée par le robot. Vérifiez la connexion USB V4L2 et le mapping (onglet Arduino & Calib).</span>
+                </div>
+            </div>
+
 
     <!-- EasyConfig Overlay -->
     
@@ -1202,7 +1247,7 @@
             <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
                 <div>
                     <h2 class="font-outfit" style="font-size: 1.5rem; color: var(--text-primary);">Console de Calibration Système</h2>
-                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Ajustez les offsets des moteurs, testez les caméras et observez la minimap.</p>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Ajustez les offsets des moteurs, testez les caméras et configurez leur mapping L/R et la qualité de stream.</p>
                 </div>
                 <button class="btn btn-secondary" onclick="closeCalibrationOverlay()">&times; Fermer la Console</button>
             </div>
@@ -1311,16 +1356,111 @@
                     </div>
                 </div>
                 
-                <!-- Camera and Minimap -->
-                <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto;">
-                    <div class="card" style="margin: 0; background-color: rgba(255,255,255,0.01);">
-                        <div class="card-title" style="font-size:0.95rem;">Configuration des Caméras</div>
+                <!-- Qualité Stream & V-SLAM -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-title" style="font-size:0.95rem;">Qualité Stream & V-SLAM</div>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 1rem;">Résolution et framerate par caméra pour le stream et le V-SLAM.</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                            <h4 style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Gauche</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution Stream <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.65rem; border-radius:3px; height:auto; margin:0; margin-left:0.5rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" id="detect-res-btn-1" onclick="queryCameraResolutions(1)" title="Détecter les résolutions disponibles">🔍 Détecter</button></label>
+                                    <select id="stream-res-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480">640x480 (480p)</option>
+                                        <option value="1280x720" selected>1280x720 (720p)</option>
+                                        <option value="1920x1080">1920x1080 (1080p)</option>
+                                        <option value="640x360">640x360 (360p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Framerate Stream</label>
+                                    <select id="stream-fps-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="15">15 fps</option>
+                                        <option value="20" selected>20 fps</option>
+                                        <option value="25">25 fps</option>
+                                        <option value="30">30 fps</option>
+                                    </select>
+                                </div>
+                                <div style="border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.25rem;">
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution V-SLAM</label>
+                                    <select id="vslam-res-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480" selected>640x480 (480p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                        <option value="1280x720">1280x720 (720p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Encodage WebRTC</label>
+                                    <select id="stream-codec-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="auto" selected>Auto (négociation)</option>
+                                        <option value="h264">H.264</option>
+                                        <option value="vp8">VP8</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                            <h4 style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Droite</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution Stream <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.65rem; border-radius:3px; height:auto; margin:0; margin-left:0.5rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" id="detect-res-btn-2" onclick="queryCameraResolutions(2)" title="Détecter les résolutions disponibles">🔍 Détecter</button></label>
+                                    <select id="stream-res-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480">640x480 (480p)</option>
+                                        <option value="1280x720" selected>1280x720 (720p)</option>
+                                        <option value="1920x1080">1920x1080 (1080p)</option>
+                                        <option value="640x360">640x360 (360p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Framerate Stream</label>
+                                    <select id="stream-fps-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="15">15 fps</option>
+                                        <option value="20" selected>20 fps</option>
+                                        <option value="25">25 fps</option>
+                                        <option value="30">30 fps</option>
+                                    </select>
+                                </div>
+                                <div style="border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.25rem;">
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution V-SLAM</label>
+                                    <select id="vslam-res-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480" selected>640x480 (480p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                        <option value="1280x720">1280x720 (720p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Encodage WebRTC</label>
+                                    <select id="stream-codec-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="auto" selected>Auto (négociation)</option>
+                                        <option value="h264">H.264</option>
+                                        <option value="vp8">VP8</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                        <button class="btn btn-primary" onclick="saveStreamQualityConfig()" style="font-size:0.8rem; padding:0.35rem 0.75rem;">Appliquer la configuration</button>
+                        <span id="stream-quality-status" style="font-size:0.75rem; color:var(--text-secondary);"></span>
+                    </div>
+<div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Configuration des Cam&eacute;ras</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.75rem;">Mapping USB &rarr; Cam1/Cam2 (L/R), statut, calibration et pr&eacute;visualisation.</p>
+                        <div id="camera-change-warning" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; border-radius:6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); font-size:0.75rem; color:#f59e0b;">
+                            ⚠️ Changement de caméra détecté ! Recalibration requise avant V-SLAM.
+                        </div>
                         
                         <!-- Mapping Selection -->
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
                             <div>
                                 <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
-                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="saveCameraPortsMapping()">
+                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="updateCameraPortOptions(); saveCameraPortsMapping();">
                                     <option value="/dev/video0">/dev/video0</option>
                                     <option value="/dev/video1">/dev/video1</option>
                                     <option value="/dev/video2">/dev/video2</option>
@@ -1328,15 +1468,20 @@
                                     <option value="/dev/video4">/dev/video4</option>
                                 </select>
                             </div>
+                        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <button id="btn-save-camera-mapping" class="btn btn-primary" onclick="saveCameraPortsMapping()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Enregistrer la configuration</button>
+                            <span id="camera-mapping-save-status" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
+                        </div>
                             <div>
                                 <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Droite</label>
-                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="saveCameraPortsMapping()">
+                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="updateCameraPortOptions(); saveCameraPortsMapping();">
                                     <option value="/dev/video0">/dev/video0</option>
                                     <option value="/dev/video1">/dev/video1</option>
                                     <option value="/dev/video2">/dev/video2</option>
                                     <option value="/dev/video3">/dev/video3</option>
                                     <option value="/dev/video4">/dev/video4</option>
                                 </select>
+                                <span id="cam-port-single-info" style="display:none;">(Caméra central — seule caméra branchée)</span>
                             </div>
                         </div>
 
@@ -1346,37 +1491,36 @@
                                     <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
                                     <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
                                         <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
+                                        <span id="calib-badge-1" style="font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:3px; background:rgba(239,68,68,0.15); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-weight:600;">⚠ Non calibrée</span>
                                         <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(1)">📷 Calibrer</button>
                                         <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.05);" onclick="openCameraConfigModal(1)">👁️ Voir</button>
+                                        <button class="btn btn-secondary" id="calib-cam-preview-1" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" onclick="toggleCalibPreview(1)">▶ Aperçu</button>
                                     </div>
                                 </div>
                                 <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
                             </div>
                             
+                            <div style="display:flex; justify-content:center; gap:0.5rem; padding: 0.25rem 0; border-top: 1px solid var(--border-color);">
+                                <button class="btn btn-secondary" onclick="swapCameraLR()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.03);">🔄 Échanger Gauche/Droite</button>
+                                <button class="btn btn-secondary" onclick="openCameraAssignModal()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);">🎥 Configurer G/D (Live)</button>
+                            </div>
                             <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                                 <div>
                                     <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Droite</span>
                                     <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
                                         <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
+                                        <span id="calib-badge-2" style="font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:3px; background:rgba(239,68,68,0.15); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-weight:600;">⚠ Non calibrée</span>
                                         <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(2)">📷 Calibrer</button>
                                         <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.05);" onclick="openCameraConfigModal(2)">👁️ Voir</button>
+                                        <button class="btn btn-secondary" id="calib-cam-preview-2" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" onclick="toggleCalibPreview(2)">▶ Aperçu</button>
                                     </div>
                                 </div>
                                 <input type="checkbox" style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-2" onchange="toggleCalibCamera(2)"/>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="card" style="margin: 0; flex: 1; display: flex; flex-direction: column; background-color: rgba(255,255,255,0.01); min-height: 280px;">
-                        <div class="card-title" style="font-size:0.95rem;">Minimap de Localisation (Position XY)</div>
-                        <div style="flex:1; border: 1px solid var(--border-color); border-radius: 8px; background-color: var(--bg-main); overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
-                            <canvas id="minimap-canvas" style="width:100%; height:100%; min-height:200px; display:block;"></canvas>
-                            <div style="position: absolute; bottom: 0.5rem; left: 0.5rem; font-size: 0.7rem; color: var(--text-secondary); background: rgba(0,0,0,0.7); padding: 0.2rem 0.4rem; border-radius: 4px;">
-                                Pose: <span id="minimap-pose-text">x: 0.00, y: 0.00, θ: 0°</span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -1436,7 +1580,7 @@
                 <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">Identifiants MyGES — <span id="myges-modal-username">User</span></h3>
                 <button class="modal-close" onclick="closeMygesModal()">&times;</button>
             </div>
-            <form onsubmit="handleMygesSubmit(event)">
+                        <form onsubmit="handleMygesSubmit(event)">
                 <input type="hidden" id="form-myges-name"/>
                 <div class="form-group">
                     <label class="form-label" for="form-myges-username">Nom d'utilisateur MyGES</label>
@@ -1446,7 +1590,13 @@
                     <label class="form-label" for="form-myges-password">Mot de passe MyGES</label>
                     <input type="password" id="form-myges-password" class="form-input" placeholder="••••••••" required autocomplete="current-password"/>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center; margin-top: 1.5rem;">Enregistrer les identifiants</button>
+                <div id="myges-test-result" style="margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8rem; display: none;"></div>
+                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+                    <button type="button" id="btn-myges-test" class="btn btn-secondary" onclick="handleMygesTest()" style="flex: 1; justify-content: center;">
+                        🔍 Tester la connexion
+                    </button>
+                    <button type="submit" class="btn btn-primary" style="flex: 2; justify-content: center;">Enregistrer les identifiants</button>
+                </div>
             </form>
         </div>
     </div>
@@ -1605,6 +1755,66 @@
         </div>
     </div>
 
+
+<!-- Camera L/R Assignment Modal with Live Stream Previews -->
+    <div id="cameraAssignModal" class="modal-overlay" onclick="closeCameraAssignModalOnClick(event)" style="background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div class="modal-content" style="max-width: 780px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px;">
+            <div class="modal-header">
+                <h3 class="font-outfit" style="font-size: 1.25rem; font-weight: 700;">🎥 Configuration Visuelle Gauche / Droite</h3>
+                <button class="modal-close" onclick="closeCameraAssignModal()">&times;</button>
+            </div>
+
+            <div style="padding: 0 1.25rem 1.25rem;">
+                <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem;">
+                    Observez les flux vidéo ci-dessous et attribuez chaque caméra à son rôle (Gauche ou Droite).
+                    La caméra <strong>Gauche</strong> est celle placée du côté gauche du robot vu de dos.
+                </p>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                    <!-- Camera 1 -->
+                    <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.85rem; font-weight:600;">Caméra 1</span>
+                            <span id="assign-current-1" style="font-size:0.7rem; padding:0.15rem 0.4rem; border-radius:4px; background:rgba(255,255,255,0.05); color:var(--text-secondary);">Non assignée</span>
+                        </div>
+                        <div style="position:relative; aspect-ratio: 4/3; background:#000; border-radius:8px; overflow:hidden;">
+                            <video id="assign-video-1" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover; display:none;"></video>
+                            <div id="assign-status-1" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0.75rem; color:var(--text-secondary);">Chargement du flux...</div>
+                        </div>
+                        <div style="display:flex; gap:0.4rem;">
+                            <button class="btn btn-secondary" onclick="assignCameraLR(1, 'left')" id="assign-btn-left-1" style="flex:1; padding:0.35rem; font-size:0.75rem; border-radius:6px; height:auto; margin:0; background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.3);">← Gauche</button>
+                            <button class="btn btn-secondary" onclick="assignCameraLR(1, 'right')" id="assign-btn-right-1" style="flex:1; padding:0.35rem; font-size:0.75rem; border-radius:6px; height:auto; margin:0; background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3);">Droite →</button>
+                        </div>
+                    </div>
+
+                    <!-- Camera 2 -->
+                    <div style="background:var(--bg-main); border:1px solid var(--border-color); border-radius:12px; padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-size:0.85rem; font-weight:600;">Caméra 2</span>
+                            <span id="assign-current-2" style="font-size:0.7rem; padding:0.15rem 0.4rem; border-radius:4px; background:rgba(255,255,255,0.05); color:var(--text-secondary);">Non assignée</span>
+                        </div>
+                        <div style="position:relative; aspect-ratio: 4/3; background:#000; border-radius:8px; overflow:hidden;">
+                            <video id="assign-video-2" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover; display:none;"></video>
+                            <div id="assign-status-2" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0.75rem; color:var(--text-secondary);">Chargement du flux...</div>
+                        </div>
+                        <div style="display:flex; gap:0.4rem;">
+                            <button class="btn btn-secondary" onclick="assignCameraLR(2, 'left')" id="assign-btn-left-2" style="flex:1; padding:0.35rem; font-size:0.75rem; border-radius:6px; height:auto; margin:0; background:rgba(59,130,246,0.1); border-color:rgba(59,130,246,0.3);">← Gauche</button>
+                            <button class="btn btn-secondary" onclick="assignCameraLR(2, 'right')" id="assign-btn-right-2" style="flex:1; padding:0.35rem; font-size:0.75rem; border-radius:6px; height:auto; margin:0; background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3);">Droite →</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="assign-result" style="display:none; padding:0.6rem 0.75rem; border-radius:8px; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.3); margin-bottom:1rem; font-size:0.8rem; color:#22c55e;">
+                    ✓ <span id="assign-result-text"></span>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+                    <button class="btn btn-secondary" onclick="closeCameraAssignModal()" style="padding:0.4rem 1rem; font-size:0.85rem; border-radius:8px; height:auto; margin:0;">Fermer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <!-- Screen lightbox overlay -->
     <div id="lightbox" class="modal-overlay" onclick="closeLightbox()" style="background-color: rgba(0,0,0,0.95); cursor: zoom-out;">
         <img id="lightbox-img" style="max-width: 90%; max-height: 90%; object-fit: contain; border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);"/>
@@ -1659,7 +1869,7 @@
             </div>
             
             <!-- Content Area -->
-            <div style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; min-height: 350px;">
+            <div style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column;">
                 
                 <!-- STEP 1 CONTENT -->
                 <div id="ec-step-1" style="display: none; flex-direction: column; gap: 1.5rem; padding: 1.5rem; flex: 1;">
@@ -1714,6 +1924,9 @@
                     ✅ Valider cet offset
                 </button>
             </div>
+            <button class="btn btn-secondary" onclick="ecSkipStep()" style="align-self: center; margin-top: 0.5rem; font-size: 0.8rem; padding: 0.5rem 1rem; color: var(--text-secondary); border-color: var(--border-color);">
+                ⏭️ Passer cette étape
+            </button>
         </div>
         
         <!-- ===== Final View (all 12 joints done) ===== -->
@@ -1731,11 +1944,15 @@
                     💾 Enregistrer Uniquement (Garder Éteint)
                 </button>
             </div>
+            <button class="btn btn-secondary" onclick="ecSkipStep()" style="margin-top: 0.5rem; font-size: 0.8rem; padding: 0.5rem 1rem; color: var(--text-secondary); border-color: var(--border-color);">
+                ⏭️ Passer sans enregistrer
+            </button>
         </div>
         
-        <!-- Success animation (kept for compatibility) -->
-        <div id="ec-motor-success-anim" style="display: none;">
-                
+        <!-- Success animation (kept for compatibility, hidden) -->
+        <div id="ec-motor-success-anim" style="display: none;"></div>
+                </div><!-- /ec-step-1 -->
+
                 <!-- STEP LR: Attribution Gauche/Droite (2 cameras only) -->
                 <div id="ec-step-lr" style="display: none; flex-direction: column; gap: 1.5rem; height: 100%; padding: 1.5rem;">
                     <div style="line-height:1.5; font-size:0.9rem;">
@@ -1902,11 +2119,34 @@
                 <button id="ec-btn-prev" class="btn btn-secondary" disabled onclick="ecPrevStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
                     ← Précédent
                 </button>
-                <span id="ec-progress-text" style="font-size:0.75rem; color: var(--text-secondary);">Étape 1 sur 4</span>
+                <button id="ec-btn-skip" class="btn btn-secondary" onclick="ecSkipStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem; margin-right: 0.5rem;">Passer</button>
+                    <span id="ec-progress-text" style="font-size:0.75rem; color: var(--text-secondary);">Étape 1 sur 4</span>
                 <button id="ec-btn-next" class="btn btn-primary" disabled onclick="ecNextStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
                     Suivant →
                 </button>
             </div>
         </div>
+
+    <div id="cam-preview-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background: rgba(9,9,11,0.95); backdrop-filter: blur(8px); z-index: 3000; justify-content: center; align-items: center; flex-direction: column; padding: 2rem;">
+        <div style="width: 90%; max-width: 720px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h3 id="cam-preview-title" class="font-outfit" style="font-size: 1.2rem; margin: 0;">Apercu Camera</h3>
+                <button class="btn btn-secondary" onclick="closeCalibPreview()" style="font-size: 0.85rem;">Fermer</button>
+            </div>
+            <div style="background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3; position: relative;">
+                <video id="calib-preview-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; background: #000;"></video>
+                <div id="calib-preview-loader" style="position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; color: white; font-size: 0.85rem;">
+                    <div style="width: 24px; height: 24px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <span>Connexion au flux HLS...</span>
+                </div>
+                <div id="calib-preview-error" style="display:none; position: absolute; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--danger); padding: 1.5rem; text-align: center; font-size: 0.9rem;">
+                    <svg viewBox="0 0 24 24" width="40" height="40"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Flux camera indisponible. Verifiez camera + MediaMTX (port 48889).</span>
+                    <button class="btn btn-secondary" onclick="closeCalibPreview()" style="font-size: 0.8rem; margin-top: 0.5rem;">Fermer</button>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">Le flux identifie visuellement la camera. Start/stop via la Vue d'ensemble.</div>
+        </div>
+    </div>
 </body>
 </html>

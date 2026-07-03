@@ -24,6 +24,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
@@ -120,6 +121,22 @@ app = FastAPI(
     version="2.1.0",
     lifespan=lifespan,
 )
+
+
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    # Force re-fetch of JS/HTML/CSS so deploys are visible without hard-reload.
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith('/static/') or path.startswith('/templates/') or path == '/' \
+           or path.endswith(('.html', '.js', '.css')):
+            response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            response.headers['Pragma'] = 'no-cache'
+            response.headers['Expires'] = '0'
+        return response
+
+
+app.add_middleware(NoCacheStaticMiddleware)
 
 # Static files (CSS, JS)
 static_dir = Path(__file__).parent / "static"

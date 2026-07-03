@@ -108,7 +108,7 @@ preferred_ai_targets = {
 }
 
 async def stop_camera_delayed(cam_id: int, manager):
-    await asyncio.sleep(30)
+    await asyncio.sleep(5)  # Filet de securite 5s (au lieu de 30s) pour fermeture d'onglet
     if stream_keep_alive[cam_id]:
         return
     if len(active_camera_listeners[cam_id]) == 0:

@@ -84,6 +84,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
         window.localViewing = { 1: false, 2: false };
         window.userClosedStream = { 1: false, 2: false };
         let peerConnections = { 1: null, 2: null };
+        let streamingState = { 1: "idle", 2: "idle" };  // idle|requesting|connecting|active|error
         window.manualJointControlActive = false;
         
         // SLAM / Map variables
@@ -122,6 +123,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
         // ─── INIT ─────────────────────────────────────────────────────────────
         
         async function checkAuth() {
+            loadStreamQualityConfig();
+
             if (!apiToken) {
                 showLogin();
                 return;
@@ -192,6 +195,9 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             initDragAndDrop();
             connectGlobalWebSocket();
             loadSavedOffsets();
+            updateSLAMMode();
+            if (typeof updateCameraPortOptions === 'function') updateCameraPortOptions();
+            if (typeof updateCameraModularity === 'function') updateCameraModularity(false, false);
             // Fallback: si le badge est toujours en 'Chargement...' apres 10s, afficher un etat neutre
             setTimeout(() => {
                 const badgeCalib = document.getElementById('calib-status-badge');
@@ -201,6 +207,9 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     badgeCalib.style.fontWeight = 'normal';
                 }
             }, 10000);
+            // Force refresh SLAM badge every 3s — picks up new cam1_connected/cam2_connected
+            // even when telemetry 'sensors' field hasn't been re-broadcast for a while.
+            setInterval(() => { try { updateSLAMMode(); } catch (e) { console.warn('updateSLAMMode tick failed', e); } }, 3000);
         }
 
         // --- INTERVALS ---
@@ -289,6 +298,20 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     if (payload.cameras) {
                         updateCameraModularity(payload.cameras.cam1 === true, payload.cameras.cam2 === true);
                     }
+                    // Update calibration status badges
+                    if (payload.sensors && payload.sensors.calibration_status) {
+                        updateCalibrationBadges(payload.sensors.calibration_status);
+                    }
+                    // Show camera change warning
+                    if (payload.sensors && payload.sensors.camera_changed) {
+                        const warningEl = document.getElementById('camera-change-warning');
+                        if (warningEl) {
+                            const changed = payload.sensors.camera_changed;
+                            const anyChanged = (changed['1'] === true || changed[1] === true) ||
+                                               (changed['2'] === true || changed[2] === true);
+                            warningEl.style.display = anyChanged ? 'block' : 'none';
+                        }
+                    }
                     if (payload.ai_state) {
                         updateAIControlUI('tts', payload.ai_state.tts);
                         updateAIControlUI('stt', payload.ai_state.stt);
@@ -312,9 +335,9 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     
                     // Update IMU
                     if (payload.imu) {
-                        const roll = payload.imu.roll || 0;
-                        const pitch = payload.imu.pitch || 0;
-                        const yaw = payload.imu.yaw || 0;
+                        const roll = payload.imu.roll ?? 0;
+                        const pitch = payload.imu.pitch ?? 0;
+                        const yaw = payload.imu.yaw ?? 0;
                         // Cache module-level pour la carte Vue d ensemble (payload.imu peut etre null/absent sur certains ticks 0.5s)
                         window._bastetLastImu = { roll: roll, pitch: pitch, yaw: yaw };
                         
@@ -328,7 +351,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         // Rotate 3D IMU CSS Cube
                         const cube = document.getElementById('imu-visual-cube');
                         if (cube) {
-                            cube.style.transform = `rotateX(${pitch}deg) rotateY(${roll}deg) rotateZ(${-yaw}deg)`;
+                            cube.style.transform = `rotateX(${-pitch}deg) rotateY(${roll}deg) rotateZ(${-yaw}deg)`;
                         }
                     }
 
@@ -393,7 +416,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         const rx = payload.pose.x || 0;
                         const ry = payload.pose.y || 0;
                         const rtheta = payload.pose.theta || 0;
-                        document.getElementById('minimap-pose-text').textContent = `x: ${rx.toFixed(2)}, y: ${ry.toFixed(2)}, θ: ${Math.round(rtheta * 180 / Math.PI)}°`;
+                        // (Pose x/y/θ now flows into the SLAM visualizer via drawSLAMMap(); calibration minimap was removed.)
                     }
                     if (payload.path) {
                         window.slamPath = payload.path;
@@ -440,7 +463,22 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                             toggleStream(camId);
                         }
                     }
+
+                    // Update calib preview buttons (merged from former duplicate handler)
+                    const previewBtn = document.getElementById('calib-cam-preview-' + camId);
+                    if (previewBtn) {
+                        if (isActive) {
+                            previewBtn.textContent = '■ Arrêter';
+                            previewBtn.style.background = 'rgba(239,68,68,0.1)';
+                            previewBtn.style.borderColor = 'rgba(239,68,68,0.3)';
+                        } else {
+                            previewBtn.textContent = '▶ Aperçu';
+                            previewBtn.style.background = 'rgba(99,102,241,0.1)';
+                            previewBtn.style.borderColor = 'rgba(99,102,241,0.3)';
+                        }
+                    }
                 }
+
                 else if (payload.type === "keep_stream_status") {
                     const camId = parseInt(payload.camera);
                     const isKeep = payload.keep === true;
@@ -455,6 +493,56 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                             keepBtn.classList.remove("active");
                             keepBtn.innerHTML = "📌 Keep Stream : OFF";
                         }
+                    }
+                }
+                else if (payload.type === "camera_resolutions") {
+                    const camId = payload.camera;
+                    const resolutions = payload.resolutions || [];
+                    const selectEl = document.getElementById('stream-res-' + camId);
+                    const statusEl = document.getElementById('stream-quality-status');
+                    if (selectEl && resolutions.length > 0) {
+                        const currentVal = selectEl.value;
+                        selectEl.innerHTML = '';
+                        resolutions.forEach(function(r) {
+                            const parts = r.split('x');
+                            const label = parts.length === 2 ? (parts[0] + 'x' + parts[1] + ' (' + parts[1] + 'p)') : r;
+                            const opt = document.createElement('option');
+                            opt.value = r;
+                            opt.textContent = label;
+                            selectEl.appendChild(opt);
+                        });
+                        // Try to restore previous selection if available
+                        if (currentVal && resolutions.includes(currentVal)) {
+                            selectEl.value = currentVal;
+                        }
+                        statusEl.textContent = 'Caméra ' + camId + ' : ' + resolutions.length + ' résolutions détectées';
+                        statusEl.style.color = 'var(--success)';
+                    } else {
+                        statusEl.textContent = 'Aucune résolution détectée pour caméra ' + camId;
+                        statusEl.style.color = 'var(--danger)';
+                    }
+                    // Restore detect button
+                    setTimeout(function() {
+                        statusEl.textContent = '';
+                    }, 5000);
+                }
+                else if (payload.type === "vslam_blocked") {
+                    const camId = payload.camera;
+                    const reason = payload.reason || 'Calibration requise.';
+                    // Uncheck V-SLAM toggle
+                    const vSlamCheck = document.getElementById('stream-v-slam-1');
+                    if (vSlamCheck && camId === 1) vSlamCheck.checked = false;
+                    // Show alert
+                    if (typeof showToast === 'function') {
+                        showToast('V-SLAM bloqué', 'Caméra ' + camId + ': ' + reason, 'warning');
+                    } else {
+                        alert('V-SLAM bloqué: ' + reason);
+                    }
+                    // Reset stream UI
+                    const statusEl2 = document.getElementById('stream-status-' + camId);
+                    if (statusEl2) {
+                        statusEl2.textContent = 'Calibration requise';
+                        statusEl2.className = 'status-badge';
                     }
                 }
                 else if (payload.type === "wifi_list") {
@@ -837,7 +925,6 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         function openCalibrationOverlay() {
             document.getElementById('calibration-overlay').classList.add('active');
-            setTimeout(drawMinimap, 100);
             loadSavedOffsets();
         }
 
@@ -987,6 +1074,441 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 alert("Erreur réseau.");
             }
         }
+
+        let calibPreviewPc = null;
+
+        function toggleCalibPreview(camId) {
+            // Open the dedicated calibration preview modal overlay (popup above calibration overlay).
+            // WebRTC/WHEP path (low latency vs HLS) - uses the same pattern already proven for cam1/cam2 live streaming.
+            const overlay = document.getElementById('cam-preview-overlay');
+            if (!overlay) {
+                alert('Erreur interne: le popup d\'apercu n\'est pas chargé. Rafraichissez la page.');
+                return;
+            }
+            // Reset state
+            const videoEl = document.getElementById('calib-preview-video');
+            const loaderEl = document.getElementById('calib-preview-loader');
+            const errorEl = document.getElementById('calib-preview-error');
+            if (loaderEl) loaderEl.style.display = 'flex';
+            if (errorEl) errorEl.style.display = 'none';
+            // Destroy previous WebRTC peer connection (close old preview cleanly)
+            if (calibPreviewPc) {
+                try { calibPreviewPc.close(); } catch(e) {}
+                calibPreviewPc = null;
+            }
+            if (videoEl) {
+                videoEl.pause();
+                videoEl.src = '';
+                videoEl.srcObject = null;
+            }
+            // Title
+            const titleEl = document.getElementById('cam-preview-title');
+            if (titleEl) titleEl.textContent = 'Apercu Caméra ' + camId + ' (' + (camId === 1 ? 'Gauche' : 'Droite') + ')';
+            overlay.style.display = 'flex';
+            // Connect to MediaMTX WHEP endpoint - Caddy exposes HTTPS at :48889, reverse-proxied to mediamtx :8889
+            const webrtcUrl = window.location.protocol + '//' + window.location.hostname + ':48889/robot/cam' + camId + '/whep';
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            calibPreviewPc = pc;
+            pc.addTransceiver('video', { direction: 'recvonly' });
+            pc.addTransceiver('audio', { direction: 'recvonly' });
+            let trackReceived = false;
+            // 12s timeout for first ontrack (camera warm-up buffer)
+            const trackTimeout = setTimeout(() => {
+                if (!trackReceived) {
+                    if (loaderEl) loaderEl.style.display = 'none';
+                    if (errorEl) {
+                        errorEl.innerHTML = 'Flux WebRTC indisponible.<br>Temps de connexion dépassé (' + camId + ').<br>Vérifiez que la caméra est active.';
+                        errorEl.style.display = 'flex';
+                    }
+                    try { pc.close(); } catch(e) {}
+                    if (calibPreviewPc === pc) calibPreviewPc = null;
+                }
+            }, 12000);
+            pc.ontrack = (event) => {
+                trackReceived = true;
+                clearTimeout(trackTimeout);
+                if (videoEl && event.streams && event.streams[0]) {
+                    videoEl.srcObject = event.streams[0];
+                    videoEl.play().catch(() => {});
+                }
+                if (loaderEl) loaderEl.style.display = 'none';
+            };
+            pc.oniceconnectionstatechange = () => {
+                if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed' || pc.iceConnectionState === 'disconnected') {
+                    if (!trackReceived) {
+                        if (loaderEl) loaderEl.style.display = 'none';
+                        if (errorEl) {
+                            errorEl.innerHTML = 'Connexion WebRTC échouée (' + camId + ').<br>ICE : ' + pc.iceConnectionState;
+                            errorEl.style.display = 'flex';
+                        }
+                    }
+                }
+            };
+            pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+                // POST offer SDP to MediaMTX WHEP endpoint - retry up to 48x250ms in case camera isn't streaming yet
+                const maxAttempts = 48;
+                let attempt = 0;
+                const postOffer = () => {
+                    attempt++;
+                    fetch(webrtcUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/sdp' },
+                        body: pc.localDescription.sdp,
+                    }).then(res => {
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        return res.text();
+                    }).then(answerSdp => {
+                        return pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+                    }).catch(err => {
+                        if (attempt < maxAttempts && !trackReceived) {
+                            setTimeout(postOffer, 250);
+                        } else if (!trackReceived) {
+                            if (loaderEl) loaderEl.style.display = 'none';
+                            if (errorEl) {
+                                errorEl.innerHTML = 'WHEP échoué après ' + maxAttempts + ' tentatives (' + camId + ').<br>' + (err && err.message ? err.message : err);
+                                errorEl.style.display = 'flex';
+                            }
+                            try { pc.close(); } catch(e) {}
+                            if (calibPreviewPc === pc) calibPreviewPc = null;
+                        }
+                    });
+                };
+                postOffer();
+            }).catch(err => {
+                if (!trackReceived) {
+                    if (loaderEl) loaderEl.style.display = 'none';
+                    if (errorEl) {
+                        errorEl.innerHTML = 'Erreur createOffer (' + camId + ').<br>' + (err && err.message ? err.message : err);
+                        errorEl.style.display = 'flex';
+                    }
+                    try { pc.close(); } catch(e) {}
+                    if (calibPreviewPc === pc) calibPreviewPc = null;
+                }
+            });
+        }
+
+        function closeCalibPreview() {
+            const overlay = document.getElementById('cam-preview-overlay');
+            const videoEl = document.getElementById('calib-preview-video');
+            if (calibPreviewPc) {
+                try { calibPreviewPc.close(); } catch(e) {}
+                calibPreviewPc = null;
+            }
+            if (videoEl) {
+                videoEl.pause();
+                videoEl.src = '';
+                videoEl.srcObject = null;
+            }
+            if (overlay) overlay.style.display = 'none';
+        }
+
+
+        // ESC closes the topmost active modal *AND* the cam preview overlay (shared handler)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const calibOverlay = document.getElementById('cam-preview-overlay');
+                if (calibOverlay && calibOverlay.style.display === 'flex') closeCalibPreview();
+
+                const assignModal = document.getElementById('cameraAssignModal');
+                if (assignModal && assignModal.classList.contains('active')) closeCameraAssignModal();
+
+                const configModal = document.getElementById('cameraConfigModal');
+                if (configModal && configModal.classList.contains('active') && typeof closeCameraConfigModal === 'function') closeCameraConfigModal();
+            }
+        });
+
+        // On pagehide (navigation/refresh/bfcache), forcibly close every live RTC peer.
+        // Without this, MediaMTX keeps the WebRTC session open ~12s after the browser leaves.
+        window.addEventListener('pagehide', function() {
+            try {
+                if (typeof calibPreviewPc !== 'undefined' && calibPreviewPc) {
+                    try { calibPreviewPc.close(); } catch(e) {}
+                    calibPreviewPc = null;
+                }
+            } catch(e) {}
+            [1, 2].forEach(function(camId) {
+                const v = document.getElementById('assign-video-' + camId);
+                if (v && v._webrtcPc) {
+                    try { v._webrtcPc.close(); } catch(e) {}
+                    v._webrtcPc = null;
+                }
+            });
+        });
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlay = document.getElementById('cam-preview-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay) closeCalibPreview();
+                });
+            }
+        });
+
+        function swapCameraLR() {
+            const leftSelect = document.getElementById('cam-port-left');
+            const rightSelect = document.getElementById('cam-port-right');
+            if (leftSelect && rightSelect) {
+                const tmp = leftSelect.value;
+                leftSelect.value = rightSelect.value;
+                rightSelect.value = tmp;
+                if (typeof updateCameraPortOptions === 'function') updateCameraPortOptions();
+                saveCameraPortsMapping();
+            }
+        }
+
+
+        // ─── Camera L/R Assignment Modal with Live Stream Previews (WebRTC) ────
+        let assignAssigned = { left: null, right: null };
+
+        function openCameraAssignModal() {
+            document.getElementById('cameraAssignModal').classList.add('active');
+            // Reset state
+            assignAssigned = { left: null, right: null };
+            document.getElementById('assign-result').style.display = 'none';
+            // Reset current labels
+            for (let camId of [1, 2]) {
+                const label = document.getElementById('assign-current-' + camId);
+                if (label) { label.textContent = 'Non assignée'; label.style.color = 'var(--text-secondary)'; label.style.background = 'rgba(255,255,255,0.05)'; }
+                // Reset button styles
+                for (let side of ['left', 'right']) {
+                    const btn = document.getElementById('assign-btn-' + side + '-' + camId);
+                    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+                }
+            }
+            // Start both previews
+            startAssignPreview(1);
+            startAssignPreview(2);
+            // Pre-fill current mapping from telemetry camera_mapping
+            // camera_mapping.left = device path for cam1, camera_mapping.right = device path for cam2
+            // If cam1's device is currently on left → cam1=left, cam2=right (default)
+            // If they've been swapped → cam2=left, cam1=right
+            const leftSelect = document.getElementById('cam-port-left');
+            const rightSelect = document.getElementById('cam-port-right');
+            const telMapping = window.lastTelemetryState && window.lastTelemetryState.camera_mapping;
+            if (telMapping && telMapping.left && telMapping.right) {
+                // cam1 is the device currently on left, cam2 is the device on right
+                // Default: cam1=left, cam2=right
+                assignAssigned = { left: 1, right: 2 };
+                updateAssignUI();
+            } else if (leftSelect && rightSelect) {
+                // Fallback: use dropdown values (default is video0=left, video2=right)
+                assignAssigned = { left: 1, right: 2 };
+                updateAssignUI();
+            }
+        }
+
+        function closeCameraAssignModal() {
+            const modal = document.getElementById('cameraAssignModal');
+            if (modal) modal.classList.remove('active');
+            stopAssignPreviews();
+        }
+
+        function closeCameraAssignModalOnClick(event) {
+            if (event.target.id === 'cameraAssignModal') {
+                closeCameraAssignModal();
+            }
+        }
+
+        function startAssignPreview(camId) {
+            const videoEl = document.getElementById('assign-video-' + camId);
+            const statusEl = document.getElementById('assign-status-' + camId);
+            if (!videoEl || !statusEl) return;
+
+            // Clean up any previous WebRTC peer on this element
+            if (videoEl._webrtcPc) {
+                try { videoEl._webrtcPc.close(); } catch(e) {}
+                videoEl._webrtcPc = null;
+            }
+            videoEl.srcObject = null;
+            videoEl.src = '';
+
+            statusEl.style.display = 'flex';
+            statusEl.textContent = 'Connexion au flux WebRTC...';
+
+            // MediaMTX WHEP endpoint at :48889 (mandatory path segment, not a protocol switch)
+            const webrtcUrl = window.location.protocol + '//' + window.location.hostname + ':48889/robot/cam' + camId + '/whep';
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            videoEl._webrtcPc = pc;
+            pc.addTransceiver('video', { direction: 'recvonly' });
+
+            let connected = false;
+
+            pc.ontrack = (event) => {
+                if (!videoEl) return;
+                if (event.streams && event.streams[0] && videoEl.srcObject !== event.streams[0]) {
+                    videoEl.srcObject = event.streams[0];
+                } else if (!videoEl.srcObject) {
+                    const inboundStream = new MediaStream();
+                    inboundStream.addTrack(event.track);
+                    videoEl.srcObject = inboundStream;
+                }
+                videoEl.play().catch(() => {});
+                videoEl.style.display = 'block';
+                statusEl.style.display = 'none';
+                connected = true;
+            };
+
+            pc.oniceconnectionstatechange = () => {
+                if ((pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') && !connected) {
+                    statusEl.innerHTML = 'Connexion WebRTC échouée.<br>ICE : ' + pc.iceConnectionState;
+                    statusEl.style.display = 'flex';
+                    videoEl.style.display = 'none';
+                }
+            };
+
+            pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+                const maxAttempts = 6;
+                let attempt = 0;
+                const postOffer = () => {
+                    attempt++;
+                    if (connected) return;
+                    fetch(webrtcUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/sdp' },
+                        body: pc.localDescription.sdp,
+                    }).then(res => {
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        return res.text();
+                    }).then(answerSdp => {
+                        return pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+                    }).catch(err => {
+                        if (attempt < maxAttempts && !connected) {
+                            setTimeout(postOffer, 500);
+                        } else if (!connected) {
+                            statusEl.innerHTML = 'Flux WebRTC indisponible (' + (err && err.message ? err.message : err) + ').';
+                            statusEl.style.display = 'flex';
+                            videoEl.style.display = 'none';
+                            try { pc.close(); } catch(e) {}
+                            if (videoEl._webrtcPc === pc) videoEl._webrtcPc = null;
+                        }
+                    });
+                };
+                postOffer();
+            }).catch(err => {
+                if (!connected) {
+                    statusEl.innerHTML = 'Erreur WebRTC (' + (err && err.message ? err.message : err) + ').';
+                    statusEl.style.display = 'flex';
+                    videoEl.style.display = 'none';
+                    try { pc.close(); } catch(e) {}
+                    if (videoEl._webrtcPc === pc) videoEl._webrtcPc = null;
+                }
+            });
+        }
+
+        function stopAssignPreviews() {
+            for (let camId of [1, 2]) {
+                const videoEl = document.getElementById('assign-video-' + camId);
+                if (videoEl) {
+                    if (videoEl._webrtcPc) {
+                        try { videoEl._webrtcPc.close(); } catch(e) {}
+                        videoEl._webrtcPc = null;
+                    }
+                    videoEl.srcObject = null;
+                    videoEl.src = '';
+                    videoEl.style.display = 'none';
+                }
+                const statusEl = document.getElementById('assign-status-' + camId);
+                if (statusEl) { statusEl.style.display = 'flex'; statusEl.textContent = 'Chargement du flux...'; }
+            }
+        }
+
+        function assignCameraLR(camId, side) {
+            // Prevent double-assignment
+            if (assignAssigned[side] !== null) {
+                if (typeof showToast === 'function') {
+                    showToast("Attention", "La position " + (side === 'left' ? 'Gauche' : 'Droite') + " est déjà assignée", "warning");
+                }
+                return;
+            }
+            assignAssigned[side] = camId;
+            // Auto-assign the other camera to the other side
+            const otherCam = camId === 1 ? 2 : 1;
+            const otherSide = side === 'left' ? 'right' : 'left';
+            if (assignAssigned[otherSide] === null) {
+                assignAssigned[otherSide] = otherCam;
+            }
+
+            // Save mapping to robot using actual device paths from telemetry
+            const leftCam = assignAssigned.left;
+            const rightCam = assignAssigned.right;
+            if (leftCam && rightCam) {
+                // Get actual device paths from telemetry camera_mapping
+                // camera_mapping.left = device path currently assigned to cam1
+                // camera_mapping.right = device path currently assigned to cam2
+                const telMapping = window.lastTelemetryState && window.lastTelemetryState.camera_mapping;
+                const cam1Dev = (telMapping && telMapping.left) ? telMapping.left : '/dev/video0';
+                const cam2Dev = (telMapping && telMapping.right) ? telMapping.right : '/dev/video2';
+                const leftDev = leftCam === 1 ? cam1Dev : cam2Dev;
+                const rightDev = rightCam === 1 ? cam1Dev : cam2Dev;
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({
+                        type: "save_camera_mapping",
+                        left: leftDev,
+                        right: rightDev
+                    }));
+                }
+                // Update dropdowns
+                const leftSelect = document.getElementById('cam-port-left');
+                const rightSelect = document.getElementById('cam-port-right');
+                if (leftSelect) leftSelect.value = leftDev;
+                if (rightSelect) rightSelect.value = rightDev;
+
+                // Show result
+                const resultEl = document.getElementById('assign-result');
+                const resultText = document.getElementById('assign-result-text');
+                if (resultEl && resultText) {
+                    resultText.textContent = "Caméra Gauche = " + leftDev + " (Cam" + leftCam + "), Caméra Droite = " + rightDev + " (Cam" + rightCam + ")";
+                    resultEl.style.display = 'block';
+                }
+                if (typeof showToast === 'function') {
+                    showToast("Caméras", "Gauche: " + leftDev + ", Droite: " + rightDev, "success");
+                }
+            }
+
+            updateAssignUI();
+        }
+
+        function updateAssignUI() {
+            for (let camId of [1, 2]) {
+                const label = document.getElementById('assign-current-' + camId);
+                if (!label) continue;
+                let assigned = null;
+                if (assignAssigned.left === camId) assigned = 'left';
+                else if (assignAssigned.right === camId) assigned = 'right';
+
+                if (assigned === 'left') {
+                    label.textContent = '← Gauche';
+                    label.style.color = '#3b82f6';
+                    label.style.background = 'rgba(59,130,246,0.15)';
+                } else if (assigned === 'right') {
+                    label.textContent = 'Droite →';
+                    label.style.color = '#ef4444';
+                    label.style.background = 'rgba(239,68,68,0.15)';
+                } else {
+                    label.textContent = 'Non assignée';
+                    label.style.color = 'var(--text-secondary)';
+                    label.style.background = 'rgba(255,255,255,0.05)';
+                }
+
+                // Disable buttons for assigned sides
+                for (let side of ['left', 'right']) {
+                    const btn = document.getElementById('assign-btn-' + side + '-' + camId);
+                    if (!btn) continue;
+                    if (assignAssigned[side] !== null && assignAssigned[side] !== camId) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.4';
+                    } else if (assignAssigned[side] === camId) {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.4';
+                        btn.style.fontWeight = '700';
+                    } else {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.fontWeight = '400';
+                    }
+                }
+            }
+        }
+
 
         function toggleCalibCamera(camId) {
             const checkbox = document.getElementById(`calib-cam-enable-${camId}`);
@@ -1397,83 +1919,6 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         // ─── CANVASES RENDER CODES ───────────────────────────────────────────
         
-        function drawMinimap() {
-            const canvas = document.getElementById('minimap-canvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-            
-            const w = rect.width;
-            const h = rect.height;
-            
-            ctx.clearRect(0, 0, w, h);
-            
-            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim();
-            ctx.lineWidth = 1;
-            const step = 20;
-            for (let x = 0; x < w; x += step) {
-                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-            }
-            for (let y = 0; y < h; y += step) {
-                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
-            }
-            
-            ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim();
-            ctx.beginPath();
-            ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h);
-            ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
-            ctx.stroke();
-            
-            const scale = 30; // px/m
-            const cx = w / 2;
-            const cy = h / 2;
-            
-            // Path
-            if (window.slamPath && window.slamPath.length > 0) {
-                ctx.strokeStyle = 'rgba(99, 102, 241, 0.6)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                window.slamPath.forEach((pt, idx) => {
-                    const px = cx + pt.x * scale;
-                    const py = cy - pt.y * scale;
-                    if (idx === 0) ctx.moveTo(px, py);
-                    else ctx.lineTo(px, py);
-                });
-                ctx.stroke();
-            }
-            
-            // Robot
-            const rx = cx + window.robotPose.x * scale;
-            const ry = cy - window.robotPose.y * scale;
-            const rtheta = -window.robotPose.theta;
-            
-            ctx.save();
-            ctx.translate(rx, ry);
-            ctx.rotate(rtheta);
-            
-            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
-            ctx.beginPath();
-            ctx.moveTo(12, 0);
-            ctx.lineTo(-8, -8);
-            ctx.lineTo(-4, 0);
-            ctx.lineTo(-8, 8);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(0, 0, 10 + (Date.now() % 1000) / 100, 0, Math.PI * 2);
-            ctx.stroke();
-            
-            ctx.restore();
-        }
-
         function drawSLAMMap() {
             const canvas = document.getElementById('slam-map-canvas');
             if (!canvas) return;
@@ -1652,7 +2097,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             statusEl.textContent = 'Connexion au flux HLS...';
             
             // Use HLS stream via MediaMTX (already working and reliable)
-            const hlsUrl = `http://ha.arthonetwork.fr:48888/robot/cam${camId}/index.m3u8`;
+            const hlsUrl = `${window.location.protocol}//${window.location.hostname}:48888/robot/cam${camId}/index.m3u8`;
             
             // Check if HLS.js is available, otherwise try native HLS (Safari) or show error
             if (typeof Hls !== 'undefined' && Hls.isSupported()) {
@@ -1798,7 +2243,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             statusEl.style.display = 'flex';
             statusEl.textContent = 'Connexion au flux HLS...';
             
-            const hlsUrl = 'http://ha.arthonetwork.fr:48888/robot/cam' + camId + '/index.m3u8';
+            const hlsUrl = window.location.protocol + '//' + window.location.hostname + ':48888/robot/cam' + camId + '/index.m3u8';
             
             if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                 const hls = new Hls({ 
@@ -1983,7 +2428,30 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
         }
 
-function updateSLAMMode() {
+// ─── V-SLAM mode helper (used by updateSLAMMode + toggleVSlamTest pre-flight)
+        function getCurrentSlamMode() {
+            const sensors = window.lastTelemetryState && window.lastTelemetryState.sensors;
+            const cam1 = !!(sensors && sensors.cam1_connected === true);
+            const cam2 = !!(sensors && sensors.cam2_connected === true);
+            const camCount = (cam1 ? 1 : 0) + (cam2 ? 1 : 0);
+            let mode = 'Aucune cam';
+            let modeColor = '#ef4444';
+            let bgColor = 'rgba(239,68,68,0.12)';
+            if (camCount === 0) {
+                mode = 'Aucune caméra';
+            } else if (camCount === 1) {
+                mode = 'Mono';
+                modeColor = '#f59e0b';
+                bgColor = 'rgba(245,158,11,0.12)';
+            } else {
+                mode = 'Stéréo';
+                modeColor = '#22c55e';
+                bgColor = 'rgba(34,197,94,0.12)';
+            }
+            return { mode: mode, modeColor: modeColor, bgColor: bgColor, cam1: cam1, cam2: cam2, hasTelemetry: !!sensors };
+        }
+
+        function updateSLAMMode() {
             const badge = document.getElementById('slam-mode-badge');
             const camerasBadge = document.getElementById('slam-cameras-badge');
             const overlay = document.getElementById('slam-disabled-overlay');
@@ -2004,7 +2472,7 @@ function updateSLAMMode() {
                 mode = 'Aucune cam\u00e9ra';
                 modeColor = '#ef4444';
                 bgColor = 'rgba(239,68,68,0.12)';
-                if (overlay) overlay.style.display = 'block';
+                if (overlay) overlay.style.display = 'flex';
             } else if (camCount === 1) {
                 mode = 'Mono';
                 modeColor = '#f59e0b';
@@ -2023,32 +2491,20 @@ function updateSLAMMode() {
             if (camerasBadge) {
                 camerasBadge.textContent = camCount + ' cam\u00e9ra' + (camCount > 1 ? 's' : '') + ' d\u00e9tect\u00e9e' + (camCount > 1 ? 's' : '');
             }
-        }
         
-        // Update SLAM mode on telemetry update and tab switch
-        const _origSwitchTab = switchTab;
-        switchTab = function(tabId) {
-            _origSwitchTab(tabId);
-            if (tabId === 'map') updateSLAMMode();
-        };
         
-        // Also update when telemetry changes
-        setInterval(() => {
-            if (activeTab === 'map') updateSLAMMode();
-        }, 2000);
-function saveSLAMParameters() {
-            alert("Paramètres SLAM appliqués temporairement au visualiseur.");
-            drawSLAMMap();
-        }
 
-        // Periodic drawing loop
-        setInterval(() => {
-            if (activeTab === 'diagnostics') {
-                drawMinimap();
-            } else if (activeTab === 'map') {
-                drawSLAMMap();
+            // Aussi copier le mode dans le badge de la Console de Test V-SLAM (toujours visible)
+            const testBadge = document.getElementById('vslam-test-mode-badge');
+            if (testBadge) {
+                testBadge.textContent = 'Mode: ' + mode;
+                testBadge.style.background = bgColor;
+                testBadge.style.color = modeColor;
+                testBadge.title = (mode === 'Stéréo' ? 'Cam1 + Cam2 connectées au robot'
+                                   : (mode === 'Mono' ? 'Caméra 1 seule connectée au robot'
+                                   : 'Aucune caméra détectée par le robot'));
             }
-        }, 250);
+        }
 
         // ─── MOBILE SIDEBAR ACTIONS ───────────────────────────────────────────
 
@@ -2108,7 +2564,6 @@ function saveSLAMParameters() {
                 closeFolderDetails();
                 loadFacesGallery();
             } else if (tabId === 'diagnostics') {
-                setTimeout(drawMinimap, 100);
             } else if (tabId === 'map') {
                 setTimeout(drawSLAMMap, 100);
             } else if (tabId === 'control') {
@@ -2186,6 +2641,7 @@ function saveSLAMParameters() {
                         if (selectRight && state.camera_mapping.right && selectRight.value !== state.camera_mapping.right) {
                             selectRight.value = state.camera_mapping.right;
                         }
+                        if (typeof updateCameraPortOptions === 'function') updateCameraPortOptions();
                     }
                     
                     if (state.ai_state) {
@@ -2459,6 +2915,7 @@ function saveSLAMParameters() {
 
             statusEl.textContent = 'Connexion WebRTC…';
             statusEl.className = 'status-badge';
+            streamingState[camId] = 'connecting';
             placeholder.style.display = 'none';
             videoContainer.style.display = 'block';
             videoEl.style.display = 'none';
@@ -2477,6 +2934,11 @@ function saveSLAMParameters() {
                     if (peerConnections[camId] === pc) peerConnections[camId] = null;
                 }
                 window.localViewing[camId] = false;
+                window.userClosedStream[camId] = true;
+                streamingState[camId] = 'idle';
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: 'release_camera', camera: camId }));
+                }
                 loaderEl.style.display = 'none';
                 videoEl.style.display = 'none';
                 fsBtn.style.display = 'none';
@@ -2489,7 +2951,7 @@ function saveSLAMParameters() {
             };
 
             try {
-                pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
                 peerConnections[camId] = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
@@ -2562,16 +3024,225 @@ function saveSLAMParameters() {
             }
         }
 
+        function queryCameraResolutions(camId) {
+            const btn = document.getElementById('detect-res-btn-' + camId);
+            const statusEl = document.getElementById('stream-quality-status');
+            const originalText = btn ? btn.textContent : '🔍';
+            if (btn) {
+                btn.textContent = '⏳...';
+                btn.disabled = true;
+            }
+            statusEl.textContent = 'Détection des résolutions caméra ' + camId + '...';
+            statusEl.style.color = 'var(--text-secondary)';
+
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({
+                    type: 'query_camera_resolutions',
+                    camera: camId
+                }));
+            }
+
+            // Restore button after timeout (in case no response)
+            setTimeout(() => {
+                if (btn) {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }
+                if (statusEl.textContent.startsWith('Détection')) {
+                    statusEl.textContent = 'Délai dépassé — essayez de connecter la caméra';
+                    statusEl.style.color = 'var(--danger)';
+                    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+                }
+            }, 12000);
+        }
+
+        async function saveStreamQualityConfig() {
+            const statusEl = document.getElementById('stream-quality-status');
+            const config = {
+                cam1: {
+                    stream_res: document.getElementById('stream-res-1').value,
+                    stream_fps: parseInt(document.getElementById('stream-fps-1').value),
+                    vslam_res: document.getElementById('vslam-res-1').value,
+                    codec: document.getElementById('stream-codec-1').value,
+                },
+                cam2: {
+                    stream_res: document.getElementById('stream-res-2').value,
+                    stream_fps: parseInt(document.getElementById('stream-fps-2').value),
+                    vslam_res: document.getElementById('vslam-res-2').value,
+                    codec: document.getElementById('stream-codec-2').value,
+                }
+            };
+
+            statusEl.textContent = 'Enregistrement...';
+            statusEl.style.color = 'var(--text-secondary)';
+
+            try {
+                // Save to gateway
+                const res = await fetch('/core/stream/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Token': apiToken
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                if (res.ok) {
+                    // Send to robot via WebSocket
+                    if (appWs && appWs.readyState === WebSocket.OPEN) {
+                        appWs.send(JSON.stringify({
+                            type: 'stream_quality_config',
+                            config: config
+                        }));
+                    }
+                    statusEl.textContent = 'Configuration appliquée';
+                    statusEl.style.color = 'var(--success)';
+                } else {
+                    statusEl.textContent = 'Erreur sauvegarde';
+                    statusEl.style.color = 'var(--danger)';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Erreur réseau';
+                statusEl.style.color = 'var(--danger)';
+            }
+
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+        }
+
+        // Load saved quality config on page init
+        function getStreamQualityParams(camId) {
+            // Read current quality settings from the DOM dropdowns
+            const params = {};
+            const resEl = document.getElementById('stream-res-' + camId);
+            const fpsEl = document.getElementById('stream-fps-' + camId);
+            const codecEl = document.getElementById('stream-codec-' + camId);
+            const vslamResEl = document.getElementById('vslam-res-' + camId);
+            if (resEl && resEl.value) params.stream_res = resEl.value;
+            if (fpsEl && fpsEl.value) params.stream_fps = parseInt(fpsEl.value, 10);
+            if (codecEl && codecEl.value) params.codec = codecEl.value;
+            if (vslamResEl && vslamResEl.value) params.vslam_res = vslamResEl.value;
+            return params;
+        }
+
+        async function loadStreamQualityConfig() {
+            try {
+                const res = await fetch('/core/stream/config', {
+                    headers: { 'X-API-Token': apiToken }
+                });
+                if (!res.ok) return;
+                const config = await res.json();
+
+                if (config.cam1) {
+                    if (config.cam1.stream_res) document.getElementById('stream-res-1').value = config.cam1.stream_res;
+                    if (config.cam1.stream_fps) document.getElementById('stream-fps-1').value = config.cam1.stream_fps;
+                    if (config.cam1.vslam_res) document.getElementById('vslam-res-1').value = config.cam1.vslam_res;
+                    if (config.cam1.codec) document.getElementById('stream-codec-1').value = config.cam1.codec;
+                }
+                if (config.cam2) {
+                    if (config.cam2.stream_res) document.getElementById('stream-res-2').value = config.cam2.stream_res;
+                    if (config.cam2.stream_fps) document.getElementById('stream-fps-2').value = config.cam2.stream_fps;
+                    if (config.cam2.vslam_res) document.getElementById('vslam-res-2').value = config.cam2.vslam_res;
+                    if (config.cam2.codec) document.getElementById('stream-codec-2').value = config.cam2.codec;
+                }
+            } catch (e) {
+                // Config not available yet, use defaults
+            }
+        }
+
+
+
+        // ─── Smart Camera Port Dropdowns ──────────────────────────────────
+        // - Filter to only /dev/videoX that have live USB data (from telemetry)
+        // - Disallow selecting same port on left AND right (rollback to last-good on conflict)
+        // - When only 1 active device: disable right + show "caméra central" helper
+        function updateCameraPortOptions() {
+            // Determine active devices from telemetry (with sensible 5-path fallback)
+            const fallback = ['/dev/video0', '/dev/video1', '/dev/video2', '/dev/video3', '/dev/video4'];
+            let activeDevices = fallback;
+            const ts = window.lastTelemetryState;
+            if (ts && ts.sensors && Array.isArray(ts.sensors.available_video_devices) && ts.sensors.available_video_devices.length > 0) {
+                activeDevices = ts.sensors.available_video_devices.slice().sort();
+            }
+
+            const leftSelect = document.getElementById('cam-port-left');
+            const rightSelect = document.getElementById('cam-port-right');
+            const helper = document.getElementById('cam-port-single-info');
+            if (!leftSelect || !rightSelect) return;
+
+            // Last-known-good mapping (from telemetry) is our rollback anchor when conflict detected.
+            const telMapping = (ts && ts.camera_mapping) || null;
+            const lastGoodLeft  = (telMapping && activeDevices.includes(telMapping.left))  ? telMapping.left  : activeDevices[0];
+            const lastGoodRight = (telMapping && activeDevices.includes(telMapping.right)) ? telMapping.right : null;
+
+            if (activeDevices.length <= 1) {
+                // Single-camera mode -> grey out right, label as 'central'
+                const only = activeDevices[0] || '(aucune)';
+                leftSelect.innerHTML = '<option value="' + only + '">' + only + '</option>';
+                leftSelect.value = only;
+                rightSelect.innerHTML = '<option value="">—</option>';
+                rightSelect.value = '';
+                rightSelect.disabled = true;
+                if (helper) helper.style.display = 'block';
+                return;
+            }
+
+            // Multi-camera mode: detect conflict (user just picked a port already used by the OTHER side).
+            // Rollback BOTH to the last-known-good mapping so the user sees a stable, valid state.
+            if (leftSelect.value && rightSelect.value && leftSelect.value === rightSelect.value) {
+                leftSelect.value  = lastGoodLeft;
+                rightSelect.value = lastGoodRight || '';
+                if (typeof showToast === 'function') {
+                    showToast('Caméras', 'Mapping invalide (même port choisi sur les deux côtés). Retour au dernier mapping valide.', 'warning');
+                }
+            }
+
+            // Each select excludes the OTHER's current value (mutually exclusive).
+            rightSelect.disabled = false;
+            if (helper) helper.style.display = 'none';
+
+            const leftOpts  = activeDevices.filter(d => d !== rightSelect.value);
+            const rightOpts = activeDevices.filter(d => d !== leftSelect.value);
+            leftSelect.innerHTML  = leftOpts.map(d  => '<option value="' + d + '">' + d + '</option>').join('');
+            rightSelect.innerHTML = rightOpts.map(d => '<option value="' + d + '">' + d + '</option>').join('');
+
+            // Re-assert current value if it survived the rebuild (so the visible selection stays).
+            if (leftOpts.includes(leftSelect.value)) {
+                leftSelect.value = leftSelect.value;
+            }
+            if (rightOpts.includes(rightSelect.value)) {
+                rightSelect.value = rightSelect.value;
+            }
+        }
+
         function saveCameraPortsMapping() {
-            const left = document.getElementById('cam-port-left').value;
-            const right = document.getElementById('cam-port-right').value;
+            const leftSelect = document.getElementById('cam-port-left');
+            const rightSelect = document.getElementById('cam-port-right');
+            const left = leftSelect ? leftSelect.value : '';
+            const right = rightSelect ? rightSelect.value : '';
+            const statusEl = document.getElementById('camera-mapping-save-status');
+            function setStatus(text, color) {
+                if (statusEl) {
+                    statusEl.textContent = text;
+                    statusEl.style.color = color || 'var(--text-secondary)';
+                }
+            }
+            if (!left || !right) {
+                setStatus('Selectionnez les deux c\u00f4t\u00e9s (gauche + droite).', 'var(--danger)');
+                return;
+            }
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({
                     type: "save_camera_mapping",
                     left: left,
                     right: right
                 }));
-                showToast("Configuration des ports caméra envoyée au robot (Redémarrage ROS en cours)...");
+                setStatus('Sauvegard\u00e9 ! Envoi au robot (red\u00e9marrage ROS en cours)...', 'var(--success)');
+                setTimeout(() => setStatus('', null), 5000);
+            } else {
+                setStatus('Erreur: WebSocket d\u00e9connect\u00e9. Rechargez la page.', 'var(--danger)');
+                console.error('[saveCameraPortsMapping] WebSocket not open, readyState=', appWs ? appWs.readyState : 'null');
             }
         }
 
@@ -2724,7 +3395,7 @@ function saveSLAMParameters() {
             btnRun.innerHTML = `<span>📷 Connexion...</span>`;
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false }));
+                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false, ...getStreamQualityParams(camId) }));
             }
             
             statusText.innerHTML = `
@@ -2755,7 +3426,7 @@ function saveSLAMParameters() {
 
             try {
                 if (mccPeerConnection) mccPeerConnection.close();
-                pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
                 mccPeerConnection = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
@@ -2930,16 +3601,21 @@ function saveSLAMParameters() {
 
             if (!window.localViewing[camId]) {
                 // === DÉMARRER ===
+                if (streamingState[camId] === 'requesting' || streamingState[camId] === 'connecting' || streamingState[camId] === 'active') {
+                    console.warn('[Stream] Cam ' + camId + ' déjà en cours (' + streamingState[camId] + '), ignoré.');
+                    return;
+                }
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     let vSlamVal = false;
                     if (camId === 1) {
                         const vSlamCheck = document.getElementById('stream-v-slam-1');
                         if (vSlamCheck) vSlamVal = vSlamCheck.checked;
                     }
-                    appWs.send(JSON.stringify({type: "request_camera", camera: camId, v_slam: vSlamVal}));
+                    appWs.send(JSON.stringify({type: "request_camera", camera: camId, v_slam: vSlamVal, ...getStreamQualityParams(camId)}));
                     window.localViewing[camId] = true;
                     if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
                     window.userClosedStream[camId] = false;
+                    streamingState[camId] = 'requesting';
 
                     statusEl.textContent = 'Connexion WebRTC…';
                     statusEl.className = 'status-badge';
@@ -2955,9 +3631,15 @@ function saveSLAMParameters() {
                 window.localViewing[camId] = false;
                 if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
                 window.userClosedStream[camId] = true;
+                streamingState[camId] = 'closing';
 
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    // FIX: Envoyer stop_camera (coupe immediatement cote robot) ET release_camera (cleanup listeners).
+                    // Sans stop_camera, le gateway attend 30s avant de dire au robot de couper.
+                    appWs.send(JSON.stringify({type: "stop_camera", camera: camId}));
                     appWs.send(JSON.stringify({type: "release_camera", camera: camId}));
+                }
                 }
 
                 // Fermer la PeerConnection immédiatement
@@ -2993,11 +3675,49 @@ function saveSLAMParameters() {
             }
         }
 
+        function updateCalibrationBadges(calStatus) {
+            for (let camId of [1, 2]) {
+                const badge = document.getElementById('calib-badge-' + camId);
+                if (!badge) continue;
+                const camData = calStatus[String(camId)] || calStatus[camId] || {};
+                const calibrated = camData.calibrated === true;
+                if (calibrated) {
+                    badge.textContent = '✅ Calibrée';
+                    badge.style.background = 'rgba(34,197,94,0.15)';
+                    badge.style.color = 'var(--success)';
+                    badge.style.borderColor = 'rgba(34,197,94,0.3)';
+                    badge.setAttribute('data-calibrated', 'true');
+                } else {
+                    badge.textContent = '⚠ Non calibrée';
+                    badge.style.background = 'rgba(239,68,68,0.15)';
+                    badge.style.color = 'var(--danger)';
+                    badge.style.borderColor = 'rgba(239,68,68,0.3)';
+                    badge.setAttribute('data-calibrated', 'false');
+                }
+            }
+        }
+
+        // Check calibration before enabling V-SLAM (gate for future autonomous mode too)
+        function isCameraCalibrated(camId) {
+            const badge = document.getElementById('calib-badge-' + camId);
+            if (!badge) return false;
+            return badge.getAttribute('data-calibrated') === 'true';
+        }
+
         function handleVSlamToggleChange() {
             if (window.localViewing && window.localViewing[1]) {
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     const vSlamCheck = document.getElementById('stream-v-slam-1');
                     const vSlamVal = vSlamCheck ? vSlamCheck.checked : false;
+
+                    // V-SLAM gatekeeping: block if camera not calibrated
+                    if (vSlamVal && !isCameraCalibrated(1)) {
+                        if (vSlamCheck) vSlamCheck.checked = false;
+                        if (typeof showToast === 'function') {
+                            showToast('V-SLAM bloqué', 'Calibrez la caméra 1 dans Arduino & Calib avant d\'activer le V-SLAM.', 'warning');
+                        }
+                        return;
+                    }
                     
                     const loaderEl = document.getElementById('stream-loader-1');
                     const videoEl = document.getElementById('video-cam-1');
@@ -3012,7 +3732,7 @@ function saveSLAMParameters() {
                         statusEl.className = 'status-badge';
                     }
                     
-                    appWs.send(JSON.stringify({type: "request_camera", camera: 1, v_slam: vSlamVal}));
+                    appWs.send(JSON.stringify({type: "request_camera", camera: 1, v_slam: vSlamVal, ...getStreamQualityParams(1)}));
                     startStreamWebRTC(1);
                 }
             }
@@ -3267,14 +3987,151 @@ function saveSLAMParameters() {
             if (e.target === document.getElementById('mygesModal')) closeMygesModal();
         }
 
+        async function handleMygesTest() {
+            const resultDiv = document.getElementById('myges-test-result');
+            const btn = document.getElementById('btn-myges-test');
+            const username = document.getElementById('form-myges-username').value.trim();
+            const password = document.getElementById('form-myges-password').value;
+            
+            if (!username || !password) {
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                resultDiv.style.color = '#ef4444';
+                resultDiv.innerHTML = 'Veuillez remplir les deux champs.';
+                return;
+            }
+            
+            // Show loading state
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Test en cours...';
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'rgba(99,102,241,0.1)';
+            resultDiv.style.color = '#6366f1';
+            resultDiv.innerHTML = 'Connexion en cours...';
+            
+            try {
+                const res = await fetch('/myges/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Token': apiToken
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    resultDiv.style.background = 'rgba(34,197,94,0.1)';
+                    resultDiv.style.color = '#22c55e';
+                    resultDiv.innerHTML = '✅ ' + data.message;
+                } else {
+                    resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                    resultDiv.style.color = '#ef4444';
+                    resultDiv.innerHTML = '❌ ' + data.message;
+                }
+            } catch (e) {
+                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                resultDiv.style.color = '#ef4444';
+                resultDiv.innerHTML = '❌ Erreur réseau.';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Tester la connexion';
+            }
+        }
+
+        async function handleMygesTest() {
+            const resultDiv = document.getElementById('myges-test-result');
+            const btn = document.getElementById('btn-myges-test');
+            const username = document.getElementById('form-myges-username').value.trim();
+            const password = document.getElementById('form-myges-password').value;
+            
+            if (!username || !password) {
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                resultDiv.style.color = '#ef4444';
+                resultDiv.textContent = 'Veuillez remplir les deux champs.';
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Test en cours...';
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'rgba(99,102,241,0.1)';
+            resultDiv.style.color = '#6366f1';
+            resultDiv.textContent = 'Connexion en cours...';
+            
+            try {
+                const res = await fetch('/myges/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Token': apiToken
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    resultDiv.style.background = 'rgba(34,197,94,0.1)';
+                    resultDiv.style.color = '#22c55e';
+                    resultDiv.textContent = data.message;
+                } else {
+                    resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                    resultDiv.style.color = '#ef4444';
+                    resultDiv.textContent = data.message;
+                }
+            } catch (e) {
+                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                resultDiv.style.color = '#ef4444';
+                resultDiv.textContent = 'Erreur réseau.';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '&#128269; Tester la connexion';
+            }
+        }
+
         async function handleMygesSubmit(e) {
             e.preventDefault();
             const name = document.getElementById('form-myges-name').value;
             const username = document.getElementById('form-myges-username').value.trim();
             const password = document.getElementById('form-myges-password').value;
+            const resultDiv = document.getElementById('myges-test-result');
+
+            if (!username || !password) {
+                resultDiv.style.display = 'block';
+                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                resultDiv.style.color = '#ef4444';
+                resultDiv.textContent = 'Veuillez remplir les deux champs.';
+                return;
+            }
+
+            // Show testing state
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'rgba(99,102,241,0.1)';
+            resultDiv.style.color = '#6366f1';
+            resultDiv.textContent = 'Test des identifiants en cours...';
 
             try {
-                const res = await fetch(`/myges?name=${encodeURIComponent(name)}`, {
+                // Step 1: Test credentials
+                const testRes = await fetch('/myges/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Token': apiToken
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                const testData = await testRes.json();
+
+                if (testData.status !== 'success') {
+                    resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                    resultDiv.style.color = '#ef4444';
+                    resultDiv.textContent = '❌ ' + testData.message;
+                    return;
+                }
+
+                // Step 2: Save credentials
+                const saveRes = await fetch(`/myges?name=${encodeURIComponent(name)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -3283,14 +4140,20 @@ function saveSLAMParameters() {
                     body: JSON.stringify({ username, password })
                 });
 
-                if (res.ok) {
-                    closeMygesModal();
-                    loadAccounts();
+                if (saveRes.ok) {
+                    resultDiv.style.background = 'rgba(34,197,94,0.1)';
+                    resultDiv.style.color = '#22c55e';
+                    resultDiv.textContent = '✅ Identifiants valides et sauvegardés !';
+                    setTimeout(() => { closeMygesModal(); loadAccounts(); }, 800);
                 } else {
-                    alert('Erreur lors de la sauvegarde MyGES.');
+                    resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                    resultDiv.style.color = '#ef4444';
+                    resultDiv.textContent = '❌ Erreur lors de la sauvegarde.';
                 }
             } catch (e) {
-                alert('Erreur réseau.');
+                resultDiv.style.background = 'rgba(239,68,68,0.1)';
+                resultDiv.style.color = '#ef4444';
+                resultDiv.textContent = '❌ Erreur réseau.';
             }
         }
 
@@ -4042,13 +4905,8 @@ async function triggerUpdate(target) {
     function ecGoToStep(targetStep) {
         const maxGoto = ecCameraCount >= 2 ? 6 : 4;
         if (targetStep < 1 || targetStep > maxGoto) return;
-        // Cannot skip joint calibration if not completed
-        if (targetStep > 1 && !ecAllJointsValidated && ecCurrentStep === 1) {
-            if (typeof showToast === 'function') {
-                showToast("Navigation", "Terminez la calibration des 12 articulations avant de continuer", "warning");
-            }
-            return;
-        }
+        // Allow skipping joint calibration (toast handled by ecSkipStep)
+        // No block here — ecSkipStep shows the info toast when explicitly skipping
         // Close any open camera streams when leaving step 2/3
         if (ecCurrentStep === 2 || ecCurrentStep === 3) {
             for (let id of [1, 2]) {
@@ -4295,7 +5153,7 @@ async function triggerUpdate(target) {
             }
             
             let canGoNext = false;
-            if (step === 1 && ecCalibratedMotors) canGoNext = true;
+            if (step === 1) canGoNext = true;
             if (step === 2 && ecCalibratedCam1) canGoNext = true;
             if (step === 3 && ecCalibratedCam2) canGoNext = true;
             if (step === 4) canGoNext = false;
@@ -4303,7 +5161,43 @@ async function triggerUpdate(target) {
             document.getElementById('ec-btn-next').disabled = !canGoNext;
         }
 
+        function ecSkipStep() {
+            // If on step 1 (motor offsets), detach servo if attached and advance
+            if (ecCurrentStep === 1) {
+                if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
+                    const currentJoint = EC_JOINT_ORDER[ecJointIndex] || EC_JOINT_ORDER[0];
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: currentJoint.idx }));
+                    ecJointServoAttached = false;
+                }
+                if (typeof showToast === 'function') {
+                    showToast("EasyConfig", "Étape offsets moteur ignorée. Les offsets existants sont conservés.", "info");
+                }
+                ecNextStep();
+                return;
+            }
+            // Skip current step without doing calibration work
+            ecNextStep();
+        }
+
         function ecPrevStep() {
+            // Joint-level navigation during step 1 (joint calibration wizard)
+            if (ecCurrentStep === 1 && ecJointIndex > 0) {
+                const currentJoint = EC_JOINT_ORDER[ecJointIndex];
+                if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: currentJoint.idx }));
+                }
+                ecJointServoAttached = false;
+                ecJointIndex--;
+                ecShowJoint(ecJointIndex);
+                // Restore slider value from saved offset for this joint
+                const prevJoint = EC_JOINT_ORDER[ecJointIndex];
+                const savedOffset = ecTempOffsets[prevJoint.idx] || 0;
+                document.getElementById('ec-joint-slider').value = savedOffset;
+                document.getElementById('ec-joint-slider-value').textContent = savedOffset;
+                document.getElementById('ec-joint-limit-warning').style.display = 'none';
+                return;
+            }
+
             if (ecCurrentStep > 1) {
                 if (ecCurrentStep >= 2 && ecCurrentStep <= 5) {
                 ecCleanupStereoListeners();
@@ -4431,7 +5325,7 @@ async function triggerUpdate(target) {
             btnRun.innerHTML = `<span>📷 Connexion...</span>`;
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false }));
+                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false, ...getStreamQualityParams(camId) }));
             }
             
             statusText.innerHTML = `
@@ -4462,7 +5356,7 @@ async function triggerUpdate(target) {
             };
 
             try {
-                pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
                 ecPeerConnections[camId] = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
@@ -4651,8 +5545,28 @@ async function triggerUpdate(target) {
             const rateVal = document.getElementById('vslam-rate-val');
             
             if (!window.vslamTesting) {
+                // Pre-flight (note: V-SLAM tourne sur le robot en LOCAL — il
+                // nécessite uniquement la présence physique d'une caméra USB,
+                // pas que l'utilisateur active le streaming depuis Vue d'ensemble).
+                const slamInfo = getCurrentSlamMode();
+                if (!slamInfo.hasTelemetry) {
+                    if (typeof showToast === 'function') showToast('V-SLAM', 'Aucune télémétrie reçue du robot. Vérifiez que le robot est en ligne.', 'error');
+                    else alert('V-SLAM: aucune télémétrie du robot.');
+                    return;
+                }
+                if (!slamInfo.cam1 && !slamInfo.cam2) {
+                    if (typeof showToast === 'function') showToast('V-SLAM', 'Le robot ne détecte aucune caméra USB. Vérifiez le branchement physique et le mapping (onglet Arduino & Calib).', 'error');
+                    else alert('V-SLAM: aucune caméra détectée.');
+                    return;
+                }
+                if (typeof showToast === 'function') {
+                    const label = (slamInfo.cam1 && slamInfo.cam2) ? 'Stéréo (Cam1+Cam2)'
+                                 : (slamInfo.cam1 ? 'Mono (Cam2 absente)' : 'Mono (Cam1 absente)');
+                    showToast('V-SLAM', 'Lancement LOCAL du test sur le robot — mode ' + label + ' (indépendant du streaming utilisateur).', 'info');
+                }
+                
                 window.vslamTesting = true;
-                btn.textContent = '⏹️ Arrêter le Test V-SLAM';
+                btn.textContent = '⏹️ Arrêter le Test V-SLAM (' + slamInfo.mode + ')';
                 btn.className = 'btn btn-secondary';
                 container.style.display = 'block';
                 badgeEl.textContent = 'Actif';
@@ -4661,7 +5575,7 @@ async function triggerUpdate(target) {
                 statusVal.style.color = 'var(--accent)';
                 
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
-                    appWs.send(JSON.stringify({ type: "request_camera", camera: 1, v_slam: true }));
+                    appWs.send(JSON.stringify({ type: "request_camera", camera: 1, v_slam: true, ...getStreamQualityParams(1) }));
                 }
                 
                 startVSlamTestWebRTC();
@@ -4775,7 +5689,7 @@ async function triggerUpdate(target) {
             };
 
             try {
-                pc = new RTCPeerConnection({ iceServers: [] });
+                pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
                 vslamPeerConnection = pc;
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
@@ -5210,17 +6124,5 @@ async function triggerUpdate(target) {
             }
         }
 
-        // === DEBUG: Version banner to verify fix is loaded ===
-        console.log("%cBASTET FIX LOADED", "color:green;font-size:16px;font-weight:bold", {openEasyConfig: typeof openEasyConfig, openAddUserModal: typeof openAddUserModal, ecGoToStep: typeof ecGoToStep});
-        
-        // Show green banner for 5s
-        (function() {
-            var b = document.createElement("div");
-            b.id = "bastet-fix-banner";
-            b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#22c55e;color:white;text-align:center;padding:8px;font-weight:bold;font-size:13px;font-family:sans-serif;";
-            b.textContent = "FIX CHARGE - " + new Date().toLocaleTimeString() + " | openEasyConfig=" + typeof openEasyConfig + " | openAddUserModal=" + typeof openAddUserModal;
-            document.body.insertBefore(b, document.body.firstChild);
-            setTimeout(function() { b.style.opacity="0"; b.style.transition="opacity 0.5s"; setTimeout(function() { b.remove(); }, 500); }, 4000);
-        })();
 
         checkAuth();
