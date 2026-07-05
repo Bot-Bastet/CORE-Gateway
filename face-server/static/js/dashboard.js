@@ -295,8 +295,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 
                 if (payload.type === "telemetry_diagnostics") {
                     window.lastArduinoTelemetry = Date.now();
-                    if (payload.cameras) {
-                        updateCameraModularity(payload.cameras.cam1 === true, payload.cameras.cam2 === true);
+                    // FIX: read from payload.sensors (gateway-normalized from
+                    // available_video_devices) instead of payload.cameras (legacy
+                    // ros2_listener boolean, which used to be True for both because
+                    // /dev/v4l/by-id counted UVC metadata endpoints as cameras).
+                    if (payload.sensors) {
+                        updateCameraModularity(
+                            payload.sensors.cam1_connected === true,
+                            payload.sensors.cam2_connected === true
+                        );
                     }
                     // Update calibration status badges
                     if (payload.sensors && payload.sensors.calibration_status) {
