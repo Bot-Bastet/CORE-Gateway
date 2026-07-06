@@ -6,47 +6,253 @@ on:
       - 'v*.*.*'
 
 jobs:
+  # ===========================================================================
+  # 1. Analyse Statique & Style (Flake8 & Black)
+  # ===========================================================================
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    outputs:
+      warnings_count: ${{ steps.parse.outputs.warnings_count }}
+      formatted: ${{ steps.parse.outputs.formatted }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+          
+      - name: Install linting tools
+        run: |
+          pip install flake8 black
+          
+      - name: Run flake8 Analysis
+        run: |
+          # Bloque immédiatement le workflow s'il y a des erreurs de syntaxe critiques
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Compte les autres avertissements de style et de complexité
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics > flake8_report.txt
+
+      - name: Check code formatting (Black)
+        run: |
+          black --check . --exclude='(\.git|\.github|build|dist)' > black_report.txt 2>&1 || true
+
+      - name: Parse Reports
+        id: parse
+        run: |
+          # Extrait le nombre d'avertissements de flake8
+          WARNINGS=$(tail -n 1 flake8_report.txt || echo "0")
+          echo "warnings_count=$WARNINGS" >> $GITHUB_OUTPUT
+          
+          # Vérifie si Black demande un reformatage
+          if grep -q "would reformat" black_report.txt; then
+            echo "formatted=no" >> $GITHUB_OUTPUT
+          else
+            echo "formatted=yes" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload Lint Reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lint-reports
+          path: |
+            flake8_report.txt
+            black_report.txt
+
+  # ===========================================================================
+  # 2. Détection de Duplication de Code (jscpd)
+  # ===========================================================================
+  duplication:
+    name: Code Duplication (jscpd)
+    runs-on: ubuntu-latest
+    outputs:
+      percentage: ${{ steps.parse.outputs.percentage }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: "20"
+          
+      - name: Install jscpd
+        run: npm install -g jscpd
+        
+      - name: Analyse des duplications
+        run: |
+          jscpd . \
+            --threshold 10 \
+            --min-lines 5 \
+            --min-tokens 50 \
+            --reporters "console" \
+            --ignore "**/__pycache__/**,**/dist/**,**/build/**,**/.git/**,**/node_modules/**,**/*.wav,**/*.exe,**/*.spec" > jscpd_output.txt 2>&1 || true
+            
+      - name: Parse and validate duplication
+        id: parse
+        run: |
+          python -c "
+          import re, os
+          with open('jscpd_output.txt') as f:
+              text = f.read()
+          match = re.search(r'(\d+\.?\d*)\s*%', text)
+          val = float(match.group(1)) if match else 0.0
+          percentage = f'{val}%'
+          print(f'Duplication détectée: {percentage}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'percentage={percentage}\n')
+          if val > 10.0:
+              print('Error: La duplication de code dépasse le seuil maximal autorisé de 10% !')
+              exit(1)
+          "
+
+  # ===========================================================================
+  # 3. Analyse de Sécurité SAST (Semgrep)
+  # ===========================================================================
+  security:
+    name: SAST Security Scan (Semgrep)
+    runs-on: ubuntu-latest
+    outputs:
+      findings_count: ${{ steps.parse.outputs.findings_count }}
+    container:
+      image: semgrep/semgrep:1.114.0
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - name: Scan Semgrep
+        env:
+          SEMGREP_SEND_METRICS: "off"
+        run: |
+          semgrep scan --config p/security-audit --config p/owasp-top-ten --json --output semgrep_results.json . || true
+          
+      - name: Parse and validate security findings
+        id: parse
+        run: |
+          python -c "
+          import json, os
+          with open('semgrep_results.json') as f:
+              data = json.load(f)
+          count = len(data.get('results', []))
+          print(f'Failles de sécurité trouvées: {count}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'findings_count={count}\n')
+          if count > 0:
+              print('Error: Faille de sécurité détectée par Semgrep. Release bloquée !')
+              exit(1)
+          "
+
+  # ===========================================================================
+  # 4. Scan de Vulnérabilités & Secrets (Trivy)
+  # ===========================================================================
+  vulnerability:
+    name: Vuln & Secrets Scan (Trivy)
+    runs-on: ubuntu-latest
+    outputs:
+      issues_count: ${{ steps.parse.outputs.issues_count }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      
+      - name: Scan Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: "fs"
+          scan-ref: "."
+          scanners: "vuln,secret"
+          severity: "HIGH,CRITICAL"
+          format: "json"
+          output: "trivy_results.json"
+          
+      - name: Parse and validate Trivy findings
+        id: parse
+        run: |
+          python -c "
+          import json, os
+          with open('trivy_results.json') as f:
+              data = json.load(f)
+          results = data.get('Results', [])
+          issues = 0
+          for r in results:
+              issues += len(r.get('Vulnerabilities', [])) + len(r.get('Secrets', []))
+          print(f'Vulnérabilités ou secrets critiques trouvés: {issues}')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'issues_count={issues}\n')
+          if issues > 0:
+              print('Error: Vulnérabilités/secrets de sévérité HIGH/CRITICAL détectés par Trivy. Release bloquée !')
+              exit(1)
+          "
+
+  # ===========================================================================
+  # 5. Création de l'Archive & Publication de la Release
+  # ===========================================================================
   release:
+    needs: [lint, duplication, security, vulnerability]
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Download Lint Reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: lint-reports
+          path: ./reports
 
       - name: Extract version
         id: version
-        run: echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: echo "VERSION=$REF_NAME" >> $GITHUB_OUTPUT
 
       - name: Update version.txt
-        run: echo "${{ steps.version.outputs.VERSION }}" > face-server/version.txt
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: echo "$VERSION" > face-server/version.txt
 
       - name: Create Release Archive
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           cd face-server
-          zip -r ../core-gateway-${{ steps.version.outputs.VERSION }}.zip . \
+          zip -r ../core-gateway-$VERSION.zip . \
             --exclude "__pycache__/*" \
             --exclude "*.pyc"
 
+      - name: Generate Release Body
+        run: |
+          cat << 'EOF' > release_body.md
+          ## CORE-Gateway ${{ steps.version.outputs.VERSION }}
+
+          ### 📦 Installation rapide
+          ```bash
+          # Télécharger et déployer
+          curl -L https://github.com/Bot-Bastet/CORE-Gateway/releases/download/${{ steps.version.outputs.VERSION }}/core-gateway-${{ steps.version.outputs.VERSION }}.zip -o gateway.zip
+          unzip gateway.zip
+          cp .env.example .env  # Configurer le token
+          docker compose up -d --build
+          ```
+
+          ### 🔄 Mise à jour depuis une installation existante
+          Le service se met à jour automatiquement via l'auto-updater intégré.
+
+          ### 📊 Rapport de Qualité & Sécurité (Quality Gate)
+          | Test | Statut | Métrique | Limite |
+          | :--- | :---: | :---: | :---: |
+          | 🔍 Syntaxe & Erreurs critiques (Flake8) | ✅ Conforme | 0 erreur | 0 |
+          | 📏 Avertissements de style (Flake8) | ✅ Info | ${{ needs.lint.outputs.warnings_count }} avertissements | Info |
+          | ✨ Formatage de code (Black) | ${{ needs.lint.outputs.formatted == 'yes' && '✅ Conforme' || '⚠️ Non conforme' }} | ${{ needs.lint.outputs.formatted == 'yes' && 'Formaté' || 'Non formaté' }} | Info |
+          | 📏 Duplication de code (jscpd) | ✅ Conforme | ${{ needs.duplication.outputs.percentage }} | <= 10% |
+          | 🛡️ Failles de sécurité (Semgrep) | ✅ Conforme | ${{ needs.security.outputs.findings_count }} faille | 0 |
+          | 🔐 Vulnérabilités & Secrets (Trivy) | ✅ Conforme | ${{ needs.vulnerability.outputs.issues_count }} vuln/secret | 0 |
+          EOF
+
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           name: "CORE-Gateway ${{ steps.version.outputs.VERSION }}"
-          body: |
-            ## CORE-Gateway ${{ steps.version.outputs.VERSION }}
-
-            ### Installation rapide
-            ```bash
-            # Télécharger et déployer
-            curl -L https://github.com/Bot-Bastet/CORE-Gateway/releases/download/${{ steps.version.outputs.VERSION }}/core-gateway-${{ steps.version.outputs.VERSION }}.zip -o gateway.zip
-            unzip gateway.zip
-            cp .env.example .env  # Configurer le token
-            docker compose up -d --build
-            ```
-
-            ### Mise à jour depuis une installation existante
-            Le service se met à jour automatiquement via l'auto-updater intégré.
+          body_path: release_body.md
           files: |
             core-gateway-${{ steps.version.outputs.VERSION }}.zip
           draft: false
