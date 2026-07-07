@@ -137,7 +137,71 @@ L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
 Géré par MediaMTX (intégré à la Gateway). L'encodage vidéo H.264 utilise obligatoirement le profil standard `yuv420p` pour assurer une compatibilité totale avec les navigateurs web récents.
 - **RTSP (Publication/Lecture)** : `rtsp://GATEWAY_IP:48554/robot/cam1` (Basse latence, pour le Node/IA)
 - **HLS** : `https://ha.arthonetwork.fr:48888/robot/cam1/` (Streaming web via lecteur intégré Caddy)
-- **WebRTC** : `https://ha.arthonetwork.fr:48889/robot/cam1` (Ultra-basse latence pour l'App Mobile)
+- **WebRTC (WHEP)** : `https://ha.arthonetwork.fr:48889/robot/cam1/whep` (Ultra-basse latence pour navigateurs et App Mobile)
+
+### 5.1 API REST des Flux Caméras (On-Demand)
+
+Tous les endpoints ci-dessous nécessitent `X-API-Token` dans le header.
+
+#### **GET `/api/cameras`**
+Retourne le manifest des caméras actuellement détectées par le robot.
+```json
+{
+  "cameras": {
+    "1": { "connected": true, "device": "/dev/video0", "calibrated": true },
+    "2": { "connected": false, "device": null, "calibrated": false }
+  }
+}
+```
+
+#### **GET `/api/streams`**
+Retourne l'état de tous les flux caméras.
+```json
+{
+  "streams": {
+    "1": { "running": true, "viewers": 2, "rest_viewers": ["web-abc123"], "browser_viewers": 1, "idle_kill_ms": 58000, "v_slam": false, "keep_alive": false },
+    "2": { "running": false, "viewers": 0, "rest_viewers": [], "browser_viewers": 0, "idle_kill_ms": 0, "v_slam": false, "keep_alive": false }
+  }
+}
+```
+
+#### **GET `/api/streams/{cam}`**
+Retourne l'état d'un flux caméra spécifique (cam = 1 ou 2).
+
+#### **POST `/api/streams/{cam}/join`**
+S'enregistre comme viewer REST de la caméra. Si premier viewer, **déclenche `start_camera` sur le robot** (lancement ffmpeg → MediaMTX).
+- **Body** : `{ "client_id": "web-abc123" }` (optionnel, auto-généré si absent)
+- **Réponse** : `{ "status": "starting", "client_id": "web-abc123", "running": true, "viewers": 1, ... }`
+- **Erreur 409** : Si la caméra n'est pas branchée physiquement
+
+#### **DELETE `/api/streams/{cam}/leave`**
+Retire un viewer REST. Si plus aucun viewer (WS + REST = 0), lance un **minuteur d'extinction de 60s**.
+- **Body** : `{ "client_id": "web-abc123" }` (obligatoire)
+- **Réponse** : `{ "status": "left", "cooldown_starts": true, ... }`
+
+#### **POST `/api/streams/{cam}/stop`**
+Arrêt forcé (anti-griefing : 409 si d'autres viewers regardent encore).
+
+### 5.2 Messages WebSocket (Stream)
+
+Envoyés via `wss://ha.arthonetwork.fr:44888/ws/app`.
+
+- **`request_camera`** (App → Gateway → Robot) : Démarre le streaming d'une caméra.
+  ```json
+  { "type": "request_camera", "camera": 1, "v_slam": false }
+  ```
+- **`release_camera`** (App → Gateway) : Libère l'abonnement WebSocket à la caméra.
+  ```json
+  { "type": "release_camera", "camera": 1 }
+  ```
+- **`stream_status`** (Gateway → App) : Notifie l'app du changement d'état d'un flux.
+  ```json
+  { "type": "stream_status", "camera": 1, "active": true }
+  ```
+- **`stream_state_sync`** (Gateway → App) : Synchronisation périodique de l'état complet (viewers, idle timer).
+  ```json
+  { "type": "stream_state_sync", "camera": 1, "running": true, "viewers": 3 }
+  ```
 
 ---
 

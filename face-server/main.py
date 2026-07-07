@@ -165,10 +165,14 @@ from routes.dashboard import router as dashboard_router
 from routes.accounts import router as accounts_router
 from routes.faces import router as faces_router
 from routes.system import router as system_router
-from routes.websocket import router as websocket_router
+from routes.ws_robot import router as ws_robot_router
+from routes.ws_app import router as ws_app_router
+from routes.ws_node import router as ws_node_router
 
 app.include_router(dashboard_router)
 app.include_router(accounts_router)
 app.include_router(faces_router)
 app.include_router(system_router)
-app.include_router(websocket_router)
+app.include_router(ws_robot_router)
+app.include_router(ws_app_router)
+app.include_router(ws_node_router)
