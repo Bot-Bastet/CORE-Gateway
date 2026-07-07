@@ -489,8 +489,10 @@
                 statusVal.textContent = 'Initialisation...';
                 statusVal.style.color = 'var(--accent)';
                 
+                const activeCam = slamInfo.cam1 ? 1 : (slamInfo.cam2 ? 2 : 1);
+                window.vslamActiveCamera = activeCam;
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
-                    appWs.send(JSON.stringify({ type: "request_camera", camera: 1, v_slam: true, ...getStreamQualityParams(1) }));
+                    appWs.send(JSON.stringify({ type: "request_camera", camera: activeCam, v_slam: true, ...getStreamQualityParams(activeCam) }));
                 }
                 
                 startVSlamTestWebRTC();
@@ -571,8 +573,9 @@
                     try { vslamPeerConnection.close(); } catch(e) {}
                     vslamPeerConnection = null;
                 }
+                const activeCam = window.vslamActiveCamera || 1;
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
-                    appWs.send(JSON.stringify({ type: "release_camera", camera: 1 }));
+                    appWs.send(JSON.stringify({ type: "release_camera", camera: activeCam }));
                 }
             }
         }
@@ -636,7 +639,8 @@
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
 
-                const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam1/whep`;
+                const activeCam = window.vslamActiveCamera || 1;
+                const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${activeCam}/whep`;
                 let response = null;
                 let retries = 15;
                 while (retries > 0 && window.vslamTesting) {
