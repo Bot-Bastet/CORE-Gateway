@@ -146,7 +146,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # nosemgrep: python.lang.security.audit.use-wildcard-origin — intentional: dashboard served on local network only
     allow_methods=["*"],
     allow_headers=["*"],
 )

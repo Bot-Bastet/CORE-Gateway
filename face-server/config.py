@@ -161,7 +161,7 @@ def cleanup_duplicates():
             modified = True
             continue
         with open(path, "rb") as f:
-            file_hash = hashlib.md5(f.read()).hexdigest()
+            file_hash = hashlib.md5(f.read()).hexdigest()  # nosemgrep: python.lang.security.audit.insecure-md5-algorithm — used for file deduplication fingerprint, not cryptographic security
         unique_id = f"{entry['name']}_{file_hash}"
         if unique_id in seen_hashes:
             path.unlink()

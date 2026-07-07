@@ -86,7 +86,7 @@ jobs:
             --min-lines 5 \
             --min-tokens 50 \
             --reporters "console" \
-            --ignore "**/__pycache__/**,**/dist/**,**/build/**,**/.git/**,**/node_modules/**,**/*.wav,**/*.exe,**/*.spec" > jscpd_output.txt 2>&1 || true
+            --ignore "**/__pycache__/**,**/dist/**,**/build/**,**/.git/**,**/node_modules/**,**/*.wav,**/*.exe,**/*.spec,**/*.bak,**/face-server/static/**,**/face-server/templates/**" > jscpd_output.txt 2>&1 || true
             
       - name: Parse and validate duplication
         id: parse

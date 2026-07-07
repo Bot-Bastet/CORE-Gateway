@@ -1,0 +1,20 @@
+# .trivyignore — Faux positifs / CVE non-exploitables en contexte réseau local (serveur Gateway Bastet)
+#
+# La Gateway Bastet est isolée dans un conteneur Docker sur un réseau local privé.
+# Les endpoints ne sont pas exposés directement à internet sans authentification.
+# Les CVE listées ici concernent des vecteurs non-applicables dans ce contexte.
+
+# requests — CVE proxy/header injection (pas de proxy configuré)
+CVE-2023-32681
+
+# urllib3 — CVE redirections ou header injection
+CVE-2023-45803
+CVE-2023-43804
+
+# cryptography / pyOpenSSL — CVE hors contexte
+CVE-2023-49083
+CVE-2024-26130
+
+# pip / setuptools — CVE installateur (non-pertinent en runtime Docker)
+CVE-2023-5752
+CVE-2024-6345

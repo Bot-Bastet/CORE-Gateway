@@ -38,7 +38,7 @@ async def upload_face(
         raise HTTPException(status_code=400, detail=f"Limite atteinte : Impossible d'ajouter plus de 8 photos pour {normalized_name}.")
 
     content = await file.read()
-    file_hash = hashlib.md5(content).hexdigest()
+    file_hash = hashlib.md5(content).hexdigest()  # nosemgrep: python.lang.security.audit.insecure-md5-algorithm — used for image deduplication fingerprint
 
     for e in meta:
         if e["name"].lower() == normalized_name.lower() and e.get("hash") == file_hash:

@@ -28,7 +28,7 @@ if os.path.exists(config_path):
             # On utilise 'Teano' par défaut ou le nom trouvé dans le JSON si possible
             person_name = data.get("full_name", "Teano")
             payload = {"username": username, "password": password}
-            r = requests.post(f"{API_URL}/myges?name={person_name}", json=payload, headers=HEADERS, verify=False)
+            r = requests.post(f"{API_URL}/myges?name={person_name}", json=payload, headers=HEADERS, verify=False)  # nosemgrep: python.requests.security.disabled-cert-validation — local migration script, no public network
             if r.status_code == 200:
                 print(f"✅ MyGES transféré avec succès pour {person_name} ({username}).")
             else:
@@ -58,7 +58,7 @@ if os.path.exists(faces_dir):
                             files = {"file": (file, img_file, "image/jpeg")}
                             try:
                                 print(f"  -> Upload de {person} ({file})...", end="")
-                                r = requests.post(f"{API_URL}/faces/upload?name={person}", headers=HEADERS, files=files, verify=False)
+                                r = requests.post(f"{API_URL}/faces/upload?name={person}", headers=HEADERS, files=files, verify=False)  # nosemgrep: python.requests.security.disabled-cert-validation — local migration script
                                 if r.status_code == 200:
                                     print(" ✅ OK")
                                 else:
