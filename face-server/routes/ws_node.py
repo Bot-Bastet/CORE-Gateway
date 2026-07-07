@@ -9,7 +9,7 @@ from config import (
     API_TOKEN, manager, stream_active, stream_v_slam,
     stream_keep_alive, active_camera_listeners, camera_stop_timers,
     camera_idle_kill_at, stop_camera_delayed, should_schedule_idle_kill,
-    latest_diagnostics,
+    state,
 )
 from routes.ws_helpers import emit_stream_state_sync, handle_node_connection_change
 
@@ -45,7 +45,8 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
                     if not stream_active[cam_id] or v_slam_changed:
                         stream_active[cam_id] = True
                         if v_slam:
-                            cal_status = latest_diagnostics.get("sensors", {}).get("calibration_status", {})
+                            diags = await state.get_diagnostics()
+                            cal_status = diags.get("sensors", {}).get("calibration_status", {})
                             cam_cal = cal_status.get(str(cam_id), cal_status.get(cam_id, {}))
                             if cam_cal and not cam_cal.get("calibrated", False):
                                 await websocket.send_json({
@@ -122,7 +123,8 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
                     if not stream_active[cam_id] or v_slam_changed:
                         stream_active[cam_id] = True
                         if v_slam:
-                            cal_status = latest_diagnostics.get("sensors", {}).get("calibration_status", {})
+                            diags = await state.get_diagnostics()
+                            cal_status = diags.get("sensors", {}).get("calibration_status", {})
                             cam_cal = cal_status.get(str(cam_id), cal_status.get(cam_id, {}))
                             if cam_cal and not cam_cal.get("calibrated", False):
                                 await websocket.send_json({

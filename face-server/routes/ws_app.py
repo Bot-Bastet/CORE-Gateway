@@ -26,7 +26,7 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
 
     await manager.connect(websocket, "app")
     for cam_id in [1, 2]:
-        is_active = len(active_camera_listeners[cam_id]) > 0 or stream_active[cam_id]
+        is_active = stream_active[cam_id]
         await websocket.send_json({"type": "stream_status", "camera": cam_id, "active": is_active})
         await websocket.send_json({"type": "keep_stream_status", "camera": cam_id, "keep": stream_keep_alive[cam_id]})
         ws_count = len(active_camera_listeners[cam_id])
@@ -65,7 +65,11 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         stream_active[cam_id] = True
                         await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
                         await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
-                        await emit_stream_state_sync(cam_id, manager)
+                    else:
+                        # Stream deja actif : re-envoyer start_camera au robot (idempotent)
+                        # On n'envoie PAS stream_status au client (le flag stream_active est optimiste)
+                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
+                    await emit_stream_state_sync(cam_id, manager)
                 elif msg_type == "release_camera":
                     cam_id = msg_json.get("camera", 1)
                     if not stream_active[cam_id]:
@@ -125,6 +129,10 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         stream_active[cam_id] = True
                         await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
                         await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
+                    else:
+                        # Stream deja actif : re-envoyer start_camera au robot (idempotent)
+                        # On n'envoie PAS stream_status au client (le flag stream_active est optimiste)
+                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
                     await emit_stream_state_sync(cam_id, manager)
                 elif msg_type == "leave_stream":
                     cam_id = msg_json.get("camera", 1)
