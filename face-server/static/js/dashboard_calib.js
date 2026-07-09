@@ -872,9 +872,9 @@
 
                 let trackTimeout = setTimeout(() => {
 
-                    showCalibWebRTCError('Timeout — aucun flux reçu après 8s');
+                    showCalibWebRTCError('Timeout — aucun flux reçu après 18s');
 
-                }, 8000);
+                }, 18000);
 
 
 
@@ -938,7 +938,7 @@
 
                 let response = null;
 
-                let retries = 15;
+                let retries = 60;
 
                 while (retries > 0 && document.getElementById('cameraCalibModal').classList.contains('active')) {
 
