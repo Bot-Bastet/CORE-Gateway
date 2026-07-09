@@ -48,8 +48,8 @@ class GatewayState:
         self.rest_camera_listeners: dict = {1: set(), 2: set()}
         self.camera_idle_kill_at: dict = {1: 0.0, 2: 0.0}
         self.preferred_ai_targets: dict = {
-            "tts": "robot", "stt": "robot", "chat": "robot",
-            "yolo": "robot", "face_rec": "robot",
+            "tts": "disabled", "stt": "disabled", "chat": "disabled",
+            "yolo": "disabled", "face_rec": "disabled",
         }
         self.github_releases_cache: dict = {}
 

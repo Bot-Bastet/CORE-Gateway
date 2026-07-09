@@ -44,6 +44,11 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
             "v_slam": stream_v_slam[cam_id],
             "idle_kill_ms": idle_kill_ms,
         })
+    # Envoyer l'état AI courant au dashboard qui vient de se connecter
+    await websocket.send_json({
+        "type": "ai_state_update",
+        "ai_state": dict(preferred_ai_targets)
+    })
     try:
         while True:
             data = await websocket.receive_text()
@@ -152,8 +157,17 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         active_target = target
                         if target == "node" and not node_connected:
                             active_target = "robot"
-                        msg_json["target"] = active_target
-                        data = json.dumps(msg_json)
+                        # Envoyer au robot/node la cible active (avec fallback potentiel)
+                        robot_msg = json.dumps({"type": "ai_control", "feature": feature, "target": active_target})
+                        await manager.broadcast(robot_msg, "robot")
+                        await manager.broadcast(robot_msg, "node")
+                        # Envoyer à TOUS les dashboards la préférence réelle (sans fallback)
+                        # pour que l'UI reflète le choix de l'utilisateur
+                        await manager.broadcast(json.dumps({
+                            "type": "ai_state_update",
+                            "ai_state": dict(preferred_ai_targets)
+                        }), "app")
+                    continue
                 elif msg_type == "arduino_cmd":
                     await manager.broadcast(data, "robot")
                 elif msg_type == "query_camera_resolutions":

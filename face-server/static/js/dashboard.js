@@ -1213,6 +1213,18 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+                else if (payload.type === "ai_state_update") {
+
+                    const s = payload.ai_state || {};
+
+                    ['tts', 'stt', 'chat', 'yolo', 'face_rec'].forEach(f => {
+
+                        if (s[f] !== undefined) updateAIControlUI(f, s[f]);
+
+                    });
+
+                }
+
             } catch(e) {
 
                 // not json or parsing error

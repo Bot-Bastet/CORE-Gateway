@@ -46,8 +46,10 @@ async def emit_stream_state_sync(cam_id: int, manager):
 async def handle_node_connection_change(connected: bool):
     """Bascule automatiquement les services si le PC Node se déconnecte/reconnecte."""
     for feature, target in preferred_ai_targets.items():
-        if target == "node":
-            active_target = "node" if connected else "robot"
+        if target == "node" or (not connected and preferred_ai_targets[feature] == "node"):
+            active_target = "node" if connected else "disabled"
+            if not connected:
+                preferred_ai_targets[feature] = "disabled"
             controlled_msg = json.dumps({
                 "type": "ai_control",
                 "feature": feature,
