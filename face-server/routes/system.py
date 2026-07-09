@@ -11,7 +11,10 @@ from config import (
     load_json, save_json, manager, normalize_camera_manifest,
 )
 from auth import verify_token
-from models import CoreState, MyGESCredentials
+from models import (
+    CoreState, MyGESCredentials, NavGoalRequest, MotionVelocityRequest,
+    MotionJointsRequest, ArduinoCommandRequest, ChatRequest
+)
 from myges_api import MyGesAPI
 
 router = APIRouter(tags=["System"])
@@ -200,3 +203,83 @@ def test_myges(creds: MyGESCredentials):
         }
     except Exception as e:
         return {"status": "error", "message": f"Erreur: {str(e)}"}
+
+
+# ─── Robot Control REST Endpoints ──────────────────────────────────────────
+
+@router.post("/api/robot/navigation/goal", summary="Envoyer un objectif de navigation", dependencies=[Depends(verify_token)])
+async def send_nav_goal_rest(req: NavGoalRequest):
+    """Envoyer un objectif de navigation (x, y) au robot."""
+    payload = {
+        "type": "nav_goal",
+        "x": req.x,
+        "y": req.y
+    }
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Objectif de navigation envoyé."}
+
+
+@router.post("/api/robot/motion/velocity", summary="Envoyer une commande de vitesse", dependencies=[Depends(verify_token)])
+async def send_motion_velocity_rest(req: MotionVelocityRequest):
+    """Envoyer une commande de vitesse (téléopération) au robot."""
+    payload = {
+        "type": "cmd_vel",
+        "linear": req.linear,
+        "angular": req.angular
+    }
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Commande de vitesse envoyée."}
+
+
+@router.post("/api/robot/motion/joints", summary="Envoyer les angles des servos ROS", dependencies=[Depends(verify_token)])
+async def send_motion_joints_rest(req: MotionJointsRequest):
+    """Envoyer les angles des 12 servos ROS au robot."""
+    payload = {
+        "type": "manual_joint_control",
+        "angles": req.angles
+    }
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Commande d'articulations envoyée."}
+
+
+@router.post("/api/robot/arduino/command", summary="Envoyer une commande directe à l'Arduino", dependencies=[Depends(verify_token)])
+async def send_arduino_cmd_rest(req: ArduinoCommandRequest):
+    """Envoyer une commande à l'Arduino Mega."""
+    payload = {
+        "type": "arduino_cmd",
+        "cmd": req.cmd
+    }
+    if req.index is not None:
+        payload["index"] = req.index
+    if req.angle is not None:
+        payload["angle"] = req.angle
+
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Commande Arduino envoyée."}
+
+
+@router.post("/api/robot/chat", summary="Envoyer un message textuel au système de chat IA", dependencies=[Depends(verify_token)])
+async def send_chat_rest(req: ChatRequest):
+    """Envoyer un message de chat au robot."""
+    payload = {
+        "type": "chat",
+        "text": req.text
+    }
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Message de chat envoyé."}
+

@@ -33,6 +33,7 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from pydantic import BaseModel
 
 from auth import verify_token
+from models import MonoCalibRequest, StereoCalibRequest
 from config import (
     stream_active, stream_v_slam, stream_keep_alive,
     active_camera_listeners, rest_camera_listeners,
@@ -307,3 +308,52 @@ def debug_state(_: str = Depends(verify_token)):
         "kill_at": dict(camera_idle_kill_at),
         "now": _time(),
     }
+
+
+# ─── Camera Calibration Endpoints ──────────────────────────────────────────
+
+@router.post("/calibration/camera/run/mono")
+async def run_mono_calibration_rest(req: MonoCalibRequest, _: str = Depends(verify_token)):
+    """Lancer la calibration mono via REST."""
+    payload = {
+        "type": "run_mono_calib",
+        "camera": req.camera,
+        "chessboard_cols": req.chessboard_cols,
+        "chessboard_rows": req.chessboard_rows,
+        "square_size_mm": req.square_size_mm,
+        "timeout_seconds": 300
+    }
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Commande run_mono_calib transmise au robot."}
+
+
+@router.post("/calibration/camera/run/stereo")
+async def run_stereo_calibration_rest(req: StereoCalibRequest, _: str = Depends(verify_token)):
+    """Lancer la calibration stéréo via REST."""
+    payload = {
+        "type": "run_stereo_calib",
+        "chessboard_cols": req.chessboard_cols,
+        "chessboard_rows": req.chessboard_rows,
+        "square_size_mm": req.square_size_mm,
+        "timeout_seconds": 300
+    }
+    try:
+        await manager.broadcast(json.dumps(payload), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Commande run_stereo_calib transmise au robot."}
+
+
+@router.post("/calibration/camera/abort")
+async def abort_calibration_rest(_: str = Depends(verify_token)):
+    """Arrêter ou annuler la calibration en cours."""
+    try:
+        await manager.broadcast(json.dumps({"type": "stop_camera", "camera": 1}), "robot")
+        await manager.broadcast(json.dumps({"type": "stop_camera", "camera": 2}), "robot")
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Robot WS indisponible: {e}")
+    return {"status": "ok", "message": "Commande d'annulation calibration transmise au robot."}
+
