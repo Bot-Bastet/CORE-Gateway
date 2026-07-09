@@ -146,7 +146,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # nosemgrep: python.lang.security.audit.use-wildcard-origin — intentional: dashboard served on local network only
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -165,14 +165,18 @@ from routes.dashboard import router as dashboard_router
 from routes.accounts import router as accounts_router
 from routes.faces import router as faces_router
 from routes.system import router as system_router
+from routes.updates import router as updates_router
 from routes.ws_robot import router as ws_robot_router
-from routes.ws_app import router as ws_app_router
 from routes.ws_node import router as ws_node_router
+from routes.ws_app import router as ws_app_router
+from routes.streams import router as streams_router
 
 app.include_router(dashboard_router)
 app.include_router(accounts_router)
 app.include_router(faces_router)
 app.include_router(system_router)
+app.include_router(updates_router)
 app.include_router(ws_robot_router)
-app.include_router(ws_app_router)
 app.include_router(ws_node_router)
+app.include_router(ws_app_router)
+app.include_router(streams_router)
