@@ -727,6 +727,7 @@
             const btnRun = document.getElementById('btn-mcc-run-calib');
             if (btnRun) {
                 btnRun.disabled = false;
+                btnRun.className = 'btn btn-primary';
                 btnRun.innerHTML = '<span>📷 Lancer la Caméra</span>';
                 btnRun.onclick = () => runIndividualCameraCalib();
             }
@@ -734,11 +735,18 @@
             if (statusText) {
                 statusText.innerHTML = '<span>Cliquez sur Lancer pour vous connecter à la caméra.</span>';
             }
-            const overlayEl = document.getElementById('mcc-cam-status-overlay');
-            if (overlayEl) {
-                overlayEl.style.display = 'flex';
-                overlayEl.style.backgroundColor = 'rgba(9,9,11,0.85)';
-            }
+            const imgs = document.querySelectorAll('#mcc-cam-img');
+            imgs.forEach(img => {
+                img.style.display = 'none';
+                img.removeAttribute('src');
+            });
+            const ovls = document.querySelectorAll('#mcc-cam-status-overlay');
+            ovls.forEach(ovl => {
+                ovl.style.backgroundColor = 'rgba(9,9,11,0.85)';
+                ovl.style.justifyContent = 'center';
+                ovl.style.paddingBottom = '1rem';
+                ovl.style.display = 'flex';
+            });
             const hudEl = document.getElementById('mcc-cam-hud');
             if (hudEl) {
                 hudEl.style.display = 'none';
@@ -984,11 +992,27 @@
 
         
 
+        function cancelRunningCalibration() {
+            const camId = window.mccCurrentCamId;
+            const btnRun = document.getElementById('btn-mcc-run-calib');
+            if (btnRun) {
+                btnRun.disabled = true;
+                btnRun.className = "btn btn-primary";
+                btnRun.innerHTML = '<span>Annulation en cours...</span>';
+            }
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "stop_camera", camera: camId }));
+            }
+        }
+        
+
         function confirmIndividualCameraCalib() {
             window.isCalibrating = true;
             const btnRun = document.getElementById('btn-mcc-run-calib');
-            btnRun.disabled = true;
-            btnRun.innerHTML = '<span>Demarrage calibration...</span>';
+            btnRun.disabled = false;
+            btnRun.className = 'btn btn-danger';
+            btnRun.innerHTML = '<span>❌ Annuler la Calibration</span>';
+            btnRun.onclick = () => cancelRunningCalibration();
             const overlayEl = document.getElementById('mcc-cam-status-overlay');
             const statusText = document.getElementById('mcc-cam-status-text');
             const hudEl = document.getElementById('mcc-cam-hud');

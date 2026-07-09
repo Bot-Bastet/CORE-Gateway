@@ -860,6 +860,21 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+                else if (payload.type === "mono_calib_frame" || payload.type === "stereo_calib_frame") {
+                    const imgs = document.querySelectorAll('#mcc-cam-img');
+                    imgs.forEach(img => {
+                        img.src = 'data:image/jpeg;base64,' + payload.image;
+                        img.style.display = 'block';
+                    });
+                    const videos = document.querySelectorAll('#mcc-cam-video');
+                    videos.forEach(v => v.style.display = 'none');
+                    const ovls = document.querySelectorAll('#mcc-cam-status-overlay');
+                    ovls.forEach(ovl => {
+                        ovl.style.backgroundColor = 'rgba(9,9,11,0.2)';
+                        ovl.style.justifyContent = 'flex-end';
+                        ovl.style.paddingBottom = '0.5rem';
+                    });
+                }
                 else if (payload.type === "mono_calib_progress") {
                     const camId = payload.camera;
                     const ovl = document.getElementById('mcc-cam-status-overlay');
@@ -4811,6 +4826,21 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         var _ptxt = document.getElementById('ec-stereo-progress-text');
                         if (_pbar) _pbar.style.width = data.progress + '%';
                         if (_ptxt) _ptxt.textContent = data.message || ('Calibration... ' + data.progress + '%');
+                    }
+                    if (data.type === 'mono_calib_frame' || data.type === 'stereo_calib_frame') {
+                        var _imgs = document.querySelectorAll('#mcc-cam-img');
+                        _imgs.forEach(function(img) {
+                            img.src = 'data:image/jpeg;base64,' + data.image;
+                            img.style.display = 'block';
+                        });
+                        var _videos = document.querySelectorAll('#mcc-cam-video');
+                        _videos.forEach(function(v) { v.style.display = 'none'; });
+                        var _ovls = document.querySelectorAll('#mcc-cam-status-overlay');
+                        _ovls.forEach(function(ovl) {
+                            ovl.style.backgroundColor = 'rgba(9,9,11,0.2)';
+                            ovl.style.justifyContent = 'flex-end';
+                            ovl.style.paddingBottom = '0.5rem';
+                        });
                     }
                     if (data.type === 'mono_calib_progress') {
                         var _ovl = document.getElementById('mcc-cam-status-overlay');
