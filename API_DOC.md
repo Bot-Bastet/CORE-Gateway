@@ -39,7 +39,6 @@ Canal bidirectionnel pour le serveur de traitement.
       "v_slam": false
     }
     ```
-    Active la caméra demandée, ajoute la connexion à la liste des auditeurs actifs, annule tout minuteur d'arrêt en cours, et notifie le robot (`start_camera`) ainsi que l'application mobile (`stream_status`).
   - **Arrêter un flux** :
     ```json
     {
@@ -47,10 +46,9 @@ Canal bidirectionnel pour le serveur de traitement.
       "camera": 1
     }
     ```
-    Retire la connexion de la liste des auditeurs de la caméra. Si aucun auditeur n'est actif, un minuteur d'extinction de 10 secondes est lancé pour couper le flux de la caméra sur le robot.
 
-### `wss://ha.arthonetwork.fr:44888/ws/app` (Connexion Application Mobile)
-Canal bidirectionnel pour l'utilisateur (Application mobile / Dashboard).
+### `wss://ha.arthonetwork.fr:44888/ws/app` (Connexion Application Mobile / Dashboard)
+Canal bidirectionnel principal pour l'utilisateur.
 - À la connexion, la Gateway renvoie immédiatement un message d'état initial pour chaque caméra :
   ```json
   {
@@ -59,262 +57,245 @@ Canal bidirectionnel pour l'utilisateur (Application mobile / Dashboard).
     "active": true
   }
   ```
-- **Routage** : Les commandes et messages reçus de l'App sont diffusés à `robot`.
-- **Commandes caméras** :
-  - Identique à l'interface `node`, supporte le message `request_camera` pour démarrer et s'abonner à un flux, et `release_camera` pour s'en désabonner.
+- **Routage** : Les messages reçus de l'App sont diffusés au `robot` et éventuellement au `node`.
+- **Messages WebSocket gérés (App → Gateway → Robot) :**
+  - **`request_camera`** : S'abonner et démarrer le flux WebRTC d'une caméra.
+    ```json
+    { "type": "request_camera", "camera": 1, "v_slam": false }
+    ```
+  - **`release_camera`** : Libérer l'abonnement à une caméra.
+    ```json
+    { "type": "release_camera", "camera": 1 }
+    ```
+  - **`stop_camera`** : Arrêter ou annuler une caméra ou une calibration en cours.
+    ```json
+    { "type": "stop_camera", "camera": 1 }
+    ```
+  - **`cmd_vel`** : Téléopération manuelle (vitesse linéaire et angulaire).
+    ```json
+    { "type": "cmd_vel", "linear": 0.2, "angular": -0.5 }
+    ```
+  - **`nav_goal`** : Envoyer une coordonnée cible de navigation autonome sur la carte.
+    ```json
+    { "type": "nav_goal", "x": 1.25, "y": -0.8 }
+    ```
+  - **`arduino_cmd`** : Contrôle bas niveau des servomoteurs de l'Arduino Mega.
+    ```json
+    { "type": "arduino_cmd", "cmd": "stand" }
+    { "type": "arduino_cmd", "cmd": "sit" }
+    { "type": "arduino_cmd", "cmd": "attach", "index": 4 }
+    { "type": "arduino_cmd", "cmd": "detach", "index": 4 }
+    { "type": "arduino_cmd", "cmd": "write", "index": 4, "angle": 95.0 }
+    { "type": "arduino_cmd", "cmd": "reset_imu" }
+    ```
+  - **`manual_joint_control`** : Contrôle angulaire direct des 12 moteurs ROS.
+    ```json
+    { "type": "manual_joint_control", "angles": [90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0] }
+    ```
+  - **`chat`** : Envoi d'un message textuel ou vocal (qui sera traité par l'IA et MyGES).
+    ```json
+    { "type": "chat", "text": "Bonjour Bastet" }
+    ```
+  - **`run_mono_calib`** : Lancer la tâche de calibration mono.
+    ```json
+    { "type": "run_mono_calib", "camera": 1, "chessboard_cols": 9, "chessboard_rows": 6, "square_size_mm": 25, "timeout_seconds": 300 }
+    ```
+  - **`run_stereo_calib`** : Lancer la calibration stéréo.
+    ```json
+    { "type": "run_stereo_calib", "chessboard_cols": 9, "chessboard_rows": 6, "square_size_mm": 25, "timeout_seconds": 300 }
+    ```
+
+- **Messages WebSocket de notification (Robot → Gateway → App) :**
+  - **`stream_status`** : Notification d'activation/désactivation de flux.
+    ```json
+    { "type": "stream_status", "camera": 1, "active": true }
+    ```
+  - **`mono_calib_frame` / `stereo_calib_frame`** : Retour vidéo temps réel en Base64 avec détection de damier.
+    ```json
+    { "type": "mono_calib_frame", "camera": 1, "image": "/9j/4AAQSkZ..." }
+    ```
+  - **`mono_calib_progress` / `stereo_calib_progress`** : Progression textuelle et pourcentage.
+    ```json
+    { "type": "mono_calib_progress", "camera": 1, "message": "Recherche du damier...", "progress": 45 }
+    ```
+  - **`mono_calib_result` / `stereo_calib_result`** : Fin de tâche de calibration.
+    ```json
+    { "type": "mono_calib_result", "camera": 1, "success": true, "message": "OK", "fx": 521.3, "reprojection_error": 0.18 }
+    ```
 
 ---
 
 ## 2. Authentification & Comptes (REST)
 
-L'API utilise des endpoints dédiés pour l'authentification et la gestion des profils.
+Endpoints pour la gestion des profils et sessions.
 
-### **POST `/auth/register`** (ou `/accounts`)
-Crée ou met à jour un compte utilisateur.
-```json
-{
-  "email": "utilisateur@bastet.com",
-  "pseudo": "Pseudo",
-  "first_name": "Prénom",
-  "last_name": "Nom",
-  "phone": "0600000000",
-  "password": "votre_mot_de_passe",
-  "is_admin": false,
-  "preferences": {}
-}
-```
-
-### **POST `/auth/login`**
-Vérifie les identifiants et retourne les informations de l'utilisateur.
-```json
-{
-  "email": "utilisateur@bastet.com",
-  "password": "votre_mot_de_passe"
-}
-```
-
-### **GET `/accounts`**
-Liste tous les comptes enregistrés.
-
-### **DELETE `/accounts/{full_name}`**
-Supprime un compte utilisateur par son nom complet. Supprime également les identifiants MyGES associés et les photos de visage de la base de données.
-
-### **POST `/preferences`**
-Met à jour les préférences de l'utilisateur.
-```json
-{
-  "full_name": "Nom Utilisateur",
-  "preferences": {
-    "dark_mode": true
-  }
-}
-```
+- **POST `/auth/register`** (ou `/accounts`) : Créer ou mettre à jour un compte.
+- **POST `/auth/login`** : Connexion et récupération des infos.
+- **GET `/accounts`** : Lister les comptes.
+- **DELETE `/accounts/{full_name}`** : Supprimer un compte (MyGES et visages inclus).
+- **POST `/preferences`** : Enregistrer les préférences de style (Ex: `{"dark_mode": true}`).
 
 ---
 
 ## 3. Identifiants Intranet / MyGES (REST)
 
-Le robot accède aux données MyGES via ces endpoints.
-
-- **POST `/myges`** : Enregistre les identifiants MyGES (username/password) pour un utilisateur.
-- **GET `/myges`** : Récupère les identifiants MyGES (interrogé par le robot).
+- **POST `/myges`** : Enregistrer les identifiants MyGES (username/password) d'un utilisateur.
+- **GET `/myges`** : Récupérer les identifiants (interrogé par le robot).
+- **POST `/myges/test`** : Tester la validité des identifiants et retourner un aperçu du planning.
 
 ---
 
 ## 4. Base de Visages (REST)
 
-L'App permet à l'utilisateur de s'enregistrer pour être reconnu.
-
-- **POST `/faces/upload`** : Upload de photos (Multipart). Limité à 8 photos par personne.
+- **POST `/faces/upload`** : Upload d'image de visage (limité à 8 photos par personne).
 - **GET `/faces`** : Lister tous les visages enregistrés.
-- **GET `/faces/{face_id}/image`** : Récupérer l'image correspondante.
+- **GET `/faces/{face_id}/image`** : Télécharger l'image.
 - **DELETE `/faces/{face_id}`** : Supprimer un visage.
 
 ---
 
 ## 5. Flux Vidéos (RTSP / WebRTC)
 
-Géré par MediaMTX (intégré à la Gateway). L'encodage vidéo H.264 utilise obligatoirement le profil standard `yuv420p` pour assurer une compatibilité totale avec les navigateurs web récents.
 - **RTSP (Publication/Lecture)** : `rtsp://GATEWAY_IP:48554/robot/cam1` (Basse latence, pour le Node/IA)
 - **HLS** : `https://ha.arthonetwork.fr:48888/robot/cam1/` (Streaming web via lecteur intégré Caddy)
 - **WebRTC (WHEP)** : `https://ha.arthonetwork.fr:48889/robot/cam1/whep` (Ultra-basse latence pour navigateurs et App Mobile)
 
 ### 5.1 API REST des Flux Caméras (On-Demand)
 
-Tous les endpoints ci-dessous nécessitent `X-API-Token` dans le header.
+Tous ces endpoints nécessitent `X-API-Token` dans le header.
 
-#### **GET `/api/cameras`**
-Retourne le manifest des caméras actuellement détectées par le robot.
-```json
-{
-  "cameras": {
-    "1": { "connected": true, "device": "/dev/video0", "calibrated": true },
-    "2": { "connected": false, "device": null, "calibrated": false }
+- **GET `/api/cameras`** : Retourne le manifest des caméras détectées par le robot.
+- **GET `/api/streams`** : Retourne l'état de tous les flux caméras (viewers, timers, keep_alive).
+- **GET `/api/streams/{cam}`** : Retourne l'état d'un flux spécifique.
+- **POST `/api/streams/{cam}/join`** : Rejoindre un flux (démarre la caméra sur le robot au premier viewer).
+- **DELETE `/api/streams/{cam}/leave`** : Quitter un flux (lance un minuteur d'arrêt de 60s si dernier viewer).
+- **POST `/api/streams/{cam}/stop`** : Arrêt forcé du flux (si aucun autre viewer connecté).
+
+### 5.2 Configuration Qualité Stream (REST)
+
+- **GET `/core/stream/config`** : Récupérer la configuration de résolution, framerate et bitrate.
+- **POST `/core/stream/config`** : Modifier la configuration de qualité.
+  ```json
+  {
+    "resolution": "640x480",
+    "framerate": 10.0,
+    "bitrate": "2M"
   }
-}
-```
+  ```
 
-#### **GET `/api/streams`**
-Retourne l'état de tous les flux caméras.
-```json
-{
-  "streams": {
-    "1": { "running": true, "viewers": 2, "rest_viewers": ["web-abc123"], "browser_viewers": 1, "idle_kill_ms": 58000, "v_slam": false, "keep_alive": false },
-    "2": { "running": false, "viewers": 0, "rest_viewers": [], "browser_viewers": 0, "idle_kill_ms": 0, "v_slam": false, "keep_alive": false }
+### 5.3 [NOUVEAU - REST] Commandes et Lancement Calibration
+
+Endpoints permettant de lancer, stopper ou superviser la calibration en mode REST :
+- **POST `/api/calibration/camera/run/mono`** : Démarre une tâche de calibration monoculaire.
+  ```json
+  {
+    "camera": 1,
+    "chessboard_cols": 9,
+    "chessboard_rows": 6,
+    "square_size_mm": 25
   }
-}
-```
-
-#### **GET `/api/streams/{cam}`**
-Retourne l'état d'un flux caméra spécifique (cam = 1 ou 2).
-
-#### **POST `/api/streams/{cam}/join`**
-S'enregistre comme viewer REST de la caméra. Si premier viewer, **déclenche `start_camera` sur le robot** (lancement ffmpeg → MediaMTX).
-- **Body** : `{ "client_id": "web-abc123" }` (optionnel, auto-généré si absent)
-- **Réponse** : `{ "status": "starting", "client_id": "web-abc123", "running": true, "viewers": 1, ... }`
-- **Erreur 409** : Si la caméra n'est pas branchée physiquement
-
-#### **DELETE `/api/streams/{cam}/leave`**
-Retire un viewer REST. Si plus aucun viewer (WS + REST = 0), lance un **minuteur d'extinction de 60s**.
-- **Body** : `{ "client_id": "web-abc123" }` (obligatoire)
-- **Réponse** : `{ "status": "left", "cooldown_starts": true, ... }`
-
-#### **POST `/api/streams/{cam}/stop`**
-Arrêt forcé (anti-griefing : 409 si d'autres viewers regardent encore).
-
-### 5.2 Messages WebSocket (Stream)
-
-Envoyés via `wss://ha.arthonetwork.fr:44888/ws/app`.
-
-- **`request_camera`** (App → Gateway → Robot) : Démarre le streaming d'une caméra.
-  ```json
-  { "type": "request_camera", "camera": 1, "v_slam": false }
   ```
-- **`release_camera`** (App → Gateway) : Libère l'abonnement WebSocket à la caméra.
+- **POST `/api/calibration/camera/run/stereo`** : Démarre une tâche de calibration stéréo.
   ```json
-  { "type": "release_camera", "camera": 1 }
+  {
+    "chessboard_cols": 9,
+    "chessboard_rows": 6,
+    "square_size_mm": 25
+  }
   ```
-- **`stream_status`** (Gateway → App) : Notifie l'app du changement d'état d'un flux.
+- **POST `/api/calibration/camera/abort`** : Arrête immédiatement la calibration en cours sur le robot.
+
+---
+
+## 6. État du Robot, Calibration & Téléopération (REST)
+
+### 6.1 Diagnostic & État Général
+- **POST `/core/state`** : Mise à jour de l'état général (publié périodiquement par le robot).
+- **GET `/core/state`** : Récupération de l'état général du robot.
+- **GET `/core/diagnostics`** : Récupère les diagnostics ROS complets envoyés par le robot en direct.
+
+### 6.2 Calibration Servomoteurs & Fichiers Intrinsèques
+- **GET `/core/calibration`** : Récupérer la liste des 12 offsets des servomoteurs de Bastet.
+- **POST `/core/calibration`** : Enregistrer la liste des 12 offsets.
+- **GET `/core/camera/calibration/{cam_id}`** : Récupérer le fichier de calibration intrinsèque YAML (ou JSON) de la caméra.
+- **POST `/core/camera/calibration/{cam_id}`** : Enregistrer la calibration intrinsèque de la caméra.
+- **GET `/core/camera/calibration/stereo`** : Récupérer la calibration extrinsèque stéréo.
+- **POST `/core/camera/calibration/stereo`** : Enregistrer la calibration extrinsèque stéréo.
+- **POST `/core/camera/calibration/reset`** : Effacer toutes les calibrations de caméra pour repartir à zéro.
+
+### 6.3 [NOUVEAU - REST] Téléopération, Chat & Contrôle Moteur
+
+Endpoints permettant de piloter le robot et de chater sans connexion WebSocket permanente :
+- **POST `/api/robot/navigation/goal`** : Envoyer une destination autonome.
   ```json
-  { "type": "stream_status", "camera": 1, "active": true }
+  {
+    "x": 1.5,
+    "y": -0.5
+  }
   ```
-- **`stream_state_sync`** (Gateway → App) : Synchronisation périodique de l'état complet (viewers, idle timer).
+- **POST `/api/robot/motion/velocity`** : Envoyer une commande de vitesse (téléopération Joystick).
   ```json
-  { "type": "stream_state_sync", "camera": 1, "running": true, "viewers": 3 }
+  {
+    "linear": 0.2,
+    "angular": -0.1
+  }
+  ```
+- **POST `/api/robot/motion/joints`** : Envoyer un tableau d'angles pour les 12 servos ROS.
+  ```json
+  {
+    "angles": [90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0, 90.0]
+  }
+  ```
+- **POST `/api/robot/arduino/command`** : Envoyer une commande directe à l'Arduino.
+  ```json
+  {
+    "cmd": "stand", // stand, sit, attach, detach, write, reset_imu
+    "index": 3,    // Optionnel, pour attach/detach/write
+    "angle": 95.0  // Optionnel, pour write
+  }
+  ```
+- **POST `/api/robot/chat`** : Envoyer un message textuel au système de chat IA.
+  ```json
+  {
+    "text": "Fais un pas en avant"
+  }
   ```
 
 ---
 
-## 6. État du Robot (CORE State)
+## 7. Mises à Jour & Télémétrie (REST)
 
-Permet de suivre en temps réel ce que voit et fait le robot et de gérer la calibration.
+Endpoints permettant de contrôler et surveiller les mises à jour et rollbacks de versions logicielles.
 
-- **POST `/core/state`** : Mise à jour de l'état (par le robot).
-- **GET `/core/state`** : Récupération de l'état (par l'app).
-
-**Payload de l'état :**
-```json
-{
-  "seen_person": "Nom reconnu ou null",
-  "seen_objects": ["liste", "objets", "detectes"],
-  "last_chat": [{"role": "user", "content": "..."}],
-  "robot_status": "online / hibernating / offline",
-  "active_streams": {
-    "1": true,
-    "2": false
-  },
-  "robot_version": "v0.2.5",
-  "arduino_version": "v0.0.0",
-  "sensors": {
-    "cpu_percent": 45,
-    "ram_percent": 25.0,
-    "temp_c": 65.0,
-    "spotbot_service_active": true,
-    "spotbot_service": "active / inactive",
-    "cam1_connected": true,
-    "cam2_connected": false,
-    "arduino_connected": true,
-    "system": {
-      "cpu_temp": 65.0,
-      "cpu_load_1m": 1.8,
-      "ram_total_mb": 8062,
-      "ram_used_mb": 2048,
-      "ram_percent": 25.0
-    }
-  },
-  "ai_state": {
-    "tts": "robot / node / disabled",
-    "stt": "robot / node / disabled",
-    "chat": "robot / node / disabled",
-    "yolo": "enabled / disabled",
-    "face_rec": "enabled / disabled"
+- **POST `/system/update/gateway`** : Lancer la mise à jour de la Gateway.
+- **GET `/system/update/gateway/progress`** : Récupérer l'état et progression de mise à jour Gateway (`?force=true` optionnel).
+- **POST `/system/update/gateway/progress`** : Mettre à jour la progression Gateway.
+- **POST `/system/update/gateway/rollback`** : Forcer le rollback de la Gateway vers une version spécifique.
+  ```json
+  {
+    "version": "v0.3.7"
   }
-}
-```
-
-### **GET `/core/calibration`**
-Récupère les offsets de calibration des 12 servos de Bastet sous forme de liste.
-```json
-{
-  "offsets": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-}
-```
-
-### **POST `/core/calibration`**
-Sauvegarde les offsets de calibration.
-```json
-{
-  "offsets": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-}
-```
-
-### **GET `/core/diagnostics`**
-Récupère les diagnostics de télémétrie temps-réel reçus du robot (`telemetry_diagnostics` via WebSocket).
-
----
-
-## 7. Mises à Jour & Télémétrie (REST + WebSockets)
-
-Permet de contrôler et surveiller les mises à jour de la Gateway, du Robot et de l'Arduino.
-
-### **POST `/system/update/gateway`**
-Lance la mise à jour sur la Gateway (redémarre le conteneur).
-
-### **GET `/system/update/gateway/progress`**
-Récupère le statut de progression de la Gateway.
-- **Query Parameter (facultatif)** : `?force=true` (force l'interrogation de l'API GitHub).
-
-### **POST `/system/update/gateway/progress`**
-Met à jour la progression de la mise à jour de la Gateway.
-
-### **POST `/system/update/robot`**
-Déclenche la mise à jour du robot.
-
-### **GET `/system/update/robot/progress`**
-Récupère la progression de la mise à jour du robot.
-- **Query Parameter (facultatif)** : `?force=true`.
-
-### **POST `/system/update/robot/progress`**
-Met à jour la progression de la mise à jour du robot.
-
-### **POST `/system/update/arduino`**
-Déclenche le flashage de l'Arduino Mega.
-
-### **GET `/system/update/arduino/progress`**
-Récupère la progression du flashage Arduino.
-- **Query Parameter (facultatif)** : `?force=true`.
-
-### **POST `/system/update/arduino/progress`**
-Met à jour la progression du flash de l'Arduino.
+  ```
+- **POST `/system/update/robot`** : Déclencher la mise à jour du robot.
+- **GET `/system/update/robot/progress`** : Récupérer la progression du robot (`?force=true` optionnel).
+- **POST `/system/update/robot/progress`** : Mettre à jour la progression du robot.
+- **POST `/system/update/robot/rollback`** : Forcer le rollback du robot et de l'Arduino vers une version spécifique.
+  ```json
+  {
+    "version": "v0.2.27"
+  }
+  ```
+- **POST `/system/update/arduino`** : Lancer le flashage de l'Arduino Mega.
+- **GET `/system/update/arduino/progress`** : Récupérer la progression de l'Arduino (`?force=true` optionnel).
+- **POST `/system/update/arduino/progress`** : Mettre à jour la progression de l'Arduino.
 
 ---
 
 ## 8. Diagnostic Santé (REST)
 
-### **GET `/health`**
-Endpoint de vérification de l'état de l'API. Retourne un statut de santé.
-```json
-{
-  "status": "healthy"
-}
-```
+- **GET `/health`** : Vérifier la santé de l'API.
+  ```json
+  {
+    "status": "healthy"
+  }
+  ```
