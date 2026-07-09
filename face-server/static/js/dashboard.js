@@ -9379,9 +9379,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             select.innerHTML = '<option value="">-- Sélectionner une version --</option>';
 
-            releases.forEach(r => {
+            releases.forEach((r, idx) => {
 
-                select.innerHTML += `<option value="${r.tag}">${r.tag} - ${r.name || ''}</option>`;
+                const isSelected = (idx === 0) ? ' selected' : '';
+
+                select.innerHTML += `<option value="${r.tag}"${isSelected}>${r.tag} - ${r.name || ''}</option>`;
 
             });
 
