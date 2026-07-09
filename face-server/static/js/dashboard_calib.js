@@ -674,6 +674,8 @@
 
         function closeCameraCalibModal() {
 
+            window.isCalibrating = false;
+
             document.getElementById('cameraCalibModal').classList.remove('active');
 
             
@@ -803,6 +805,14 @@
 
 
             const showCalibWebRTCError = (msg) => {
+
+                if (window.isCalibrating) {
+
+                    console.log('Ignoring WebRTC connection close during calibration:', msg);
+
+                    return;
+
+                }
 
                 if (mccPeerConnection) {
 
@@ -975,6 +985,7 @@
         
 
         function confirmIndividualCameraCalib() {
+            window.isCalibrating = true;
             const btnRun = document.getElementById('btn-mcc-run-calib');
             btnRun.disabled = true;
             btnRun.innerHTML = '<span>Demarrage calibration...</span>';

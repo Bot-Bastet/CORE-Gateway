@@ -870,6 +870,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     }
                 }
                 else if (payload.type === "mono_calib_result") {
+                    window.isCalibrating = false;
                     const camId = payload.camera;
                     const ovl2 = document.getElementById('mcc-cam-status-overlay');
                     const txt2 = document.getElementById('mcc-cam-status-text');
@@ -4818,6 +4819,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         if (_txt) _txt.innerHTML = '<span style="font-size:1rem; color:var(--text-primary);">' + (data.message || '').replace(/\n/g, '<br/>') + '</span><br/><span style="font-size:0.75rem; color:var(--text-secondary);">' + (data.progress || 0) + '%</span>';
                     }
                     if (data.type === 'mono_calib_result') {
+                        window.isCalibrating = false;
                         var _ovl2 = document.getElementById('mcc-cam-status-overlay');
                         var _txt2 = document.getElementById('mcc-cam-status-text');
                         var _btn2 = document.getElementById('btn-mcc-run-calib');
@@ -4831,8 +4833,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                             if (_btn2) { _btn2.disabled = false; _btn2.innerHTML = '<span>Reessayer la Calibration</span>'; _btn2.onclick = function() { confirmIndividualCameraCalib(); }; }
                         }
                     }
-                                        if (data.type === 'stereo_calib_result') {
-
+                    if (data.type === 'stereo_calib_result') {
+                        window.isCalibrating = false;
                         clearInterval(_ecStereoInterval);
 
                         if (progressBar) progressBar.style.width = '100%';
