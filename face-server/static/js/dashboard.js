@@ -860,6 +860,35 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+                else if (payload.type === "mono_calib_progress") {
+                    const camId = payload.camera;
+                    const ovl = document.getElementById('mcc-cam-status-overlay');
+                    const txt = document.getElementById('mcc-cam-status-text');
+                    if (ovl) ovl.style.display = 'flex';
+                    if (txt) {
+                        txt.innerHTML = '<span style="font-size:1rem; color:var(--text-primary);">' + (payload.message || '').replace(/\n/g, '<br/>') + '</span><br/><span style="font-size:0.75rem; color:var(--text-secondary);">' + (payload.progress || 0) + '%</span>';
+                    }
+                }
+                else if (payload.type === "mono_calib_result") {
+                    const camId = payload.camera;
+                    const ovl2 = document.getElementById('mcc-cam-status-overlay');
+                    const txt2 = document.getElementById('mcc-cam-status-text');
+                    const btn2 = document.getElementById('btn-mcc-run-calib');
+                    if (payload.success) {
+                        if (ovl2) { ovl2.style.display = 'flex'; ovl2.style.backgroundColor = 'rgba(9,9,11,0.9)'; }
+                        if (txt2) {
+                            txt2.innerHTML = '<span style="font-size:2rem; color:var(--success); display:block; margin-bottom:0.5rem;">OK</span><span style="color:var(--success); font-weight:bold; font-size:1.05rem;">Calibration reussie !</span><br/><span style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem; display:block;">fx=' + (payload.fx || '?') + 'px  reproj=' + (payload.reprojection_error || '?') + '</span>';
+                        }
+                        if (btn2) { btn2.disabled = false; btn2.innerHTML = '<span>Fermer la Calibration</span>'; btn2.onclick = closeCameraCalibModal; }
+                    } else {
+                        if (ovl2) { ovl2.style.display = 'flex'; ovl2.style.backgroundColor = 'rgba(9,9,11,0.9)'; }
+                        if (txt2) {
+                            txt2.innerHTML = '<span style="font-size:2rem; color:var(--danger); display:block; margin-bottom:0.5rem;">X</span><span style="color:var(--danger); font-weight:bold; font-size:1.05rem;">Echec</span><br/><span style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem; display:block;">' + (payload.message || 'Erreur') + '</span>';
+                        }
+                        if (btn2) { btn2.disabled = false; btn2.innerHTML = '<span>Reessayer la Calibration</span>'; btn2.onclick = function() { confirmIndividualCameraCalib(); }; }
+                    }
+                }
+
                 else if (payload.type === "stream_status") {
 
                     const camId = parseInt(payload.camera);
@@ -5482,7 +5511,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     const cam2Connected = sensors.cam2_connected === true;
 
-
+                    if (cam2Connected) {
+                        window.forceStereoUI = false;
+                    } else {
+                        window.forceMonoUI = false;
+                    }
 
                     updateCameraModularity(cam1Connected, cam2Connected);
 
@@ -5682,47 +5715,105 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
 
 
+        window.forceStereoUI = false;
+        window.forceMonoUI = false;
+
+        function forceStereoMode() {
+            window.forceMonoUI = false;
+            window.forceStereoUI = true;
+            const ts = window.lastTelemetryState;
+            const cam1Connected = ts && ts.sensors && ts.sensors.cam1_connected === true;
+            const cam2Connected = ts && ts.sensors && ts.sensors.cam2_connected === true;
+            updateCameraModularity(cam1Connected, cam2Connected);
+        }
+
+        function forceMonoMode() {
+            window.forceMonoUI = true;
+            window.forceStereoUI = false;
+            const rightMain = document.getElementById('cam-port-right');
+            const rightModal = document.getElementById('cam-port-right-modal');
+            if (rightMain) rightMain.value = '';
+            if (rightModal) rightModal.value = '';
+            saveCameraPortsMapping();
+            const ts = window.lastTelemetryState;
+            const cam1Connected = ts && ts.sensors && ts.sensors.cam1_connected === true;
+            const cam2Connected = ts && ts.sensors && ts.sensors.cam2_connected === true;
+            updateCameraModularity(cam1Connected, cam2Connected);
+        }
+
         function updateCameraModularity(cam1Connected, cam2Connected) {
+            const forceStereo = window.forceStereoUI === true;
+            const forceMono = window.forceMonoUI === true;
+            const cam2Active = (cam2Connected || forceStereo) && !forceMono;
 
             const card1 = document.getElementById('stream-card-1');
-
             const card2 = document.getElementById('stream-card-2');
-
             if (card1) card1.style.display = cam1Connected ? 'flex' : 'none';
+            if (card2) card2.style.display = cam2Active ? 'flex' : 'none';
 
-            if (card2) card2.style.display = cam2Connected ? 'flex' : 'none';
-
-            // Quality-card (Stream quality & V-SLAM section): hide missing camera's card
             const qcard1 = document.getElementById('quality-card-1');
             const qcard2 = document.getElementById('quality-card-2');
             if (qcard1) qcard1.style.display = cam1Connected ? 'block' : 'none';
-            if (qcard2) qcard2.style.display = cam2Connected ? 'block' : 'none';
-            // Dynamic grid columns: 1fr 1fr when both, 1fr when only one (card takes full width).
-            // Hide entire grid when neither camera is connected (avoid empty card).
+            if (qcard2) qcard2.style.display = cam2Active ? 'block' : 'none';
+
             const qgrid = document.getElementById('quality-grid');
             if (qgrid) {
-                qgrid.style.gridTemplateColumns = (cam1Connected && cam2Connected) ? '1fr 1fr' : '1fr';
-                qgrid.style.display = (cam1Connected || cam2Connected) ? 'grid' : 'none';
+                qgrid.style.gridTemplateColumns = (cam1Connected && cam2Active) ? '1fr 1fr' : '1fr';
+                qgrid.style.display = (cam1Connected || cam2Active) ? 'grid' : 'none';
             }
 
             const calibCam1Container = document.getElementById('calib-cam-container-1');
-
             const calibCam2Container = document.getElementById('calib-cam-container-2');
-
+            const calibCam2ContainerModal = document.getElementById('calib-cam-container-2-modal');
             if (calibCam1Container) calibCam1Container.style.display = cam1Connected ? 'flex' : 'none';
+            if (calibCam2Container) calibCam2Container.style.display = cam2Active ? 'flex' : 'none';
+            if (calibCam2ContainerModal) calibCam2ContainerModal.style.display = cam2Active ? 'flex' : 'none';
 
-            if (calibCam2Container) calibCam2Container.style.display = cam2Connected ? 'flex' : 'none';
+            const titleLeftMain = document.getElementById('title-cam-left-main');
+            const titleLeftModal = document.getElementById('title-cam-left-modal');
+            const labelPortLeftMain = document.getElementById('label-port-left-main');
+            const labelPortLeftModal = document.getElementById('label-port-left-modal');
+            const qualityTitleLeft = document.getElementById('quality-title-cam-1');
+            const qualityTitleLeftModal = document.getElementById('quality-title-cam-1-modal');
+            const streamTitleLeft = document.getElementById('stream-title-cam-1');
 
-            
+            if (titleLeftMain) titleLeftMain.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (titleLeftModal) titleLeftModal.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (labelPortLeftMain) labelPortLeftMain.textContent = cam2Active ? 'Port Gauche' : 'Port Caméra';
+            if (labelPortLeftModal) labelPortLeftModal.textContent = cam2Active ? 'Port Gauche' : 'Port Caméra';
+            if (qualityTitleLeft) qualityTitleLeft.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (qualityTitleLeftModal) qualityTitleLeftModal.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (streamTitleLeft) streamTitleLeft.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+
+            const containerPortRightMain = document.getElementById('container-port-right-main');
+            const containerPortRightModal = document.getElementById('container-port-right-modal');
+            if (containerPortRightMain) containerPortRightMain.style.display = cam2Active ? 'block' : 'none';
+            if (containerPortRightModal) containerPortRightModal.style.display = cam2Active ? 'block' : 'none';
+
+            const btnAddMain = document.getElementById('btn-add-camera-main');
+            const btnAddModal = document.getElementById('btn-add-camera-modal');
+            if (btnAddMain) btnAddMain.style.display = cam2Active ? 'none' : 'inline-block';
+            if (btnAddModal) btnAddModal.style.display = cam2Active ? 'none' : 'inline-block';
+
+            const btnRemoveMain = document.getElementById('btn-remove-camera-main');
+            const btnRemoveModal = document.getElementById('btn-remove-camera-modal');
+            if (btnRemoveMain) btnRemoveMain.style.display = cam2Active ? 'inline-block' : 'none';
+            if (btnRemoveModal) btnRemoveModal.style.display = cam2Active ? 'inline-block' : 'none';
+
+            const btnSwapMain = document.getElementById('btn-swap-cam-main');
+            const btnSwapModal = document.getElementById('btn-swap-cam-modal');
+            if (btnSwapMain) btnSwapMain.style.display = cam2Active ? 'inline-block' : 'none';
+            if (btnSwapModal) btnSwapModal.style.display = cam2Active ? 'inline-block' : 'none';
+
+            const btnConfigMain = document.getElementById('btn-config-cam-main');
+            const btnConfigModal = document.getElementById('btn-config-cam-modal');
+            if (btnConfigMain) btnConfigMain.style.display = cam2Active ? 'inline-block' : 'none';
+            if (btnConfigModal) btnConfigModal.style.display = cam2Active ? 'inline-block' : 'none';
 
             const vslamSpan = document.getElementById('vslam-text-mode');
-
             if (vslamSpan) {
-
-                vslamSpan.textContent = cam2Connected ? 'Superposer V-SLAM Stéréo' : 'Superposer V-SLAM Mono';
-
+                vslamSpan.textContent = cam2Active ? 'Superposer V-SLAM Stéréo' : 'Superposer V-SLAM Mono';
             }
-
         }
 
 
@@ -6412,6 +6503,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         // - When only 1 active device: disable right + show "caméra central" helper
 
+        function syncCamPorts(side, val) {
+            const mainEl = document.getElementById(`cam-port-${side}`);
+            const modalEl = document.getElementById(`cam-port-${side}-modal`);
+            if (mainEl) mainEl.value = val;
+            if (modalEl) modalEl.value = val;
+            updateCameraPortOptions();
+            saveCameraPortsMapping();
+        }
+
         function updateCameraPortOptions() {
 
             // Determine active devices from telemetry (with sensible 5-path fallback)
@@ -6430,13 +6530,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
 
 
-            const leftSelect = document.getElementById('cam-port-left');
+            const leftSelects = [document.getElementById('cam-port-left'), document.getElementById('cam-port-left-modal')].filter(Boolean);
 
-            const rightSelect = document.getElementById('cam-port-right');
+            const rightSelects = [document.getElementById('cam-port-right'), document.getElementById('cam-port-right-modal')].filter(Boolean);
 
-            const helper = document.getElementById('cam-port-single-info');
+            const helpers = [document.getElementById('cam-port-single-info'), document.getElementById('cam-port-single-info-modal')].filter(Boolean);
 
-            if (!leftSelect || !rightSelect) return;
+            if (leftSelects.length === 0 || rightSelects.length === 0) return;
 
 
 
@@ -6456,17 +6556,18 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 const only = activeDevices[0] || '(aucune)';
 
-                leftSelect.innerHTML = '<option value="' + only + '">' + only + '</option>';
+                leftSelects.forEach(sel => {
+                    sel.innerHTML = '<option value="' + only + '">' + only + '</option>';
+                    sel.value = only;
+                });
 
-                leftSelect.value = only;
+                rightSelects.forEach(sel => {
+                    sel.innerHTML = '<option value="">—</option>';
+                    sel.value = '';
+                    sel.disabled = true;
+                });
 
-                rightSelect.innerHTML = '<option value="">—</option>';
-
-                rightSelect.value = '';
-
-                rightSelect.disabled = true;
-
-                if (helper) helper.style.display = 'block';
+                helpers.forEach(hel => hel.style.display = 'block');
 
                 return;
 
@@ -6478,11 +6579,14 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             // Rollback BOTH to the last-known-good mapping so the user sees a stable, valid state.
 
-            if (leftSelect.value && rightSelect.value && leftSelect.value === rightSelect.value) {
+            const currentLeftVal = leftSelects[0].value;
+            const currentRightVal = rightSelects[0].value;
 
-                leftSelect.value  = lastGoodLeft;
+            if (currentLeftVal && currentRightVal && currentLeftVal === currentRightVal) {
 
-                rightSelect.value = lastGoodRight || '';
+                leftSelects.forEach(sel => sel.value  = lastGoodLeft);
+
+                rightSelects.forEach(sel => sel.value = lastGoodRight || '');
 
                 if (typeof showToast === 'function') {
 
@@ -6496,35 +6600,27 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             // Each select excludes the OTHER's current value (mutually exclusive).
 
-            rightSelect.disabled = false;
+            rightSelects.forEach(sel => sel.disabled = false);
 
-            if (helper) helper.style.display = 'none';
-
-
-
-            const leftOpts  = activeDevices.filter(d => d !== rightSelect.value);
-
-            const rightOpts = activeDevices.filter(d => d !== leftSelect.value);
-
-            leftSelect.innerHTML  = leftOpts.map(d  => '<option value="' + d + '">' + d + '</option>').join('');
-
-            rightSelect.innerHTML = rightOpts.map(d => '<option value="' + d + '">' + d + '</option>').join('');
+            helpers.forEach(hel => hel.style.display = 'none');
 
 
 
-            // Re-assert current value if it survived the rebuild (so the visible selection stays).
+            const leftOpts  = activeDevices.filter(d => d !== rightSelects[0].value);
 
-            if (leftOpts.includes(leftSelect.value)) {
+            const rightOpts = activeDevices.filter(d => d !== leftSelects[0].value);
 
-                leftSelect.value = leftSelect.value;
+            leftSelects.forEach(sel => {
+                const oldVal = sel.value;
+                sel.innerHTML  = leftOpts.map(d  => '<option value="' + d + '">' + d + '</option>').join('');
+                if (leftOpts.includes(oldVal)) sel.value = oldVal;
+            });
 
-            }
-
-            if (rightOpts.includes(rightSelect.value)) {
-
-                rightSelect.value = rightSelect.value;
-
-            }
+            rightSelects.forEach(sel => {
+                const oldVal = sel.value;
+                sel.innerHTML = rightOpts.map(d => '<option value="' + d + '">' + d + '</option>').join('');
+                if (rightOpts.includes(oldVal)) sel.value = oldVal;
+            });
 
         }
 
@@ -6540,17 +6636,14 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             const right = rightSelect ? rightSelect.value : '';
 
-            const statusEl = document.getElementById('camera-mapping-save-status');
+            const statusEls = [document.getElementById('camera-mapping-save-status'), document.getElementById('camera-mapping-save-status-modal')].filter(Boolean);
 
             function setStatus(text, color) {
 
-                if (statusEl) {
-
-                    statusEl.textContent = text;
-
-                    statusEl.style.color = color || 'var(--text-secondary)';
-
-                }
+                statusEls.forEach(el => {
+                    el.textContent = text;
+                    el.style.color = color || 'var(--text-secondary)';
+                });
 
             }
 
@@ -6592,7 +6685,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         async function openCameraConfigModal(camId) {
 
-            document.getElementById('mcv-modal-title').textContent = `Configuration Caméra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
+            const ts = window.lastTelemetryState;
+            const cam2Connected = ts && ts.sensors && ts.sensors.cam2_connected === true;
+            if (!cam2Connected) {
+                document.getElementById('mcv-modal-title').textContent = 'Configuration Caméra';
+            } else {
+                document.getElementById('mcv-modal-title').textContent = `Configuration Caméra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
+            }
 
             
 
@@ -6728,7 +6827,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             window.mccCurrentCamId = camId;
 
-            document.getElementById('mcc-modal-title').textContent = `Calibration Caméra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
+            const ts = window.lastTelemetryState;
+            const cam2Connected = ts && ts.sensors && ts.sensors.cam2_connected === true;
+            if (!cam2Connected) {
+                document.getElementById('mcc-modal-title').textContent = 'Calibration Caméra';
+            } else {
+                document.getElementById('mcc-modal-title').textContent = `Calibration Caméra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
+            }
 
             
 
@@ -6846,6 +6951,26 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 appWs.send(JSON.stringify({ type: "stop_camera", camera: camId }));
 
+            }
+
+            const btnRun = document.getElementById('btn-mcc-run-calib');
+            if (btnRun) {
+                btnRun.disabled = false;
+                btnRun.innerHTML = '<span>📷 Lancer la Caméra</span>';
+                btnRun.onclick = () => runIndividualCameraCalib();
+            }
+            const statusText = document.getElementById('mcc-cam-status-text');
+            if (statusText) {
+                statusText.innerHTML = '<span>Cliquez sur Lancer pour vous connecter à la caméra.</span>';
+            }
+            const overlayEl = document.getElementById('mcc-cam-status-overlay');
+            if (overlayEl) {
+                overlayEl.style.display = 'flex';
+                overlayEl.style.backgroundColor = 'rgba(9,9,11,0.85)';
+            }
+            const hudEl = document.getElementById('mcc-cam-hud');
+            if (hudEl) {
+                hudEl.style.display = 'none';
             }
 
         }
@@ -7093,8 +7218,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 window.mccPeerConnection.close();
                 window.mccPeerConnection = null;
             }
-            if (window.appWs && window.appWs.readyState === WebSocket.OPEN) {
-                window.appWs.send(JSON.stringify({ type: 'stop_camera', camera: camId }));
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: 'stop_camera', camera: camId }));
             }
             var _cols = parseInt((document.getElementById('mcc-cols')||{}).value) || 9;
             var _rows = parseInt((document.getElementById('mcc-rows')||{}).value) || 6;
@@ -7104,8 +7229,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             if (hudEl) hudEl.style.display = 'none';
             if (videoEl) { videoEl.style.display = 'none'; videoEl.srcObject = null; }
             setTimeout(function() {
-                if (window.appWs && window.appWs.readyState === WebSocket.OPEN) {
-                    window.appWs.send(JSON.stringify({
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({
                         type: 'run_mono_calib',
                         camera: camId,
                         chessboard_cols: _cols,

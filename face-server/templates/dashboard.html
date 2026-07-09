@@ -327,7 +327,7 @@
                     </div>
                     <div class="stream-controls">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra Gauche</h4>
+                            <h4 id="stream-title-cam-1" style="font-size: 0.95rem; font-weight: 600;">Caméra Gauche</h4>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span id="stream-status-1" class="status-badge">Inactif</span>
                                 <label class="vslam-toggle" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
@@ -1364,7 +1364,7 @@
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div id="quality-card-1" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
-                            <h4 style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Gauche</h4>
+                            <h4 id="quality-title-cam-1" style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Gauche</h4>
                             <div style="display:flex; flex-direction:column; gap:0.5rem;">
                                 <div>
                                     <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution Stream <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.65rem; border-radius:3px; height:auto; margin:0; margin-left:0.5rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" id="detect-res-btn-1" onclick="queryCameraResolutions(1)" title="Détecter les résolutions disponibles">🔍 Détecter</button></label>
@@ -1458,10 +1458,10 @@
                         </div>
                         
                         <!-- Mapping Selection -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+                        <div id="camera-ports-grid-main" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
                             <div>
-                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
-                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="updateCameraPortOptions(); saveCameraPortsMapping();">
+                                <label id="label-port-left-main" class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
+                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="syncCamPorts('left', this.value);">
                                     <option value="/dev/video0">/dev/video0</option>
                                     <option value="/dev/video1">/dev/video1</option>
                                     <option value="/dev/video2">/dev/video2</option>
@@ -1473,9 +1473,9 @@
                             <button id="btn-save-camera-mapping" class="btn btn-primary" onclick="saveCameraPortsMapping()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Enregistrer la configuration</button>
                             <span id="camera-mapping-save-status" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
                         </div>
-                            <div>
+                            <div id="container-port-right-main">
                                 <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Droite</label>
-                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="updateCameraPortOptions(); saveCameraPortsMapping();">
+                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="syncCamPorts('right', this.value);">
                                     <option value="/dev/video0">/dev/video0</option>
                                     <option value="/dev/video1">/dev/video1</option>
                                     <option value="/dev/video2">/dev/video2</option>
@@ -1489,7 +1489,7 @@
                         <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.75rem;">
                             <div id="calib-cam-container-1" style="display:flex; justify-content:space-between; align-items:center;">
                                 <div>
-                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
+                                    <span id="title-cam-left-main" style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
                                     <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
                                         <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
                                         <span id="calib-badge-1" style="font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:3px; background:rgba(239,68,68,0.15); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-weight:600;">⚠ Non calibrée</span>
@@ -1501,9 +1501,11 @@
                                 <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
                             </div>
                             
-                            <div style="display:flex; justify-content:center; gap:0.5rem; padding: 0.25rem 0; border-top: 1px solid var(--border-color);">
-                                <button class="btn btn-secondary" onclick="swapCameraLR()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.03);">🔄 Échanger Gauche/Droite</button>
-                                <button class="btn btn-secondary" onclick="openCameraAssignModal()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);">🎥 Configurer G/D (Live)</button>
+                            <div id="actions-cam-main" style="display:flex; justify-content:center; gap:0.5rem; padding: 0.25rem 0; border-top: 1px solid var(--border-color);">
+                                <button id="btn-add-camera-main" class="btn btn-secondary" onclick="forceStereoMode()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #10b981;">➕ Ajouter une caméra</button>
+                                <button id="btn-remove-camera-main" class="btn btn-secondary" onclick="forceMonoMode()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #ef4444; display:none;">➖ Supprimer la 2e caméra</button>
+                                <button id="btn-swap-cam-main" class="btn btn-secondary" onclick="swapCameraLR()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.03);">🔄 Échanger Gauche/Droite</button>
+                                <button id="btn-config-cam-main" class="btn btn-secondary" onclick="openCameraAssignModal()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);">🎥 Configurer G/D (Live)</button>
                             </div>
                             <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                                 <div>
@@ -2475,7 +2477,7 @@
                     </div>
                     <div class="stream-controls">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <h4 style="font-size: 0.95rem; font-weight: 600;">Caméra Gauche</h4>
+                            <h4 id="stream-title-cam-1" style="font-size: 0.95rem; font-weight: 600;">Caméra Gauche</h4>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <span id="stream-status-1" class="status-badge">Inactif</span>
                                 <label class="vslam-toggle" style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">
@@ -3512,7 +3514,7 @@
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                         <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
-                            <h4 style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Gauche</h4>
+                            <h4 id="quality-title-cam-1" style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Gauche</h4>
                             <div style="display:flex; flex-direction:column; gap:0.5rem;">
                                 <div>
                                     <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution Stream <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.65rem; border-radius:3px; height:auto; margin:0; margin-left:0.5rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" id="detect-res-btn-1" onclick="queryCameraResolutions(1)" title="Détecter les résolutions disponibles">🔍 Détecter</button></label>
@@ -3606,10 +3608,10 @@
                         </div>
                         
                         <!-- Mapping Selection -->
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+                        <div id="camera-ports-grid-modal" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
                             <div>
-                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
-                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="updateCameraPortOptions(); saveCameraPortsMapping();">
+                                <label id="label-port-left-modal" class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
+                                <select id="cam-port-left-modal" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="syncCamPorts('left', this.value);">
                                     <option value="/dev/video0">/dev/video0</option>
                                     <option value="/dev/video1">/dev/video1</option>
                                     <option value="/dev/video2">/dev/video2</option>
@@ -3619,25 +3621,25 @@
                             </div>
                         <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
                             <button id="btn-save-camera-mapping" class="btn btn-primary" onclick="saveCameraPortsMapping()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Enregistrer la configuration</button>
-                            <span id="camera-mapping-save-status" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
+                            <span id="camera-mapping-save-status-modal" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
                         </div>
-                            <div>
+                            <div id="container-port-right-modal">
                                 <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Droite</label>
-                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="updateCameraPortOptions(); saveCameraPortsMapping();">
+                                <select id="cam-port-right-modal" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="syncCamPorts('right', this.value);">
                                     <option value="/dev/video0">/dev/video0</option>
                                     <option value="/dev/video1">/dev/video1</option>
                                     <option value="/dev/video2">/dev/video2</option>
                                     <option value="/dev/video3">/dev/video3</option>
                                     <option value="/dev/video4">/dev/video4</option>
                                 </select>
-                                <span id="cam-port-single-info" style="display:none;">(Caméra central — seule caméra branchée)</span>
+                                <span id="cam-port-single-info-modal" style="display:none;">(Caméra central — seule caméra branchée)</span>
                             </div>
                         </div>
 
                         <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.75rem;">
                             <div id="calib-cam-container-1" style="display:flex; justify-content:space-between; align-items:center;">
                                 <div>
-                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
+                                    <span id="title-cam-left-modal" style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
                                     <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
                                         <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
                                         <span id="calib-badge-1" style="font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:3px; background:rgba(239,68,68,0.15); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-weight:600;">⚠ Non calibrée</span>
@@ -3649,11 +3651,13 @@
                                 <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
                             </div>
                             
-                            <div style="display:flex; justify-content:center; gap:0.5rem; padding: 0.25rem 0; border-top: 1px solid var(--border-color);">
-                                <button class="btn btn-secondary" onclick="swapCameraLR()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.03);">🔄 Échanger Gauche/Droite</button>
-                                <button class="btn btn-secondary" onclick="openCameraAssignModal()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);">🎥 Configurer G/D (Live)</button>
+                            <div id="actions-cam-modal" style="display:flex; justify-content:center; gap:0.5rem; padding: 0.25rem 0; border-top: 1px solid var(--border-color);">
+                                <button id="btn-add-camera-modal" class="btn btn-secondary" onclick="forceStereoMode()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #10b981;">➕ Ajouter une caméra</button>
+                                <button id="btn-remove-camera-modal" class="btn btn-secondary" onclick="forceMonoMode()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #ef4444; display:none;">➖ Supprimer la 2e caméra</button>
+                                <button id="btn-swap-cam-modal" class="btn btn-secondary" onclick="swapCameraLR()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.03);">🔄 Échanger Gauche/Droite</button>
+                                <button id="btn-config-cam-modal" class="btn btn-secondary" onclick="openCameraAssignModal()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);">🎥 Configurer G/D (Live)</button>
                             </div>
-                            <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                            <div id="calib-cam-container-2-modal" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
                                 <div>
                                     <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Droite</span>
                                     <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
