@@ -103,6 +103,9 @@
                     
                     // Update joint angles (0 to 11)
                     if (payload.joints && payload.joints.length === 12) {
+                        // Toujours mettre à jour le cache global des angles servo réels
+                        window.latestServoAngles = payload.joints.slice();
+
                         for (let i = 0; i < 12; i++) {
                             const angle = payload.joints[i];
                             const valEl = document.getElementById(`joint-val-${i}`);
@@ -111,6 +114,13 @@
                                 if (valEl) valEl.textContent = `${Math.round(angle)}°`;
                                 if (sliderEl) sliderEl.value = Math.round(angle);
                             }
+                        }
+
+                        // Synchroniser le viewer 3D en mode Actif (non-démo)
+                        const demoCheck = document.getElementById('demo-mode-checkbox');
+                        const isDemo = demoCheck ? demoCheck.checked : true;
+                        if (!isDemo && typeof window.updateSpotMicroServos === 'function') {
+                            window.updateSpotMicroServos(payload.joints);
                         }
                     }
                     

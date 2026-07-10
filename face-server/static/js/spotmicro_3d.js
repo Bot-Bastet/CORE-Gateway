@@ -516,6 +516,58 @@
   window.getSpotMicroPosture = function () { return posture; };
   window.stopSpotMicroMovement = function () { cmd = "s"; keys = {}; };
 
+  // ─── Sync viewer with real servo angles from Arduino/WebSocket ─────
+  // angles12 : tableau de 12 valeurs en degrés (0-180, 90 = neutre)
+  // Mapping Arduino → viewer (basé sur EC_JOINT_ORDER côté JS) :
+  //   0=FR coxa, 1=FR thigh, 2=FR calf
+  //   3=FL coxa, 4=FL thigh, 5=FL calf
+  //   6=RR coxa, 7=RR thigh, 8=RR calf
+  //   9=RL coxa, 10=RL thigh, 11=RL calf
+  // Conversion : angle_servo → angle_viewer en radians
+  //   coxa  : (servo - 90) * DEG          (centré à 0)
+  //   thigh : 1.25 + (servo - 90) * DEG   (offset IK stand)
+  //   calf  : -2.59 + (servo - 90) * DEG  (offset IK stand)
+  window.updateSpotMicroServos = function (angles12) {
+    if (!angles12 || angles12.length < 12) return;
+    var mapping = [
+      { id: "fr", s: 0, t: 1, c: 2 },
+      { id: "fl", s: 3, t: 4, c: 5 },
+      { id: "rr", s: 6, t: 7, c: 8 },
+      { id: "rl", s: 9, t: 10, c: 11 }
+    ];
+    mapping.forEach(function (m) {
+      var s_deg = angles12[m.s] !== undefined ? angles12[m.s] : 90;
+      var t_deg = angles12[m.t] !== undefined ? angles12[m.t] : 90;
+      var c_deg = angles12[m.c] !== undefined ? angles12[m.c] : 90;
+      tgt[m.id + "_s"] = (s_deg - 90) * DEG;
+      tgt[m.id + "_t"] = 1.25  + (t_deg - 90) * DEG;
+      tgt[m.id + "_c"] = -2.59 + (c_deg - 90) * DEG;
+    });
+    // Forcer powered ON pour voir les pattes
+    posture.powered = true;
+    cmd = "s";
+  };
+
+  // Reset viewer au stand neutre (toutes pattes à 90°)
+  window.resetSpotMicro3D = function () {
+    Object.keys(cur).forEach(function (k) {
+      if (k.endsWith("_s")) { cur[k] = 0;     tgt[k] = 0; }
+      if (k.endsWith("_t")) { cur[k] = 0;     tgt[k] = 0; }
+      if (k.endsWith("_c")) { cur[k] = 0;     tgt[k] = 0; }
+    });
+    posture.height = 100;
+    posture.roll = 0; posture.pitch = 0; posture.yaw = 0;
+    cmd = "s";
+    keys = {};
+    // Sync sliders HTML si présents
+    ["height", "roll", "pitch", "yaw"].forEach(function (k) {
+      var sl = document.getElementById("posture-slider-" + k);
+      var vl = document.getElementById("posture-val-" + k);
+      if (sl) sl.value = k === "height" ? 100 : 0;
+      if (vl) vl.textContent = k === "height" ? "100%" : "0°";
+    });
+  };
+
   window.disposeSpotMicro3D = function () {
     if (animFrameId) cancelAnimationFrame(animFrameId);
     window.removeEventListener("keydown", onKeyDown);

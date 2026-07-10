@@ -8,7 +8,7 @@ controlActiveDir = null;
 controlWalkInterval = null;
 navPointA = null;
 navPointB = null;
-robotPosture = { height: 0.0, speed: 50.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false };
+robotPosture = { height: 100.0, speed: 50.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false };
 
 // LLM auto-execute: disabled by default
 window.llmAutoControl = false;
@@ -170,7 +170,11 @@ function stopWalking() {
 function onPostureSliderChange(key, value) {
   robotPosture[key] = parseFloat(value);
   var labelEl = document.getElementById("posture-val-" + key);
-  if (labelEl) { var units = (key === "height" || key === "speed") ? "%" : "deg"; labelEl.textContent = value + units; }
+  if (labelEl) {
+    // Affichage correct des unités
+    var suffix = (key === 'height' || key === 'speed') ? '%' : '°';
+    labelEl.textContent = value + suffix;
+  }
   if (typeof updateSpotMicroPosture === "function") updateSpotMicroPosture(robotPosture);
   debouncePostureSync(key, value);
 }
@@ -189,10 +193,22 @@ function toggleDemoMode(checked) {
   if (appWs && appWs.readyState === WebSocket.OPEN)
     appWs.send(JSON.stringify({ type: 'demo_mode', enabled: checked }));
 
-  // Quand on repasse en mode ACTIF, synchroniser le viewer 3D
-  // avec les angles réels du robot reçus en live via WS
-  if (!checked && window.latestServoAngles && typeof updateSpotMicroServos === 'function') {
-    updateSpotMicroServos(window.latestServoAngles);
+  if (checked) {
+    // Passage en SIMULATION : reset le viewer 3D à la position neutre (stand)
+    if (typeof window.resetSpotMicro3D === 'function') {
+      window.resetSpotMicro3D();
+    } else if (typeof window.updateSpotMicroPosture === 'function') {
+      window.updateSpotMicroPosture({ height: 100, roll: 0, pitch: 0, yaw: 0 });
+    }
+    // Sync viewer avec la posture actuelle des sliders
+    if (typeof window.updateSpotMicroPosture === 'function') {
+      window.updateSpotMicroPosture(robotPosture);
+    }
+  } else {
+    // Passage en mode ACTIF : synchroniser le viewer avec les angles réels du robot
+    if (window.latestServoAngles && typeof window.updateSpotMicroServos === 'function') {
+      window.updateSpotMicroServos(window.latestServoAngles);
+    }
   }
 
   _setBadge(robotPosture.powered, checked);
