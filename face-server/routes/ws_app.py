@@ -1,6 +1,5 @@
 """WebSocket handler for app (browser dashboard) clients."""
 import json
-import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
@@ -8,11 +7,16 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from time import time as _time
 from config import (
     API_TOKEN, manager, stream_active, stream_v_slam,
-    stream_keep_alive, active_camera_listeners, camera_stop_timers,
-    camera_idle_kill_at, rest_camera_listeners,
-    stop_camera_delayed, should_schedule_idle_kill, preferred_ai_targets,
+    stream_keep_alive, active_camera_listeners,
+    camera_idle_kill_at, rest_camera_listeners, preferred_ai_targets,
 )
-from routes.ws_helpers import emit_stream_state_sync
+from routes.ws_helpers import (
+    handle_camera_join,
+    handle_camera_release,
+    handle_camera_stop,
+    handle_toggle_keep_stream,
+    handle_camera_leave,
+)
 
 router = APIRouter()
 
@@ -44,7 +48,7 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
             "v_slam": stream_v_slam[cam_id],
             "idle_kill_ms": idle_kill_ms,
         })
-    # Envoyer l'état AI courant au dashboard qui vient de se connecter
+    # Send current AI state to newly connected dashboard
     await websocket.send_json({
         "type": "ai_state_update",
         "ai_state": dict(preferred_ai_targets)
@@ -59,95 +63,25 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                 if msg_type == "request_camera":
                     cam_id = msg_json.get("camera", 1)
                     v_slam = msg_json.get("v_slam", False)
-                    active_camera_listeners[cam_id].add(websocket)
-                    if camera_stop_timers[cam_id] is not None:
-                        camera_stop_timers[cam_id].cancel()
-                        camera_stop_timers[cam_id] = None
-                        camera_idle_kill_at[cam_id] = 0.0
-                    v_slam_changed = (stream_v_slam[cam_id] != v_slam)
-                    stream_v_slam[cam_id] = v_slam
-                    if not stream_active[cam_id] or v_slam_changed:
-                        stream_active[cam_id] = True
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
-                        await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
-                    else:
-                        # Stream deja actif : re-envoyer start_camera au robot (idempotent)
-                        # On n'envoie PAS stream_status au client (le flag stream_active est optimiste)
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
-                    await emit_stream_state_sync(cam_id, manager)
+                    await handle_camera_join(websocket, cam_id, v_slam, manager)
                 elif msg_type == "release_camera":
                     cam_id = msg_json.get("camera", 1)
-                    if not stream_active[cam_id]:
-                        continue
-                    if websocket in active_camera_listeners[cam_id]:
-                        active_camera_listeners[cam_id].remove(websocket)
-                        if should_schedule_idle_kill(cam_id):
-                            if camera_stop_timers[cam_id] is not None:
-                                camera_stop_timers[cam_id].cancel()
-                                camera_idle_kill_at[cam_id] = 0.0
-                            camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id, manager))
-                    await emit_stream_state_sync(cam_id, manager)
+                    await handle_camera_release(websocket, cam_id, manager)
                 elif msg_type == "stop_camera":
                     cam_id = msg_json.get("camera", 1)
-                    if not stream_active[cam_id]:
-                        continue
-                    if camera_stop_timers[cam_id] is not None:
-                        camera_stop_timers[cam_id].cancel()
-                        camera_stop_timers[cam_id] = None
-                        camera_idle_kill_at[cam_id] = 0.0
-                    stream_active[cam_id] = False
-                    await manager.broadcast(json.dumps({"type": "stop_camera", "camera": cam_id}), "robot")
-                    await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": False}), "app")
-                    await emit_stream_state_sync(cam_id, manager)
+                    await handle_camera_stop(cam_id, manager)
                     continue
                 elif msg_type == "toggle_keep_stream":
                     cam_id = msg_json.get("camera", 1)
                     keep = msg_json.get("keep", False)
-                    stream_keep_alive[cam_id] = keep
-                    if keep:
-                        stream_active[cam_id] = True
-                        if camera_stop_timers[cam_id] is not None:
-                            camera_stop_timers[cam_id].cancel()
-                            camera_stop_timers[cam_id] = None
-                            camera_idle_kill_at[cam_id] = 0.0
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": stream_v_slam[cam_id]}), "robot")
-                        await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
-                    else:
-                        if should_schedule_idle_kill(cam_id):
-                            if camera_stop_timers[cam_id] is not None:
-                                camera_stop_timers[cam_id].cancel()
-                                camera_idle_kill_at[cam_id] = 0.0
-                            camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id, manager))
-                    await manager.broadcast(json.dumps({"type": "keep_stream_status", "camera": cam_id, "keep": keep}), "app")
-                    await emit_stream_state_sync(cam_id, manager)
+                    await handle_toggle_keep_stream(cam_id, keep, manager)
                 elif msg_type == "join_stream":
                     cam_id = msg_json.get("camera", 1)
                     v_slam = msg_json.get("v_slam", False)
-                    active_camera_listeners[cam_id].add(websocket)
-                    if camera_stop_timers[cam_id] is not None:
-                        camera_stop_timers[cam_id].cancel()
-                        camera_stop_timers[cam_id] = None
-                        camera_idle_kill_at[cam_id] = 0.0
-                    v_slam_changed = (stream_v_slam[cam_id] != v_slam)
-                    stream_v_slam[cam_id] = v_slam
-                    if not stream_active[cam_id] or v_slam_changed:
-                        stream_active[cam_id] = True
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
-                        await manager.broadcast(json.dumps({"type": "stream_status", "camera": cam_id, "active": True}), "app")
-                    else:
-                        # Stream deja actif : re-envoyer start_camera au robot (idempotent)
-                        # On n'envoie PAS stream_status au client (le flag stream_active est optimiste)
-                        await manager.broadcast(json.dumps({"type": "start_camera", "camera": cam_id, "v_slam": v_slam}), "robot")
-                    await emit_stream_state_sync(cam_id, manager)
+                    await handle_camera_join(websocket, cam_id, v_slam, manager)
                 elif msg_type == "leave_stream":
                     cam_id = msg_json.get("camera", 1)
-                    if websocket in active_camera_listeners[cam_id]:
-                        active_camera_listeners[cam_id].remove(websocket)
-                        if len(active_camera_listeners[cam_id]) == 0 and not stream_keep_alive[cam_id]:
-                            if camera_stop_timers[cam_id] is not None:
-                                camera_stop_timers[cam_id].cancel()
-                            camera_stop_timers[cam_id] = asyncio.create_task(stop_camera_delayed(cam_id, manager))
-                    await emit_stream_state_sync(cam_id, manager)
+                    await handle_camera_leave(websocket, cam_id, manager)
                 elif msg_type == "ai_control":
                     feature = msg_json.get("feature")
                     target = msg_json.get("target")
@@ -156,23 +90,32 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         node_connected = len(manager.active_connections.get("node", [])) > 0
                         active_target = target
                         if target == "node" and not node_connected:
-                            active_target = "robot"
-                        # Envoyer au robot/node la cible active (avec fallback potentiel)
+                            # Node pas dispo → desactiver plutot que de tomber
+                            # silencieusement sur "robot" sans prevenir l'UI
+                            active_target = "disabled"
+                        # Send effective target to robot/node
                         robot_msg = json.dumps({"type": "ai_control", "feature": feature, "target": active_target})
                         await manager.broadcast(robot_msg, "robot")
                         await manager.broadcast(robot_msg, "node")
-                        # Envoyer à TOUS les dashboards la préférence réelle (sans fallback)
-                        # pour que l'UI reflète le choix de l'utilisateur
+                        # Build EFFECTIVE state so the UI reflects what is
+                        # actually running, not the stored preference.
+                        effective_state = {}
+                        for f, t in preferred_ai_targets.items():
+                            effective_state[f] = "disabled" if (t == "node" and not node_connected) else t
                         await manager.broadcast(json.dumps({
                             "type": "ai_state_update",
-                            "ai_state": dict(preferred_ai_targets)
+                            "ai_state": effective_state,
                         }), "app")
                     continue
                 elif msg_type == "arduino_cmd":
                     await manager.broadcast(data, "robot")
                 elif msg_type == "query_camera_resolutions":
                     await manager.broadcast(data, "robot")
-            except Exception:
+            except json.JSONDecodeError:
+                # Client sent malformed JSON — skip this message silently
+                pass
+            except AttributeError:
+                # Client sent a JSON value that is not a dict (e.g. an array)
                 pass
 
             await manager.broadcast(data, "robot")
