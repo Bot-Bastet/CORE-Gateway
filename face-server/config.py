@@ -59,7 +59,7 @@ class GatewayState:
             "pitch": 0.0,       # -30..30 (body pitch deg)
             "yaw": 0.0,         # -30..30 (body yaw deg)
             "demo_mode": False, # True = simulation, motors off
-            "powered": True,    # True = robot active
+            "powered": False,    # True = robot active
         }
         self.github_releases_cache: dict = {}
 

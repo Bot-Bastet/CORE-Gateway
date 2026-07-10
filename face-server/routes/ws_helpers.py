@@ -291,6 +291,21 @@ async def handle_robot_posture_update(key: str, value, manager):
             "type": "arduino_cmd", "cmd": "sit"
         }), "robot")
 
+    # If user toggled powered OFF, tell robot to stop (detach servos)
+    if key == "powered" and not value:
+        await manager.broadcast(_json.dumps({
+            "type": "arduino_cmd", "cmd": "stop"
+        }), "robot")
+        # Also send cmd_vel zero to stop any walking
+        await manager.broadcast(_json.dumps({
+            "type": "cmd_vel", "linear": 0.0, "angular": 0.0
+        }), "robot")
+    elif key == "powered" and value:
+        # Powered on: sit is safe default
+        await manager.broadcast(_json.dumps({
+            "type": "arduino_cmd", "cmd": "sit"
+        }), "robot")
+
 
 async def handle_demo_mode_toggle(enabled: bool, manager):
     """Active/desactive le mode demo.

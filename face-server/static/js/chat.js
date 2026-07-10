@@ -172,22 +172,26 @@
             
             let cleanText = text;
             
-            // Parser les balises [ACTION: ...]
+            // Parser les balises [ACTION: ...] — only execute if LLM control is enabled
             const actionRegex = /\[ACTION:\s*([a-zA-Z]+)\]/g;
             let actionMatch;
             while ((actionMatch = actionRegex.exec(text)) !== null) {
                 const action = actionMatch[1].toLowerCase();
-                executeVoiceAction(action);
+                if (window.llmAutoControl) {
+                    executeVoiceAction(action);
+                }
             }
             cleanText = cleanText.replace(actionRegex, '');
             
-            // Parser les balises [NAV: x, y]
+            // Parser les balises [NAV: x, y] — only execute if LLM control is enabled
             const navRegex = /\[NAV:\s*(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)\]/g;
             let navMatch;
             while ((navMatch = navRegex.exec(text)) !== null) {
                 const x = parseFloat(navMatch[1]);
                 const y = parseFloat(navMatch[3]);
-                executeVoiceNav(x, y);
+                if (window.llmAutoControl) {
+                    executeVoiceNav(x, y);
+                }
             }
             cleanText = cleanText.replace(navRegex, '');
             
