@@ -383,6 +383,12 @@
                 else if (payload.type === "chat_response" || payload.type === "chat") {
                     handleIncomingLLMMessage(payload.sender || 'LLM', payload.text || '');
                 }
+                else if (payload.type === "robot_posture_sync") {
+                    // Server-synced posture state (no cache/localStorage)
+                    if (payload.robot_posture && typeof applyRobotPostureSync === "function") {
+                        applyRobotPostureSync(payload.robot_posture);
+                    }
+                }
             } catch(e) {
                 // not json or parsing error
             }

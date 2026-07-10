@@ -17,6 +17,7 @@ from config import (
     manager, stream_active, stream_v_slam,
     stream_keep_alive, active_camera_listeners, camera_idle_kill_at,
     camera_stop_timers, rest_camera_listeners, preferred_ai_targets,
+    robot_posture,
     stop_camera_delayed, should_schedule_idle_kill,
 )
 
@@ -238,3 +239,76 @@ async def handle_camera_leave(websocket, cam_id: int, manager):
                 stop_camera_delayed(cam_id, manager)
             )
     await emit_stream_state_sync(cam_id, manager)
+
+
+# ─── Robot Posture & Demo Mode ────────────────────────────────────────────
+
+
+async def handle_robot_posture_update(key: str, value, manager):
+    """Met a jour une cle de posture robot et la broadcast a tous les clients.
+
+    Stocke dans ``robot_posture`` (GatewayState → synchro multi-client).
+    Broadcast le nouvel etat complet a tous les dashboards (app) + mobile.
+    """
+    if key not in robot_posture:
+        return
+
+    # Clamp values to valid ranges
+    if key == "height":
+        value = max(0.0, min(100.0, float(value)))
+    elif key == "speed":
+        value = max(0.0, min(100.0, float(value)))
+    elif key in ("roll", "pitch", "yaw"):
+        value = max(-30.0, min(30.0, float(value)))
+    elif key == "demo_mode":
+        value = bool(value)
+    elif key == "powered":
+        value = bool(value)
+
+    robot_posture[key] = value
+
+    # Broadcast to ALL app clients (dashboard + mobile) so UI stays in sync
+    await manager.broadcast(_json.dumps({
+        "type": "robot_posture_sync",
+        "robot_posture": dict(robot_posture),
+    }), "app")
+
+    # Forward to robot channel when NOT in demo mode (real robot needs gait params)
+    if not robot_posture.get("demo_mode", False):
+        await manager.broadcast(_json.dumps({
+            "type": "robot_posture",
+            "key": key,
+            "value": value,
+        }), "robot")
+
+    # If user toggled demo mode OFF, tell robot to sit (safe position)
+    if key == "demo_mode" and not value:
+        await manager.broadcast(_json.dumps({
+            "type": "arduino_cmd", "cmd": "sit"
+        }), "robot")
+
+
+async def handle_demo_mode_toggle(enabled: bool, manager):
+    """Active/desactive le mode demo.
+
+    Demo ON  → les moteurs sont eteints (simulation uniquement).
+    Demo OFF → les moteurs s'allument et le robot s'assoit.
+    """
+    robot_posture["demo_mode"] = enabled
+
+    if enabled:
+        # Disable motors for simulation (robot expects "stop")
+        await manager.broadcast(_json.dumps({
+            "type": "arduino_cmd", "cmd": "stop"
+        }), "robot")
+    else:
+        # Re-enable motors and sit
+        await manager.broadcast(_json.dumps({
+            "type": "arduino_cmd", "cmd": "sit"
+        }), "robot")
+
+    # Sync all dashboards
+    await manager.broadcast(_json.dumps({
+        "type": "robot_posture_sync",
+        "robot_posture": dict(robot_posture),
+    }), "app")

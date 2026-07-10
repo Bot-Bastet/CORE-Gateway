@@ -9,6 +9,7 @@ from config import (
     API_TOKEN, manager, stream_active, stream_v_slam,
     stream_keep_alive, active_camera_listeners,
     camera_idle_kill_at, rest_camera_listeners, preferred_ai_targets,
+    robot_posture,
 )
 from routes.ws_helpers import (
     handle_camera_join,
@@ -16,6 +17,8 @@ from routes.ws_helpers import (
     handle_camera_stop,
     handle_toggle_keep_stream,
     handle_camera_leave,
+    handle_robot_posture_update,
+    handle_demo_mode_toggle,
 )
 
 router = APIRouter()
@@ -52,6 +55,11 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
     await websocket.send_json({
         "type": "ai_state_update",
         "ai_state": dict(preferred_ai_targets)
+    })
+    # Send current robot posture so the UI is immediately in sync
+    await websocket.send_json({
+        "type": "robot_posture_sync",
+        "robot_posture": dict(robot_posture),
     })
     try:
         while True:
@@ -111,6 +119,16 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                     await manager.broadcast(data, "robot")
                 elif msg_type == "query_camera_resolutions":
                     await manager.broadcast(data, "robot")
+                elif msg_type == "robot_posture_update":
+                    key = msg_json.get("key")
+                    value = msg_json.get("value")
+                    if key:
+                        await handle_robot_posture_update(key, value, manager)
+                    continue
+                elif msg_type == "demo_mode":
+                    enabled = msg_json.get("enabled", False)
+                    await handle_demo_mode_toggle(enabled, manager)
+                    continue
             except json.JSONDecodeError:
                 # Client sent malformed JSON — skip this message silently
                 pass

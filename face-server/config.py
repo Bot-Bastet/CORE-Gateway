@@ -51,6 +51,15 @@ class GatewayState:
             "tts": "disabled", "stt": "disabled", "chat": "disabled",
             "yolo": "disabled", "face_rec": "disabled",
         }
+        self.robot_posture: dict = {
+            "height": 0.0,      # 0..100  (stand height %)
+            "speed": 50.0,      # 0..100  (gait speed %)
+            "roll": 0.0,        # -30..30 (body roll deg)
+            "pitch": 0.0,       # -30..30 (body pitch deg)
+            "yaw": 0.0,         # -30..30 (body yaw deg)
+            "demo_mode": False, # True = simulation, motors off
+            "powered": True,    # True = robot active
+        }
         self.github_releases_cache: dict = {}
 
     @property
@@ -85,6 +94,7 @@ camera_stop_timers   = state.camera_stop_timers
 rest_camera_listeners = state.rest_camera_listeners
 camera_idle_kill_at  = state.camera_idle_kill_at
 preferred_ai_targets = state.preferred_ai_targets
+robot_posture        = state.robot_posture
 GITHUB_RELEASES_CACHE = state.github_releases_cache
 
 API_TOKEN = os.getenv("API_TOKEN", "your-api-token-here")
