@@ -23,6 +23,7 @@ ARDUINO_UPDATE_FILE = DATA_DIR / "arduino_update_state.json"
 CAMERA_CALIB_1_FILE = DATA_DIR / "camera_calib_1.json"
 CAMERA_CALIB_2_FILE = DATA_DIR / "camera_calib_2.json"
 STEREO_CALIB_FILE = DATA_DIR / "camera_calib_stereo.json"
+ROBOT_POSTURE_FILE = DATA_DIR / "robot_posture.json"
 
 FACES_DIR.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -214,6 +215,18 @@ def normalize_camera_manifest(sensors: dict) -> None:
         sensors["cam1_connected"] = len(devices) >= 1
         sensors["cam2_connected"] = len(devices) >= 2
 
+
+# ─── Load persisted robot posture from disk (survives gateway restarts) ──
+_posture_defaults = dict(state.robot_posture)
+_saved = load_json(ROBOT_POSTURE_FILE, default={})
+if isinstance(_saved, dict):
+    for k in _posture_defaults:
+        if k in _saved:
+            # Preserve types: bool for demo_mode/powered, float for others
+            if k in ("demo_mode", "powered"):
+                state.robot_posture[k] = bool(_saved[k])
+            else:
+                state.robot_posture[k] = float(_saved[k])
 
 # ─── Connection Manager ──────────────────────────────────────────────────
 # Extracted to connection_manager.py to avoid circular imports.

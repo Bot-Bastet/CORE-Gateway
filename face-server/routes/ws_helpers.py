@@ -19,6 +19,7 @@ from config import (
     camera_stop_timers, rest_camera_listeners, preferred_ai_targets,
     robot_posture,
     stop_camera_delayed, should_schedule_idle_kill,
+    save_json, ROBOT_POSTURE_FILE,
 )
 
 
@@ -267,6 +268,9 @@ async def handle_robot_posture_update(key: str, value, manager):
 
     robot_posture[key] = value
 
+    # Persist to disk so posture survives gateway restarts
+    save_json(ROBOT_POSTURE_FILE, dict(robot_posture))
+
     # Broadcast to ALL app clients (dashboard + mobile) so UI stays in sync
     await manager.broadcast(_json.dumps({
         "type": "robot_posture_sync",
@@ -295,6 +299,9 @@ async def handle_demo_mode_toggle(enabled: bool, manager):
     Demo OFF → les moteurs s'allument et le robot s'assoit.
     """
     robot_posture["demo_mode"] = enabled
+
+    # Persist to disk
+    save_json(ROBOT_POSTURE_FILE, dict(robot_posture))
 
     if enabled:
         # Disable motors for simulation (robot expects "stop")
