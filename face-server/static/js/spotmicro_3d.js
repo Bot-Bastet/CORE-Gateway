@@ -348,7 +348,7 @@
     worldGrp.position.z = -worldPos.z;
     worldGrp.rotation.y = worldPos.yaw;
 
-    if (posture.demo_mode && !window._calibModeActive) {
+    if (!window._calibModeActive) {
       computeTargets(dt);
     }
 

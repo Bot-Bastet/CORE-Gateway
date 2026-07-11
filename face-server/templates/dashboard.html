@@ -46,7 +46,7 @@
         }
     </style>
     <link rel="stylesheet" href="/static/css/dashboard.css">
-    <script src="/static/js/spotmicro_3d.js?v=7" defer></script>
+    <script src="/static/js/spotmicro_3d.js?v=8" defer></script>
 </head>
 <body>
     <!-- Mobile Sidebar Overlay -->
@@ -911,7 +911,7 @@
                     <button class="btn btn-secondary" onclick="openWifiModal()">
                         📶 Configuration WiFi
                     </button>
-                    <button class="btn btn-secondary" style="border-color: var(--accent); color: var(--success); background: rgba(255, 111, 97, 0.1);" onclick="openEasyConfig()">
+                    <button class="btn btn-secondary" style="border-color: var(--accent); color: var(--success); background: rgba(255, 111, 97, 0.1);" onclick="window.openEasyConfig()">
                         ✨ Configuration Guidée (EasyConfig)
                     </button>
                     <button class="btn btn-primary" onclick="openCalibrationOverlay()">
@@ -1282,12 +1282,12 @@
     
     </div>
 
-    <script src="/static/js/dashboard.js?v=7" defer></script>
-    <script src="/static/js/easyconfig.js?v=7" defer></script>
-    <script src="/static/js/dashboard_calib.js?v=7" defer></script>
-    <script src="/static/js/ws.js?v=7" defer></script>
-    <script src="/static/js/control.js?v=7" defer></script>
-    <script src="/static/js/vslam.js?v=7" defer></script>
+    <script src="/static/js/dashboard.js?v=8" defer></script>
+    <script src="/static/js/easyconfig.js?v=8" defer></script>
+    <script src="/static/js/dashboard_calib.js?v=8" defer></script>
+    <script src="/static/js/ws.js?v=8" defer></script>
+    <script src="/static/js/control.js?v=8" defer></script>
+    <script src="/static/js/vslam.js?v=8" defer></script>
 
 <script>
         // Redundant inline code removed - loaded from /static/js/dashboard.js
@@ -2233,11 +2233,5 @@
             <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">Le flux identifie visuellement la camera. Start/stop via la Vue d'ensemble.</div>
         </div>
     </div>
-<script>
-// Stubs globaux — appellent la vraie implementation de easyconfig.js une fois chargee
-function openEasyConfig() { if (typeof window._ecOpen === 'function') window._ecOpen(); else setTimeout(openEasyConfig, 50); }
-function closeEasyConfig() { if (typeof window._ecClose === 'function') window._ecClose(); }
-function ecStartRobotAndClose() { if (typeof window._ecStartClose === 'function') window._ecStartClose(); }
-</script>
 </body>
 </html>

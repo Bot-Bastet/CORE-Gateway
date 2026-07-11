@@ -116,12 +116,9 @@
                             }
                         }
 
-                        // Synchroniser le viewer 3D en mode Actif (non-démo)
-                        const demoCheck = document.getElementById('demo-mode-checkbox');
-                        const isDemo = demoCheck ? demoCheck.checked : true;
-                        if (!isDemo && typeof window.updateSpotMicroServos === 'function') {
-                            window.updateSpotMicroServos(payload.joints);
-                        }
+                        // Note: le modèle 3D est toujours piloté par computeTargets()
+                        // Les angles servos sont stockés pour affichage mais ne pilotent plus le viewer 3D
+                        window.latestServoAngles = payload.joints;
                     }
                     
                     // Update IMU

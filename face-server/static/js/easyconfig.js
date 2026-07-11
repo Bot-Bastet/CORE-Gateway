@@ -767,7 +767,7 @@ var ecLRStreamA = null;
             }
         }
 
-        window._ecOpen = function openEasyConfig() {
+        function openEasyConfig() {
             ecCurrentStep = 1;
             ecCalibratedMotors = false;
             ecCalibratedCam1 = false;
@@ -812,7 +812,7 @@ var ecLRStreamA = null;
             window.ecFeedbackInterval = setInterval(ecUpdateMotorFeedback, 500);
         }
 
-        window._ecClose = function closeEasyConfig() {
+        function closeEasyConfig() {
             clearInterval(window.ecFeedbackInterval);
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(null, null);
@@ -1488,7 +1488,7 @@ var ecLRStreamA = null;
             }, 500);
         }
 
-        window._ecStartClose = function ecStartRobotAndClose() {
+        function ecStartRobotAndClose() {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "start_robot" }));
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
@@ -1505,7 +1505,5 @@ window.ecNextStep       = ecNextStep;
 window.ecPrevStep       = ecPrevStep;
 window.ecSkipStep       = ecSkipStep;
 window.ecValidateJoint  = ecValidateJoint;
-window.ecSaveOffsets    = ecSaveOffsets;
 window.ecRunCameraCalib = ecRunCameraCalib;
-window.ecSaveCameraAssignment = ecSaveCameraAssignment;
 window.ecRunStereoCalib = ecRunStereoCalib;

@@ -275,10 +275,8 @@ function toggleDemoMode(checked) {
       window.resetSpotMicro3D();
     }
   } else {
-    // Passage en PHYSIQUE (RÉEL) : appliquer immédiatement les angles servo réels s'ils sont dispo
-    if (window.latestServoAngles && typeof window.updateSpotMicroServos === 'function') {
-      window.updateSpotMicroServos(window.latestServoAngles);
-    }
+    // Passage en PHYSIQUE (RÉEL) : le modèle 3D continue la simulation
+    // Les commandes sont aussi envoyées au robot via sendVel()
   }
 
   _setBadge(robotPosture.powered, checked);
