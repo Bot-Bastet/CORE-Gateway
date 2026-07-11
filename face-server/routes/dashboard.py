@@ -1,4 +1,4 @@
-﻿"""Dashboard and logo routes."""
+"""Dashboard and logo routes."""
 from pathlib import Path
 
 from fastapi import APIRouter

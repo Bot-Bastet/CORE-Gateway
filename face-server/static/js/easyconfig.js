@@ -1,4 +1,4 @@
-﻿// === EasyConfig Global State (must be at global scope for cross-file access) ===
+// === EasyConfig Global State (must be at global scope for cross-file access) ===
 // Ordre des moteurs dans l'assistant, avec position neutre URDF de r├®f├®rence
 // urdf_angle : angle (en degr├®s, 0-180) que le servo doit physiquement faire
 //              pour ├¬tre dans la position neutre d├®finie par l'URDF
@@ -1495,3 +1495,17 @@ var ecLRStreamA = null;
             }
             closeEasyConfig();
         }
+
+// === Exposition globale (appelable depuis onclick HTML et dashboard.js) ===
+window.openEasyConfig   = openEasyConfig;
+window.closeEasyConfig  = closeEasyConfig;
+window.ecStartRobotAndClose = ecStartRobotAndClose;
+window.ecShowStep       = ecShowStep;
+window.ecNextStep       = ecNextStep;
+window.ecPrevStep       = ecPrevStep;
+window.ecSkipStep       = ecSkipStep;
+window.ecValidateJoint  = ecValidateJoint;
+window.ecSaveOffsets    = ecSaveOffsets;
+window.ecRunCameraCalib = ecRunCameraCalib;
+window.ecSaveCameraAssignment = ecSaveCameraAssignment;
+window.ecRunStereoCalib = ecRunStereoCalib;

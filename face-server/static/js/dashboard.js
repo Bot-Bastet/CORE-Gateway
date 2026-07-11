@@ -1,4 +1,4 @@
-﻿// ===== Standalone login handler (works even if main script has errors) =====
+// ===== Standalone login handler (works even if main script has errors) =====
 (function() {
     var token = localStorage.getItem('bastet_api_token');
     var userStr = localStorage.getItem('bastet_user');

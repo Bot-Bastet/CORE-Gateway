@@ -118,8 +118,8 @@
       if (moving) {
         var wave = Math.sin(gaitT + ph), wave2 = Math.sin(gaitT + ph + PI * 0.5);
         gait_dz = Math.max(0, 0.04 * wave2);
-        if (cmd === "fw" || cmd === "bk") { gait_dx = (cmd === "fw" ? -1 : 1) * 0.05 * wave; }
-        else if (cmd === "sl" || cmd === "sr") { gait_dy = (cmd === "sl" ? 1 : -1) * 0.04 * wave; }
+        if (cmd === "fw" || cmd === "bk") { gait_dx = (cmd === "fw" ? 1 : -1) * 0.05 * wave; }
+        else if (cmd === "sl" || cmd === "sr") { gait_dy = (cmd === "sl" ? -1 : 1) * 0.04 * wave; }
         else if (cmd === "tl" || cmd === "tr") {
           var tdir = cmd === "tl" ? 1 : -1;
           var fwd = tdir * (isLeft ? 1 : -1);
@@ -400,10 +400,10 @@
     if (posture.powered) processKeys();
   }
   function processKeys() {
-    if (keys["z"] || keys["arrowup"]) { cmd = "bk"; return; }
-    if (keys["s"] || keys["arrowdown"]) { cmd = "fw"; return; }
-    if (keys["q"] || keys["arrowleft"]) { cmd = "sr"; return; }
-    if (keys["d"] || keys["arrowright"]) { cmd = "sl"; return; }
+    if (keys["z"] || keys["arrowup"]) { cmd = "fw"; return; }
+    if (keys["s"] || keys["arrowdown"]) { cmd = "bk"; return; }
+    if (keys["q"] || keys["arrowleft"]) { cmd = "sl"; return; }
+    if (keys["d"] || keys["arrowright"]) { cmd = "sr"; return; }
     if (keys["a"]) { cmd = "tl"; return; }
     if (keys["e"]) { cmd = "tr"; return; }
     if (keys[" "]) { cmd = "s"; return; }
@@ -611,13 +611,24 @@
       var t_deg = angles12[m.t] !== undefined ? angles12[m.t] : 90;
       var c_deg = angles12[m.c] !== undefined ? angles12[m.c] : 90;
       
-      // Inversion de signe pour le côté droit (fr, rr) pour annuler la symétrie appliquée par l'Arduino/ROS
+      // Inversion de signe pour le côté droit (fr, rr) — miroir physique Arduino/ROS
+      // FR/RR: Arduino envoie 90 + deg(rad) en miroir → sign=-1 pour retrouver le rad original
+      // FL/BL: Arduino envoie 90 - deg(rad)           → sign=+1
       var isRight = (m.id === "fr" || m.id === "rr");
       var sign = isRight ? -1 : 1;
-      
+
+      // Offsets IK: conversion angles Bastet (géom. l1=0.0585, l2=0.111, l3=0.118, H=-0.15m)
+      // → angles SpotMicro 3D (géom. L1=0.109, L2=0.130, STAND_H=0.205)
+      // Calculés analytiquement: OFFSET = target_3D_stand - bastet_contribution_at_stand
+      //   OFFSET_T = 0.5952 - (-0.9652) = +1.5604 rad  (thigh/upper)
+      //   OFFSET_C = -1.0845 - (-1.848) = +0.7635 rad  (calf/lower)
+      //   OFFSET_S ≈ 0 (abad/shoulder, déjà centré à 90° après miroir)
+      var OFFSET_T = 1.5604;
+      var OFFSET_C = 0.7635;
+
       tgt[m.id + "_s"] = sign * (s_deg - 90) * DEG;
-      tgt[m.id + "_t"] = 1.25 + sign * (t_deg - 90) * DEG;
-      tgt[m.id + "_c"] = -2.59 + sign * (c_deg - 90) * DEG;
+      tgt[m.id + "_t"] = OFFSET_T + sign * (t_deg - 90) * DEG;
+      tgt[m.id + "_c"] = OFFSET_C + sign * (c_deg - 90) * DEG;
     });
     cmd = "s";
   };
