@@ -421,7 +421,21 @@
     var loadOverlay = document.createElement("div");
     loadOverlay.id = "spot3d-loading";
     loadOverlay.style.cssText = "position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,10,15,0.95);z-index:10;transition:opacity 0.5s";
-    loadOverlay.innerHTML = '<div style="width:44px;height:44px;border:3px solid rgba(99,102,241,0.12);border-top-color:#6366f1;border-radius:50%;animation:spot3d-spin 1s linear infinite;margin-bottom:16px"></div><div id="spot3d-progress-pct" style="font-size:1.5rem;font-weight:700;color:#6366f1;margin-bottom:4px;font-family:monospace">0%</div><div style="width:180px;height:4px;background:rgba(255,255,255,0.06);border-radius:100px;overflow:hidden;margin-bottom:10px"><div id="spot3d-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#d946ef);border-radius:100px;transition:width 0.2s ease;box-shadow:0 0 8px rgba(99,102,241,0.4)"></div></div><span id="spot3d-progress-text" style="font-size:0.8rem;color:#a1a1aa;font-family:monospace">Chargement des modeles STL...</span><style>@keyframes spot3d-spin{to{transform:rotate(360deg)}}</style>';
+    loadOverlay.innerHTML = '\
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;">\
+        <div style="width:58px;height:58px;border:3px solid rgba(99,102,241,0.06);border-top-color:#6366f1;border-bottom-color:#d946ef;border-radius:50%;animation:spot3d-spin 1.2s cubic-bezier(0.5,0,0.5,1) infinite;"></div>\
+        <div style="position:absolute;width:44px;height:44px;border:3px solid rgba(217,70,239,0.04);border-left-color:#d946ef;border-right-color:#6366f1;border-radius:50%;animation:spot3d-spin-rev 0.8s linear infinite;"></div>\
+      </div>\
+      <div id="spot3d-progress-pct" style="font-size:2.4rem;font-weight:800;background:linear-gradient(90deg,#6366f1,#d946ef);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:0.25rem;font-family:\'Raleway\',sans-serif;letter-spacing:-1px;filter:drop-shadow(0 2px 8px rgba(99,102,241,0.15))">0%</div>\
+      <div style="width:200px;height:6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:100px;overflow:hidden;margin-bottom:0.75rem;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4)">\
+        <div id="spot3d-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#d946ef);border-radius:100px;transition:width 0.25s ease;box-shadow:0 0 10px rgba(99,102,241,0.5)"></div>\
+      </div>\
+      <span id="spot3d-progress-text" style="font-size:0.75rem;color:#a1a1aa;font-family:monospace;letter-spacing:0.5px;text-transform:uppercase;opacity:0.85">Initialisation...</span>\
+      <style>\
+        @keyframes spot3d-spin{to{transform:rotate(360deg)}}\
+        @keyframes spot3d-spin-rev{to{transform:rotate(-360deg)}}\
+      </style>\
+    ';
     c.appendChild(loadOverlay);
 
     var w = c.clientWidth || 400, h = c.clientHeight || 450;
