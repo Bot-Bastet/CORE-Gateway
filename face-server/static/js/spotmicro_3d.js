@@ -310,7 +310,9 @@
     worldGrp.position.z = -worldPos.z;
     worldGrp.rotation.y = worldPos.yaw;
 
-    computeTargets(dt);
+    if (posture.demo_mode) {
+      computeTargets(dt);
+    }
 
     var rate = Math.min(1, dt * 10);
     Object.keys(cur).forEach(function (k) { cur[k] += (tgt[k] - cur[k]) * rate; });
@@ -555,6 +557,9 @@
       if (k.endsWith("_t")) { cur[k] = 0;     tgt[k] = 0; }
       if (k.endsWith("_c")) { cur[k] = 0;     tgt[k] = 0; }
     });
+    worldPos.x = 0;
+    worldPos.z = 0;
+    worldPos.yaw = 0;
     posture.height = 100;
     posture.speed = 10;
     posture.roll = 0; posture.pitch = 0; posture.yaw = 0;

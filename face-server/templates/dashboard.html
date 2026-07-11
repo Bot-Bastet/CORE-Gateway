@@ -938,7 +938,10 @@
                     <div class="card" style="display: flex; flex-direction: column; min-height: 480px; margin: 0; padding: 0; overflow: hidden;">
                         <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1rem 0 1rem;">
                             <span>SpotMicro 3D — Vue Interactive</span>
-                            <span id="demo-mode-badge" class="status-badge" style="font-size:0.7rem; background:rgba(100,100,100,0.15); color:#888;">ÉTEINT</span>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <span id="robot-power-badge" class="status-badge" style="font-size:0.7rem; background:rgba(100,100,100,0.15); color:#888;">ÉTEINT</span>
+                                <span id="robot-mode-badge" class="status-badge" style="font-size:0.7rem; background:rgba(59,130,246,0.15); color:#3b82f6;">RÉEL</span>
+                            </div>
                         </div>
                         <div id="spotmicro-3d-container" style="flex:1; min-height:380px; position:relative; background:#0a0a10; border-radius:0 0 8px 8px; overflow:hidden;">
                             <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--text-secondary);font-size:0.85rem;text-align:center;">

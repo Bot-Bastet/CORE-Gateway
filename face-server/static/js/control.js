@@ -24,20 +24,31 @@ window._badgeUpdateTimer = null;
 function _setBadge(powered, demo_mode) {
   if (window._badgeUpdateTimer) clearTimeout(window._badgeUpdateTimer);
   window._badgeUpdateTimer = setTimeout(function() {
-    var badge = document.getElementById('demo-mode-badge');
-    if (!badge) return;
-    if (!powered) {
-      badge.textContent = 'ÉTEINT';
-      badge.style.background = 'rgba(100,100,100,0.15)';
-      badge.style.color = '#888';
-    } else if (demo_mode) {
-      badge.textContent = 'SIMULATION';
-      badge.style.background = 'rgba(217,70,239,0.15)';
-      badge.style.color = 'var(--accent)';
-    } else {
-      badge.textContent = 'PHYSIQUE';
-      badge.style.background = 'rgba(16,185,129,0.15)';
-      badge.style.color = 'var(--success)';
+    var pBadge = document.getElementById('robot-power-badge');
+    var mBadge = document.getElementById('robot-mode-badge');
+    
+    if (pBadge) {
+      if (powered) {
+        pBadge.textContent = 'ALLUMÉ';
+        pBadge.style.background = 'rgba(16,185,129,0.15)';
+        pBadge.style.color = 'var(--success)';
+      } else {
+        pBadge.textContent = 'ÉTEINT';
+        pBadge.style.background = 'rgba(100,100,100,0.15)';
+        pBadge.style.color = '#888';
+      }
+    }
+    
+    if (mBadge) {
+      if (demo_mode) {
+        mBadge.textContent = 'SIMULATION';
+        mBadge.style.background = 'rgba(217,70,239,0.15)';
+        mBadge.style.color = 'var(--accent)';
+      } else {
+        mBadge.textContent = 'RÉEL';
+        mBadge.style.background = 'rgba(59,130,246,0.15)';
+        mBadge.style.color = '#3b82f6';
+      }
     }
   }, 80);
 }
@@ -209,11 +220,9 @@ function toggleDemoMode(checked) {
     // Reset le viewer 3D à la position neutre (stand)
     if (typeof window.resetSpotMicro3D === 'function') {
       window.resetSpotMicro3D();
-    } else if (typeof window.updateSpotMicroPosture === 'function') {
-      window.updateSpotMicroPosture({ height: 100, roll: 0, pitch: 0, yaw: 0 });
     }
   } else {
-    // Passage en mode ACTIF : synchroniser immédiatement le viewer avec les angles réels du robot
+    // Passage en PHYSIQUE (RÉEL) : appliquer immédiatement les angles servo réels s'ils sont dispo
     if (window.latestServoAngles && typeof window.updateSpotMicroServos === 'function') {
       window.updateSpotMicroServos(window.latestServoAngles);
     }
