@@ -611,24 +611,21 @@
       var t_deg = angles12[m.t] !== undefined ? angles12[m.t] : 90;
       var c_deg = angles12[m.c] !== undefined ? angles12[m.c] : 90;
       
-      // Inversion de signe pour le côté droit (fr, rr) — miroir physique Arduino/ROS
-      // FR/RR: Arduino envoie 90 + deg(rad) en miroir → sign=-1 pour retrouver le rad original
-      // FL/BL: Arduino envoie 90 - deg(rad)           → sign=+1
+      // Miroir physique : FR/RR → sign=-1, FL/BL → sign=+1
       var isRight = (m.id === "fr" || m.id === "rr");
       var sign = isRight ? -1 : 1;
 
-      // Offsets IK: conversion angles Bastet (géom. l1=0.0585, l2=0.111, l3=0.118, H=-0.15m)
-      // → angles SpotMicro 3D (géom. L1=0.109, L2=0.130, STAND_H=0.205)
-      // Calculés analytiquement: OFFSET = target_3D_stand - bastet_contribution_at_stand
-      //   OFFSET_T = 0.5952 - (-0.9652) = +1.5604 rad  (thigh/upper)
-      //   OFFSET_C = -1.0845 - (-1.848) = +0.7635 rad  (calf/lower)
-      //   OFFSET_S ≈ 0 (abad/shoulder, déjà centré à 90° après miroir)
-      var OFFSET_T = 1.5604;
-      var OFFSET_C = 0.7635;
+      // Clamp à 30-150° pour éviter poses extrêmes (IK peut sortir 0-200°)
+      var s_c = Math.max(30, Math.min(150, s_deg));
+      var t_c = Math.max(30, Math.min(150, t_deg));
+      var c_c = Math.max(30, Math.min(150, c_deg));
 
-      tgt[m.id + "_s"] = sign * (s_deg - 90) * DEG;
-      tgt[m.id + "_t"] = OFFSET_T + sign * (t_deg - 90) * DEG;
-      tgt[m.id + "_c"] = OFFSET_C + sign * (c_deg - 90) * DEG;
+      // Offset = angles SpotMicro stand (servo 90° → modèle debout)
+      // thigh_stand = 0.5952 rad, calf_stand = -1.0845 rad
+      // Facteur 0.6 amortit les grands écarts (géométries Bastet/SpotMicro différentes)
+      tgt[m.id + "_s"] = sign * (s_c - 90) * DEG * 0.6;
+      tgt[m.id + "_t"] = 0.5952 + sign * (t_c - 90) * DEG * 0.6;
+      tgt[m.id + "_c"] = -1.0845 + sign * (c_c - 90) * DEG * 0.6;
     });
     cmd = "s";
   };

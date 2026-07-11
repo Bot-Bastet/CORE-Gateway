@@ -2233,5 +2233,11 @@
             <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">Le flux identifie visuellement la camera. Start/stop via la Vue d'ensemble.</div>
         </div>
     </div>
+<script>
+// Stubs globaux — appellent la vraie implementation de easyconfig.js une fois chargee
+function openEasyConfig() { if (typeof window._ecOpen === 'function') window._ecOpen(); else setTimeout(openEasyConfig, 50); }
+function closeEasyConfig() { if (typeof window._ecClose === 'function') window._ecClose(); }
+function ecStartRobotAndClose() { if (typeof window._ecStartClose === 'function') window._ecStartClose(); }
+</script>
 </body>
 </html>

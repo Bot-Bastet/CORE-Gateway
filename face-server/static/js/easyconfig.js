@@ -767,7 +767,7 @@ var ecLRStreamA = null;
             }
         }
 
-        window.openEasyConfig = function openEasyConfig() {
+        window._ecOpen = function openEasyConfig() {
             ecCurrentStep = 1;
             ecCalibratedMotors = false;
             ecCalibratedCam1 = false;
@@ -812,7 +812,7 @@ var ecLRStreamA = null;
             window.ecFeedbackInterval = setInterval(ecUpdateMotorFeedback, 500);
         }
 
-        window.closeEasyConfig = function closeEasyConfig() {
+        window._ecClose = function closeEasyConfig() {
             clearInterval(window.ecFeedbackInterval);
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(null, null);
@@ -1488,7 +1488,7 @@ var ecLRStreamA = null;
             }, 500);
         }
 
-        window.ecStartRobotAndClose = function ecStartRobotAndClose() {
+        window._ecStartClose = function ecStartRobotAndClose() {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "start_robot" }));
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
