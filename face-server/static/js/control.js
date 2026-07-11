@@ -8,7 +8,7 @@ controlActiveDir = null;
 controlWalkInterval = null;
 navPointA = null;
 navPointB = null;
-robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false };
+robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit" };
 
 // LLM auto-execute: disabled by default
 window.llmAutoControl = false;
@@ -90,32 +90,25 @@ function initControlTab() {
 // Speed is now controlled via Posture & Allure slider (posture-slider-speed)
 
 function sendControlCmd(cmd) {
-  // En mode simulation : animer le modèle 3D
-  if (robotPosture.demo_mode) {
-    if (cmd === 'stand' && typeof window.setSpotMicroPowered === 'function') {
-      window.setSpotMicroPowered(true);
-      robotPosture.powered = true;
-      var btn = document.getElementById('power-toggle-btn');
-      if (btn) {
-        btn.textContent = '⏻ Allumé';
-        btn.style.background = 'rgba(16,185,129,0.15)';
-        btn.style.color = 'var(--success)';
+  if (cmd === 'stand' || cmd === 'sit') {
+    robotPosture.posture = cmd;
+    
+    // Si on est en mode simulation, on s'assure que le robot reste allumé (moteurs sous tension)
+    if (robotPosture.demo_mode) {
+      if (!robotPosture.powered) {
+        robotPosture.powered = true;
+        if (typeof setSpotMicroPowered === 'function') setSpotMicroPowered(true);
+        var powerBtn = document.getElementById('power-toggle-btn');
+        if (powerBtn) {
+          powerBtn.textContent = '⏻ Allumé';
+          powerBtn.style.background = 'rgba(16,185,129,0.15)';
+          powerBtn.style.color = 'var(--success)';
+        }
+        var offOvl = document.getElementById('offOvl');
+        if (offOvl) { offOvl.style.opacity = '0'; offOvl.style.pointerEvents = 'none'; }
       }
-      var offOvl = document.getElementById('offOvl');
-      if (offOvl) { offOvl.style.opacity = '0'; offOvl.style.pointerEvents = 'none'; }
-      applyRobotPostureSync();
-    } else if (cmd === 'sit' && typeof window.setSpotMicroPowered === 'function') {
-      window.setSpotMicroPowered(false);
-      robotPosture.powered = false;
-      var btn = document.getElementById('power-toggle-btn');
-      if (btn) {
-        btn.textContent = '⏻ Éteint';
-        btn.style.background = 'rgba(239,68,68,0.15)';
-        btn.style.color = 'var(--danger)';
-      }
-      var offOvl = document.getElementById('offOvl');
-      if (offOvl) { offOvl.style.opacity = '1'; offOvl.style.pointerEvents = 'auto'; }
-      applyRobotPostureSync();
+      if (typeof updateSpotMicroPosture === 'function') updateSpotMicroPosture(robotPosture);
+      updatePostureButtonsUI();
     }
   }
 
@@ -125,6 +118,8 @@ function sendControlCmd(cmd) {
     // Envoyer aussi via robot_posture pour que le système de mouvement ROS en soit informé
     if (cmd === 'stand' || cmd === 'sit') {
       appWs.send(JSON.stringify({ type: 'robot_posture', posture: cmd }));
+      // Mettre à jour l'état partagé posture
+      appWs.send(JSON.stringify({ type: 'robot_posture_update', key: 'posture', value: cmd }));
     }
     if (typeof showToast === 'function') {
       var labels = { stand: 'Se lever', sit: "S'asseoir", stop: 'Stop' };
@@ -297,15 +292,15 @@ function toggleRobotPower() {
     btn.style.background = robotPosture.powered ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
     btn.style.color = robotPosture.powered ? 'var(--success)' : 'var(--danger)';
   }
-  var btnStand = document.getElementById('btn-posture-stand');
-  var btnSit = document.getElementById('btn-posture-sit');
-  if (btnStand) btnStand.disabled = robotPosture.powered;
-  if (btnSit) btnSit.disabled = !robotPosture.powered;
 
   var offOvl = document.getElementById('offOvl');
   if (offOvl) {
     offOvl.style.opacity = robotPosture.powered ? '0' : '1';
     offOvl.style.pointerEvents = robotPosture.powered ? 'none' : 'auto';
+  }
+
+  if (robotPosture.powered) {
+    robotPosture.posture = 'sit'; // Default to sit posture when powered on
   }
 
   if (typeof updateSpotMicroPosture === 'function') updateSpotMicroPosture(robotPosture);
@@ -317,11 +312,14 @@ function toggleRobotPower() {
       stopWalking();
       appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'stop' }));
     } else {
-      // Power on : sit (position sécurisée)
+      // Power on : sit (position sécurisée avec moteurs allumés)
       appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'sit' }));
       appWs.send(JSON.stringify({ type: 'robot_posture', posture: 'sit' }));
+      appWs.send(JSON.stringify({ type: 'robot_posture_update', key: 'posture', value: 'sit' }));
     }
   }
+  
+  updatePostureButtonsUI();
   _setBadge(robotPosture.powered, robotPosture.demo_mode);
 }
 
@@ -357,16 +355,14 @@ function applyRobotPostureSync(postureData) {
     powerBtn.style.background = robotPosture.powered ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
     powerBtn.style.color = robotPosture.powered ? 'var(--success)' : 'var(--danger)';
   }
-  var btnStand = document.getElementById('btn-posture-stand');
-  var btnSit = document.getElementById('btn-posture-sit');
-  if (btnStand) btnStand.disabled = robotPosture.powered;
-  if (btnSit) btnSit.disabled = !robotPosture.powered;
 
   var offOvl = document.getElementById('offOvl');
   if (offOvl) {
     offOvl.style.opacity = robotPosture.powered ? '0' : '1';
     offOvl.style.pointerEvents = robotPosture.powered ? 'none' : 'auto';
   }
+
+  updatePostureButtonsUI();
 
   if (typeof updateSpotMicroPosture === 'function') updateSpotMicroPosture(robotPosture);
   if (typeof setSpotMicroDemoMode === 'function') setSpotMicroDemoMode(robotPosture.demo_mode);
@@ -566,6 +562,54 @@ function drawNavPopupMap() {
   }
 }
 
+function updatePostureButtonsUI() {
+  var btnStand = document.getElementById('btn-posture-stand');
+  var btnSit = document.getElementById('btn-posture-sit');
+  
+  if (!btnStand || !btnSit) return;
+  
+  if (!robotPosture.powered) {
+    btnStand.disabled = true;
+    btnSit.disabled = true;
+    
+    btnStand.style.background = 'rgba(255,255,255,0.02)';
+    btnStand.style.color = 'var(--text-secondary)';
+    btnStand.style.borderColor = 'var(--border-color)';
+    btnStand.style.opacity = '0.4';
+    btnStand.style.cursor = 'not-allowed';
+    
+    btnSit.style.background = 'rgba(255,255,255,0.02)';
+    btnSit.style.color = 'var(--text-secondary)';
+    btnSit.style.borderColor = 'var(--border-color)';
+    btnSit.style.opacity = '0.4';
+    btnSit.style.cursor = 'not-allowed';
+  } else {
+    btnStand.disabled = false;
+    btnSit.disabled = false;
+    btnStand.style.opacity = '1';
+    btnSit.style.opacity = '1';
+    btnStand.style.cursor = 'pointer';
+    btnSit.style.cursor = 'pointer';
+    
+    if (robotPosture.posture === 'stand') {
+      btnStand.style.background = 'var(--accent)';
+      btnStand.style.color = 'white';
+      btnStand.style.borderColor = 'var(--accent)';
+      
+      btnSit.style.background = 'rgba(255,255,255,0.05)';
+      btnSit.style.color = 'var(--text-primary)';
+      btnSit.style.borderColor = 'var(--border-color)';
+    } else {
+      btnSit.style.background = 'var(--accent)';
+      btnSit.style.color = 'white';
+      btnSit.style.borderColor = 'var(--accent)';
+      
+      btnStand.style.background = 'rgba(255,255,255,0.05)';
+      btnStand.style.color = 'var(--text-primary)';
+      btnStand.style.borderColor = 'var(--border-color)';
+    }
+  }
+}
 
 // ─── EXPLICIT WINDOW ASSIGNMENTS (guarantees onclick handlers find them) ──
 window.initControlTab = initControlTab;

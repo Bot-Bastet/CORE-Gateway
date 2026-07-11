@@ -36,7 +36,7 @@
   var legData = {}, meshCache = {};
   var gaitT = 0;
   var cmd = "s";
-  var posture = { height: 100, speed: 10, roll: 0, pitch: 0, yaw: 0, demo_mode: false, powered: false };
+  var posture = { height: 100, speed: 10, roll: 0, pitch: 0, yaw: 0, demo_mode: false, powered: false, posture: "sit" };
   var powerFrac = 0;
   var worldPos = { x: 0, z: 0, yaw: 0 };
   var keys = {};
@@ -90,7 +90,14 @@
     var moving = (cmd !== "s") && posture.powered;
     if (moving) gaitT += dt * GAIT_SPEED * (posture.speed / 10);
 
-    var H = STAND_H * (posture.height / 100);
+    var H;
+    if (!posture.powered) {
+      H = LIE_H;
+    } else if (posture.posture === "sit") {
+      H = 0.08; // Hauteur assis réaliste en mode allumé
+    } else {
+      H = STAND_H * (posture.height / 100); // Hauteur debout
+    }
     var roll = posture.roll * DEG, pitch = posture.pitch * DEG, yawB = posture.yaw * DEG;
 
     Object.keys(LEGS).forEach(function (id) {
@@ -355,8 +362,17 @@
       leg.footGrp.rotation.y = cur[id + "_c"];
     });
 
-    var standH = STAND_H * (posture.height / 100);
-    var currentH = LIE_H + (standH - LIE_H) * powerFrac;
+    var targetH;
+    if (!posture.powered) {
+      targetH = LIE_H;
+    } else if (posture.posture === "sit") {
+      targetH = 0.08;
+    } else {
+      targetH = STAND_H * (posture.height / 100);
+    }
+    if (window._currentH === undefined) window._currentH = LIE_H;
+    window._currentH += (targetH - window._currentH) * Math.min(1, dt * 6.0);
+    var currentH = window._currentH;
     bodyGrp.position.z = currentH;
     bodyGrp.rotation.set(posture.roll * DEG * powerFrac, posture.pitch * DEG * powerFrac, posture.yaw * DEG * powerFrac, "ZXY");
     if (posture.powered && cmd === "s") bodyGrp.position.z += Math.sin(timestamp * 0.003) * 0.001;
@@ -563,6 +579,7 @@
     if (np.yaw !== undefined) posture.yaw = np.yaw;
     if (np.powered !== undefined) posture.powered = np.powered;
     if (np.demo_mode !== undefined) posture.demo_mode = np.demo_mode;
+    if (np.posture !== undefined) posture.posture = np.posture;
   };
   window.setSpotMicroDemoMode = function (enabled) { posture.demo_mode = enabled; if (enabled) { cmd = "s"; keys = {}; } };
   window.setSpotMicroPowered = function (on) { posture.powered = on; if (!on) { cmd = "s"; keys = {}; } };

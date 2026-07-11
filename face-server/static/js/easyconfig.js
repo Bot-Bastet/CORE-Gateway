@@ -782,17 +782,27 @@ var ecLRStreamA = null;
                     ecPeerConnections[id] = null;
                 }
             }
+
+            // Sauvegarder l'onglet actif actuel pour pouvoir le restaurer à la fermeture
+            window.ecPreviousTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
+            // Forcer l'affichage de l'onglet télécommande où se trouve le modèle 3D
+            if (typeof switchTab === 'function') {
+                switchTab('control');
+            }
             
             const o = document.getElementById('easyconfig-overlay');
             o.style.position = 'fixed';
             o.style.top = '0';
             o.style.left = '0';
-            o.style.right = '0';
+            o.style.right = '';
+            o.style.width = '480px';
             o.style.bottom = '0';
             o.style.display = 'flex';
+            o.style.justifyContent = 'flex-start';
+            o.style.alignItems = 'stretch';
             o.style.opacity = '1';
             o.style.pointerEvents = 'auto';
-            o.style.zIndex = '100';
+            o.style.zIndex = '1000';
             o.classList.add('active');
             o.removeAttribute('inert');
             ecInitJointCalibration();
@@ -806,6 +816,10 @@ var ecLRStreamA = null;
             clearInterval(window.ecFeedbackInterval);
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(null, null);
+            }
+            // Restaurer l'onglet précédent
+            if (window.ecPreviousTab && typeof switchTab === 'function') {
+                switchTab(window.ecPreviousTab);
             }
             const o = document.getElementById('easyconfig-overlay');
             o.style.position = '';

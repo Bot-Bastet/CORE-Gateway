@@ -60,6 +60,7 @@ class GatewayState:
             "yaw": 0.0,         # -15..15 (body yaw deg)
             "demo_mode": False, # True = simulation, motors off
             "powered": False,    # True = robot active
+            "posture": "sit",   # "stand" or "sit"
         }
         self.github_releases_cache: dict = {}
 
@@ -225,6 +226,8 @@ if isinstance(_saved, dict):
             # Preserve types: bool for demo_mode/powered, float for others
             if k in ("demo_mode", "powered"):
                 state.robot_posture[k] = bool(_saved[k])
+            elif k == "posture":
+                state.robot_posture[k] = str(_saved[k])
             else:
                 state.robot_posture[k] = float(_saved[k])
 
