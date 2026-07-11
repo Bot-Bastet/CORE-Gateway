@@ -144,6 +144,8 @@
 
 })();
 
+
+
 let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token || '';
 
         let activeTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
@@ -183,6 +185,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
         window.slamPoints = [];
 
         window.robotPose = {x: 0, y: 0, theta: 0};
+
+
 
         // ─── THEME ──────────────────────────────────────────────────────────────
 
@@ -236,6 +240,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         })();
 
+
+
         // ─── INIT ─────────────────────────────────────────────────────────────
 
         
@@ -243,6 +249,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
         async function checkAuth() {
 
             loadStreamQualityConfig();
+
+
 
             if (!apiToken) {
 
@@ -286,6 +294,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function showLogin() {
 
             var emailEl = document.getElementById('loginEmail');
@@ -310,11 +320,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function hideLogin() {
 
             document.getElementById('authOverlay').style.display = 'none';
 
         }
+
+
 
         function handleLoginSubmit(e) {
 
@@ -327,6 +341,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             checkAuth();
 
         }
+
+
 
         function logout() {
 
@@ -361,6 +377,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             showLogin();
 
         }
+
+
 
         function initDashboard() {
 
@@ -406,6 +424,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // --- INTERVALS ---
 
         function startIntervals() {
@@ -422,6 +442,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function clearIntervals() {
 
             if (telemetryInterval) clearInterval(telemetryInterval);
@@ -429,6 +451,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             if (updateInterval) clearInterval(updateInterval);
 
         }
+
+
 
         // ─── WEBSOCKET CLIENT ─────────────────────────────────────────────────
 
@@ -512,6 +536,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function logToJSONConsole(data) {
 
             const consoleEl = document.getElementById('json-traffic-console');
@@ -535,6 +561,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             consoleEl.scrollTop = consoleEl.scrollHeight;
 
         }
+
+
 
         function handleIncomingWebSocketMessage(data) {
 
@@ -695,6 +723,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         }
 
                     }
+
+
 
                     // Update Arduino Mega dashboard card
 
@@ -929,6 +959,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     // Ne mettre \u00e0 jour l'UI que si on n'est pas en train de visionner localement
 
                     if (!window.localViewing || !window.localViewing[camId]) {
@@ -965,6 +997,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                         }
 
+
+
                         // FIX: pas d'auto-rejoindre. Le flux reste on-demand strict.
 
                         // Seul un clic utilisateur sur "Demarrer le flux" doit declencher toggleStream().
@@ -974,6 +1008,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         var _onDemandGuard = true; /* placeholder for removed auto-join */
 
                     }
+
+
 
                     // Update calib preview buttons (merged from former duplicate handler)
 
@@ -1002,6 +1038,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     }
 
                 }
+
+
 
                 else if (payload.type === "keep_stream_status") {
 
@@ -1187,16 +1225,6 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
-                else if (payload.type === "robot_posture_sync") {
-
-                    if (payload.robot_posture && typeof applyRobotPostureSync === "function") {
-
-                        applyRobotPostureSync(payload.robot_posture);
-
-                    }
-
-                }
-
             } catch(e) {
 
                 // not json or parsing error
@@ -1204,6 +1232,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         // ─── CHAT TAB IA FUNCTIONS ────────────────────────────────────────────
 
@@ -1240,6 +1270,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             input.value = '';
 
         }
+
+
 
         function appendLLMMessage(sender, text) {
 
@@ -1311,6 +1343,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── TÉLÉCOMMANDE CHAT VOCAL & PILOTAGE IA ────────────────────────────
 
         function sendControlChatMessage(e) {
@@ -1342,6 +1376,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             input.value = '';
 
         }
+
+
 
         function appendControlChatMessage(sender, text) {
 
@@ -1415,9 +1451,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         let voiceRecognition = null;
 
         let isVoiceListening = false;
+
+
 
         function toggleVoiceRecognition() {
 
@@ -1527,6 +1567,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function handleIncomingLLMMessage(sender, text) {
 
             // Afficher dans le chat principal de l'IA
@@ -1582,6 +1624,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             appendControlChatMessage(sender, cleanText.trim());
 
         }
+
+
 
         function executeVoiceAction(action) {
 
@@ -1647,6 +1691,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function executeVoiceNav(x, y) {
 
             navTarget = { x: x, y: y };
@@ -1677,6 +1723,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function clearJSONConsole() {
 
             const consoleEl = document.getElementById('json-traffic-console');
@@ -1684,6 +1732,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             if (consoleEl) consoleEl.textContent = '[Console effacée]';
 
         }
+
+
 
         function setAIControl(feature, target) {
 
@@ -1735,6 +1785,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function updateAIControlUI(feature, target) {
 
             const list = ['robot', 'node', 'disabled'];
@@ -1760,6 +1812,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 }
 
             });
+
+
 
             if (feature === 'chat') {
 
@@ -1792,6 +1846,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         // ─── CALIBRATION WINDOW FUNCTIONS ──────────────────────────────────────
 
@@ -1883,7 +1939,597 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // [Calibration Block 1 Extracted to dashboard_calib.js]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         // ESC closes the topmost active modal *AND* the cam preview overlay (shared handler)
 
         document.addEventListener('keydown', function(e) {
@@ -1894,9 +2540,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 if (calibOverlay && calibOverlay.style.display === 'flex') closeCalibPreview();
 
+
+
                 const assignModal = document.getElementById('cameraAssignModal');
 
                 if (assignModal && assignModal.classList.contains('active')) closeCameraAssignModal();
+
+
 
                 const configModal = document.getElementById('cameraConfigModal');
 
@@ -1905,6 +2555,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         });
+
+
 
         // On pagehide (navigation/refresh/bfcache), forcibly close every live RTC peer.
 
@@ -1956,6 +2608,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         });
 
+
+
         function swapCameraLR() {
 
             const leftSelect = document.getElementById('cam-port-left');
@@ -1978,9 +2632,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
+
+
         // ─── Camera L/R Assignment Modal with Live Stream Previews (WebRTC) ────
 
         let assignAssigned = { left: null, right: null };
+
+
 
         function openCameraAssignModal() {
 
@@ -2054,6 +2714,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeCameraAssignModal() {
 
             const modal = document.getElementById('cameraAssignModal');
@@ -2063,6 +2725,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             stopAssignPreviews();
 
         }
+
+
 
         function closeCameraAssignModalOnClick(event) {
 
@@ -2074,6 +2738,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function startAssignPreview(camId) {
 
             const videoEl = document.getElementById('assign-video-' + camId);
@@ -2081,6 +2747,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             const statusEl = document.getElementById('assign-status-' + camId);
 
             if (!videoEl || !statusEl) return;
+
+
 
             // Clean up any previous WebRTC peer on this element
 
@@ -2096,9 +2764,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             videoEl.src = '';
 
+
+
             statusEl.style.display = 'flex';
 
             statusEl.textContent = 'Connexion au flux WebRTC...';
+
+
 
             // MediaMTX WHEP endpoint at :48889 (mandatory path segment, not a protocol switch)
 
@@ -2110,7 +2782,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             pc.addTransceiver('video', { direction: 'recvonly' });
 
+
+
             let connected = false;
+
+
 
             pc.ontrack = (event) => {
 
@@ -2140,6 +2816,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             };
 
+
+
             pc.oniceconnectionstatechange = () => {
 
                 if ((pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') && !connected) {
@@ -2153,6 +2831,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 }
 
             };
+
+
 
             pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
 
@@ -2230,6 +2910,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function stopAssignPreviews() {
 
             for (let camId of [1, 2]) {
@@ -2262,6 +2944,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function assignCameraLR(camId, side) {
 
             // Prevent double-assignment
@@ -2291,6 +2975,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 assignAssigned[otherSide] = otherCam;
 
             }
+
+
 
             // Save mapping to robot using actual device paths from telemetry
 
@@ -2340,6 +3026,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 if (rightSelect) rightSelect.value = rightDev;
 
+
+
                 // Show result
 
                 const resultEl = document.getElementById('assign-result');
@@ -2362,9 +3050,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             updateAssignUI();
 
         }
+
+
 
         function updateAssignUI() {
 
@@ -2379,6 +3071,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 if (assignAssigned.left === camId) assigned = 'left';
 
                 else if (assignAssigned.right === camId) assigned = 'right';
+
+
 
                 if (assigned === 'left') {
 
@@ -2405,6 +3099,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     label.style.background = 'rgba(255,255,255,0.05)';
 
                 }
+
+
 
                 // Disable buttons for assigned sides
 
@@ -2444,6 +3140,10 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
+
+
         function toggleCalibCamera(camId) {
 
             const checkbox = document.getElementById(`calib-cam-enable-${camId}`);
@@ -2468,6 +3168,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── SERVO TESTER FUNCTIONS ───────────────────────────────────────────
 
         const TESTER_JOINT_NAMES = [
@@ -2481,6 +3183,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             'Arrière-Gauche Abduction', 'Arrière-Gauche Hanche', 'Arrière-Gauche Genou'
 
         ];
+
+
 
         function openServoTester() {
 
@@ -2498,6 +3202,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeServoTester() {
 
             document.getElementById('servo-tester-overlay').classList.remove('active');
@@ -2514,6 +3220,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function buildServoTesterList() {
 
             const container = document.getElementById('tester-servos-list');
@@ -2521,6 +3229,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             if (!container) return;
 
             container.innerHTML = '';
+
+
 
             for (let i = 0; i < 12; i++) {
 
@@ -2578,6 +3288,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function testerAttach(idx) {
 
             if (appWs && appWs.readyState === WebSocket.OPEN) {
@@ -2600,6 +3312,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function testerDetach(idx) {
 
             if (appWs && appWs.readyState === WebSocket.OPEN) {
@@ -2618,9 +3332,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         let lastTesterWriteTime = {};
 
         let pendingTesterWriteTimeout = {};
+
+
 
         function testerWrite(idx, angle) {
 
@@ -2650,6 +3368,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             lastTesterWriteTime[idx] = now;
 
+
+
             if (appWs && appWs.readyState === WebSocket.OPEN) {
 
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parseFloat(angle) }));
@@ -2657,6 +3377,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         function testerStopAll() {
 
@@ -2676,6 +3398,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── WIFI POPUP FUNCTIONS ─────────────────────────────────────────────
 
         
@@ -2688,6 +3412,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeWifiModal() {
 
             document.getElementById('wifiModal').classList.remove('active');
@@ -2696,11 +3422,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeWifiModalOnClick(e) {
 
             if (e.target === document.getElementById('wifiModal')) closeWifiModal();
 
         }
+
+
 
         function scanWifiNetworks() {
 
@@ -2756,9 +3486,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         window.wifiPasswords = {};
 
         window.wifiCurrentSsid = '';
+
+
 
         function handleWifiScanError(payload) {
 
@@ -2801,6 +3535,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             try { displayWifiNetworks([], known, payload.known_passwords || {}, cur); } catch(e) { /* noop */ }
 
         }
+
+
 
         function displayWifiNetworks(networks, knownSsids = [], knownPasswords = {}, currentSsid = '') {
 
@@ -3024,6 +3760,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function selectWifiNetwork(ssid, isSecure, isKnown = false) {
 
             document.getElementById('form-wifi-ssid').value = ssid;
@@ -3094,11 +3832,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function cancelWifiConnection() {
 
             document.getElementById('wifi-connect-form').style.display = 'none';
 
         }
+
+
 
         function handleWifiConnectSubmit(e) {
 
@@ -3150,6 +3892,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function handleWifiConnectResult(res) {
 
             const submitBtn = document.querySelector('#wifi-connect-form button[type="submit"]');
@@ -3178,6 +3922,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function forgetWifiNetwork(ssid) {
 
             if (confirm(`Êtes-vous sûr de vouloir oublier le réseau WiFi "${ssid}" sur le robot ?`)) {
@@ -3196,6 +3942,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function handleForgetFromForm() {
 
             const ssid = document.getElementById('form-wifi-ssid').value;
@@ -3207,6 +3955,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         // ─── CANVASES RENDER CODES ───────────────────────────────────────────
 
@@ -3464,6 +4214,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function resetSLAMMap() {
 
             window.robotPose = {x: 0, y: 0, theta: 0};
@@ -3475,6 +4227,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             drawSLAMMap();
 
         }
+
+
 
         function updateSLAMParam(param) {
 
@@ -3501,6 +4255,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         
 
@@ -3821,6 +4577,10 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
         
 
         // Auto-start previews when entering the LR step (called from ecShowStep)
+
+
+
+
 
         // --- Stereo Calibration ---
 
@@ -4255,6 +5015,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
 // ─── V-SLAM mode helper (used by updateSLAMMode + toggleVSlamTest pre-flight)
 
         function getCurrentSlamMode() {
@@ -4298,6 +5060,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             return { mode: mode, modeColor: modeColor, bgColor: bgColor, cam1: cam1, cam2: cam2, hasTelemetry: !!sensors };
 
         }
+
+
 
         function updateSLAMMode() {
 
@@ -4383,6 +5147,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         
 
+
+
             // Aussi copier le mode dans le badge de la Console de Test V-SLAM (toujours visible)
 
             const testBadge = document.getElementById('vslam-test-mode-badge');
@@ -4405,7 +5171,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── MOBILE SIDEBAR ACTIONS ───────────────────────────────────────────
+
+
 
         function toggleSidebar() {
 
@@ -4423,6 +5193,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeSidebar() {
 
             const sidebar = document.querySelector('.sidebar');
@@ -4439,7 +5211,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── TABS SWITCHING ───────────────────────────────────────────────────
+
+
 
         function switchTab(tabId) {
 
@@ -4469,6 +5245,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             const titles = {
 
                 'dashboard': { title: "Vue d'ensemble", subtitle: "Statistiques en direct et flux caméras du robot Bastet." },
@@ -4489,11 +5267,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             };
 
+
+
             const headerInfo = titles[tabId] || titles['dashboard'];
 
             document.getElementById('tab-title').textContent = headerInfo.title;
 
             document.getElementById('tab-subtitle').textContent = headerInfo.subtitle;
+
+
 
             if (tabId === 'users') {
 
@@ -4519,7 +5301,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── TELEMETRY ────────────────────────────────────────────────────────
+
+
 
         async function fetchTelemetry() {
 
@@ -4562,6 +5348,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         robotBadge.textContent = '🔴 Hors-ligne';
 
                     }
+
+
 
                     const sensors = state.sensors || {};
 
@@ -4609,17 +5397,25 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     const temp = sensors.temp_c || 0;
 
+
+
                     updateGaugeCircle('gauge-cpu', cpu);
 
                     document.getElementById('gauge-cpu-val').textContent = `${Math.round(cpu)}%`;
+
+
 
                     updateGaugeCircle('gauge-ram', ram);
 
                     document.getElementById('gauge-ram-val').textContent = `${Math.round(ram)}%`;
 
+
+
                     updateGaugeCircle('gauge-temp', (temp / 100) * 100);
 
                     document.getElementById('gauge-temp-val').textContent = `${Math.round(temp)}°C`;
+
+
 
                     document.getElementById('sensor-seen-person').textContent = state.seen_person || 'Personne';
 
@@ -4667,6 +5463,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     // Cameras connection & auto-enable
 
                     const cam1Status = document.getElementById('calib-cam-status-1');
@@ -4676,6 +5474,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     const cam2Status = document.getElementById('calib-cam-status-2');
 
                     const cam2Enable = document.getElementById('calib-cam-enable-2');
+
+
 
                     const activeStreams = state.active_streams || { "1": false, "2": false };
 
@@ -4700,6 +5500,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                             window.userClosedStream[camId] = false;
 
                         }
+
+
 
                         const statusEl = document.getElementById(`stream-status-${camId}`);
 
@@ -4747,6 +5549,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     const cam1Connected = sensors.cam1_connected === true;
 
                     const cam2Connected = sensors.cam2_connected === true;
@@ -4758,6 +5562,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     }
 
                     updateCameraModularity(cam1Connected, cam2Connected);
+
+
 
                     if (cam1Status) {
 
@@ -4775,9 +5581,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     if (window.lastCam1Connected === undefined) window.lastCam1Connected = false;
 
                     if (window.lastCam2Connected === undefined) window.lastCam2Connected = false;
+
+
 
                     if (cam1Connected && !window.lastCam1Connected) {
 
@@ -4803,6 +5613,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     window.lastCam1Connected = cam1Connected;
 
                     window.lastCam2Connected = cam2Connected;
@@ -4821,6 +5633,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     // FIX V4: Maintient le watchdog arduinoOfflineChecker en vie via le polling REST 2s
 
                     // (en cas de robot statique, l agent WS n envoie plus de message puisque latest_telemetry
@@ -4828,6 +5642,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     // est identique, mais le dashboard reste vu comme vivant grace aux polls /core/state).
 
                     window.lastArduinoTelemetry = Date.now();
+
+
 
                     const serviceBadge = document.getElementById('spotbot-service-badge');
 
@@ -4838,6 +5654,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     const btnStop = document.getElementById('btn-stop-spotbot');
 
                     const btnRestart = document.getElementById('btn-restart-spotbot');
+
+
 
                     if (isSpotbotActive === true) {
 
@@ -4879,6 +5697,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             try {
 
                 const gwRes = await fetch('/gateway/telemetry', { headers: { 'X-API-Token': apiToken } });
@@ -4919,6 +5739,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function updateGaugeCircle(id, val) {
 
             const el = document.getElementById(id);
@@ -4931,7 +5753,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── CAMERA STREAM ON-DEMAND ─────────────────────────────────────────
+
+
 
         window.forceStereoUI = false;
         window.forceMonoUI = false;
@@ -5034,6 +5860,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
         }
 
+
+
         function stopStreamUI(camId) {
 
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
@@ -5050,6 +5878,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
 
+
+
             if (window.hlsInstances && window.hlsInstances[camId]) {
 
                 try { window.hlsInstances[camId].destroy(); } catch(e) {}
@@ -5058,6 +5888,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             if (peerConnections[camId]) {
 
                 try { peerConnections[camId].close(); } catch(e) {}
@@ -5065,6 +5897,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 peerConnections[camId] = null;
 
             }
+
+
 
             if (videoEl) {
 
@@ -5084,7 +5918,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             if (fsBtn) fsBtn.style.display = 'none';
 
+
+
             window.localViewing[camId] = false;
+
+
 
             placeholder.style.display = 'flex';
 
@@ -5099,6 +5937,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
 
         }
+
+
 
         function playHLSStream(videoEl, camId, onPlay, onError, customKey) {
 
@@ -5192,6 +6032,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function startStreamWebRTC(camId) {
 
             const placeholder = document.getElementById(`stream-placeholder-${camId}`);
@@ -5208,6 +6050,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             const fsBtn = document.getElementById(`video-fs-btn-${camId}`);
 
+
+
             if (peerConnections[camId]) {
 
                 try { peerConnections[camId].close(); } catch(e) {}
@@ -5215,6 +6059,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 peerConnections[camId] = null;
 
             }
+
+
 
             statusEl.textContent = 'Connexion WebRTC…';
 
@@ -5232,11 +6078,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             loaderEl.style.display = 'flex';
 
+
+
             let pc = null;
 
             let aborted = false;
 
             let trackReceived = false;
+
+
 
             const showWebRTCError = (msg) => {
 
@@ -5281,6 +6131,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             };
 
+
+
             try {
 
                 pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
@@ -5289,11 +6141,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
+
+
                 let trackTimeout = setTimeout(() => {
 
                     if (!trackReceived) showWebRTCError('Timeout — aucun flux reçu après 25s');
 
                 }, 25000);
+
+
 
                 pc.oniceconnectionstatechange = () => {
 
@@ -5308,6 +6164,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     }
 
                 };
+
+
 
                 pc.ontrack = (event) => {
 
@@ -5347,9 +6205,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 };
 
+
+
                 const offer = await pc.createOffer();
 
                 await pc.setLocalDescription(offer);
+
+
 
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
 
@@ -5387,7 +6249,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 if (aborted) return;
+
+
 
                 if (!response || !response.ok) {
 
@@ -5397,9 +6263,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 const answerSdp = await response.text();
 
                 await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+
+
 
             } catch (err) {
 
@@ -5408,6 +6278,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         function queryCameraResolutions(camId) {
 
@@ -5429,6 +6301,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             statusEl.style.color = 'var(--text-secondary)';
 
+
+
             if (appWs && appWs.readyState === WebSocket.OPEN) {
 
                 appWs.send(JSON.stringify({
@@ -5440,6 +6314,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 }));
 
             }
+
+
 
             // Restore button after timeout (in case no response)
 
@@ -5466,6 +6342,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }, 25000);
 
         }
+
+
 
         async function saveStreamQualityConfig() {
 
@@ -5499,9 +6377,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             };
 
+
+
             statusEl.textContent = 'Enregistrement...';
 
             statusEl.style.color = 'var(--text-secondary)';
+
+
 
             try {
 
@@ -5522,6 +6404,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     body: JSON.stringify(config)
 
                 });
+
+
 
                 if (res.ok) {
 
@@ -5559,6 +6443,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             setTimeout(() => {
 
                 statusEl.textContent = '';
@@ -5566,6 +6452,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }, 3000);
 
         }
+
+
 
         // Load saved quality config on page init
 
@@ -5595,6 +6483,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function loadStreamQualityConfig() {
 
             try {
@@ -5608,6 +6498,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 if (!res.ok) return;
 
                 const config = await res.json();
+
+
 
                 if (config.cam1) {
 
@@ -5640,6 +6532,12 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
+
+
+
+
 
         // ─── Smart Camera Port Dropdowns ──────────────────────────────────
 
@@ -5674,6 +6572,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             const leftSelects = [document.getElementById('cam-port-left'), document.getElementById('cam-port-left-modal')].filter(Boolean);
 
             const rightSelects = [document.getElementById('cam-port-right'), document.getElementById('cam-port-right-modal')].filter(Boolean);
@@ -5682,6 +6582,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             if (leftSelects.length === 0 || rightSelects.length === 0) return;
 
+
+
             // Last-known-good mapping (from telemetry) is our rollback anchor when conflict detected.
 
             const telMapping = (ts && ts.camera_mapping) || null;
@@ -5689,6 +6591,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             const lastGoodLeft  = (telMapping && activeDevices.includes(telMapping.left))  ? telMapping.left  : activeDevices[0];
 
             const lastGoodRight = (telMapping && activeDevices.includes(telMapping.right)) ? telMapping.right : null;
+
+
 
             if (activeDevices.length <= 1) {
 
@@ -5713,6 +6617,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             // Multi-camera mode: detect conflict (user just picked a port already used by the OTHER side).
 
             // Rollback BOTH to the last-known-good mapping so the user sees a stable, valid state.
@@ -5734,11 +6640,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             // Each select excludes the OTHER's current value (mutually exclusive).
 
             rightSelects.forEach(sel => sel.disabled = false);
 
             helpers.forEach(hel => hel.style.display = 'none');
+
+
 
             const leftOpts  = activeDevices.filter(d => d !== rightSelects[0].value);
 
@@ -5757,6 +6667,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             });
 
         }
+
+
 
         function saveCameraPortsMapping() {
 
@@ -5812,6 +6724,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         async function openCameraConfigModal(camId) {
 
@@ -5925,11 +6839,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeCameraConfigModal() {
 
             document.getElementById('cameraConfigModal').classList.remove('active');
 
         }
+
+
 
         function closeCameraConfigModalOnClick(e) {
 
@@ -5941,7 +6859,441 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // [Calibration Block 2 Extracted to dashboard_calib.js]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         function toggleKeepStream(camId) {
 
             if (!window.keepStreams) window.keepStreams = { 1: false, 2: false };
@@ -5968,15 +7320,21 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function toggleStream(camId, isExplicit = false) {
 
             if (!window.activeStreams) window.activeStreams = { 1: false, 2: false };
 
             if (!window.localViewing) window.localViewing = { 1: false, 2: false };
 
+
+
             const statusEl = document.getElementById(`stream-status-${camId}`);
 
             const btnText = document.getElementById(`stream-btn-text-${camId}`);
+
+
 
             if (!window.localViewing[camId]) {
 
@@ -6067,11 +7425,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     streamingState[camId] = 'requesting';
 
+
+
                     statusEl.textContent = 'Connexion WebRTC…';
 
                     statusEl.className = 'status-badge';
 
                     btnText.textContent = 'Couper Caméra';
+
+
 
                     // FIX: Ne pas lancer WebRTC tout de suite. Le robot n'a pas encore
                     // demarre l'encodeur ffmpeg. On attend le stream_status {active:true}
@@ -6115,6 +7477,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 streamingState[camId] = 'closing';
 
+
+
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
 
                     if (appWs && appWs.readyState === WebSocket.OPEN) {
@@ -6147,6 +7511,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 // Fermer la PeerConnection immédiatement
 
                 if (peerConnections[camId]) {
@@ -6157,7 +7523,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 stopStreamUI(camId);
+
+
 
                 // Forcer l'affichage correct après stop
 
@@ -6170,6 +7540,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         function toggleFullscreen(camId) {
 
@@ -6204,6 +7576,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         function updateCalibrationBadges(calStatus) {
 
@@ -6247,6 +7621,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // Check calibration before enabling V-SLAM (gate for future autonomous mode too)
 
         function isCameraCalibrated(camId) {
@@ -6259,6 +7635,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function handleVSlamToggleChange() {
 
             if (window.localViewing && window.localViewing[1]) {
@@ -6268,6 +7646,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     const vSlamCheck = document.getElementById('stream-v-slam-1');
 
                     const vSlamVal = vSlamCheck ? vSlamCheck.checked : false;
+
+
 
                     // V-SLAM gatekeeping: block if camera not calibrated
 
@@ -6323,7 +7703,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── ACCOUNTS MANAGEMENT ─────────────────────────────────────────────
+
+
 
         async function loadAccounts() {
 
@@ -6351,9 +7735,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     }
 
+
+
                     const container = document.getElementById('users-container');
 
                     container.innerHTML = '';
+
+
 
                     const keys = Object.keys(accounts);
 
@@ -6370,6 +7758,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         return;
 
                     }
+
+
 
                     for (const fullName of keys) {
 
@@ -6390,6 +7780,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                             ? `<span class="status-badge active" style="font-size: 0.75rem;">✅ MyGES : ${mygesCreds.username}</span>`
 
                             : `<span class="status-badge" style="font-size: 0.75rem; background-color: rgba(225, 29, 72, 0.05); color: var(--danger); border: 1px solid rgba(225, 29, 72, 0.15)">❌ MyGES non configuré</span>`;
+
+
 
                         const card = document.createElement('div');
 
@@ -6473,6 +7865,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function deleteUser(fullName) {
 
             if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?\n(Cela supprimera également ses identifiants MyGES et ses photos de visage)`)) return;
@@ -6504,6 +7898,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         // Modals Accounts
 
@@ -6559,11 +7955,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function openEditUserModal(fullName) {
 
             const u = accountsCached[fullName];
 
             if (!u) return;
+
+
 
             document.getElementById('modal-user-title').textContent = `Modifier le profil`;
 
@@ -6589,6 +7989,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             document.getElementById('form-is-admin').checked = u.is_admin || false;
 
+
+
             const m2 = document.getElementById('userModal');
 
             m2.style.position = 'fixed';
@@ -6612,6 +8014,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             m2.classList.add('active');
 
         }
+
+
 
         function closeUserModal() {
 
@@ -6639,11 +8043,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeUserModalOnClick(e) {
 
             if (e.target === document.getElementById('userModal')) closeUserModal();
 
         }
+
+
 
         async function handleUserSubmit(e) {
 
@@ -6662,6 +8070,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             const password = document.getElementById('form-password').value;
 
             const isAdmin = document.getElementById('form-is-admin').checked;
+
+
 
             let preferences = {};
 
@@ -6683,6 +8093,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             const payload = {
 
                 first_name: firstName,
@@ -6701,11 +8113,15 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             };
 
+
+
             if (password) {
 
                 payload.password = password;
 
             }
+
+
 
             try {
 
@@ -6724,6 +8140,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     body: JSON.stringify(payload)
 
                 });
+
+
 
                 if (res.ok) {
 
@@ -6747,6 +8165,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // Modals MyGES
 
         function openMygesModal(name) {
@@ -6765,17 +8185,23 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeMygesModal() {
 
             document.getElementById('mygesModal').classList.remove('active');
 
         }
 
+
+
         function closeMygesModalOnClick(e) {
 
             if (e.target === document.getElementById('mygesModal')) closeMygesModal();
 
         }
+
+
 
         async function handleMygesTest() {
 
@@ -6879,6 +8305,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function handleMygesTest() {
 
             const resultDiv = document.getElementById('myges-test-result');
@@ -6979,6 +8407,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function handleMygesSubmit(e) {
 
             e.preventDefault();
@@ -6990,6 +8420,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             const password = document.getElementById('form-myges-password').value;
 
             const resultDiv = document.getElementById('myges-test-result');
+
+
 
             if (!username || !password) {
 
@@ -7005,6 +8437,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             }
 
+
+
             // Show testing state
 
             resultDiv.style.display = 'block';
@@ -7014,6 +8448,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             resultDiv.style.color = '#6366f1';
 
             resultDiv.textContent = 'Test des identifiants en cours...';
+
+
 
             try {
 
@@ -7037,6 +8473,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 const testData = await testRes.json();
 
+
+
                 if (testData.status !== 'success') {
 
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
@@ -7048,6 +8486,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     return;
 
                 }
+
+
 
                 // Step 2: Save credentials
 
@@ -7066,6 +8506,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     body: JSON.stringify({ username, password })
 
                 });
+
+
 
                 if (saveRes.ok) {
 
@@ -7099,7 +8541,11 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // ─── FACES GALLERY ───────────────────────────────────────────────────
+
+
 
         async function loadFacesGallery() {
 
@@ -7135,6 +8581,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     });
 
+
+
                     faces.forEach(f => {
 
                         const matchedName = usersList.find(u => u && f.name && u.toLowerCase() === f.name.toLowerCase()) || f.name;
@@ -7145,9 +8593,13 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     });
 
+
+
                     const foldersContainer = document.getElementById('folders-container');
 
                     foldersContainer.innerHTML = '';
+
+
 
                     const keys = Object.keys(grouped);
 
@@ -7164,6 +8616,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         return;
 
                     }
+
+
 
                     keys.forEach(name => {
 
@@ -7207,6 +8661,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     });
 
+
+
                     if (activeFolderName) {
 
                         const activeUserFaces = grouped[activeFolderName] || [];
@@ -7225,6 +8681,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function openFolderDetails(name, userFaces) {
 
             activeFolderName = name;
@@ -7239,6 +8697,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeFolderDetails() {
 
             activeFolderName = null;
@@ -7250,6 +8710,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             loadFacesGallery();
 
         }
+
+
 
         function renderFolderDetails(name, userFaces) {
 
@@ -7325,6 +8787,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function deleteFace(faceId) {
 
             if (!confirm("Voulez-vous supprimer cette photo pour la reconnaissance faciale ?")) return;
@@ -7357,6 +8821,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         let currentUploadFile = null;
 
         
@@ -7366,6 +8832,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             document.getElementById('face-file-input').click();
 
         }
+
+
 
         function handleFaceUploadSelected(e) {
 
@@ -7384,6 +8852,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         function initDragAndDrop() {
 
@@ -7447,13 +8917,19 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         async function executeFaceUploadDirect(userName) {
 
             if (!currentUploadFile || !userName) return;
 
+
+
             const fd = new FormData();
 
             fd.append('file', currentUploadFile);
+
+
 
             try {
 
@@ -7466,6 +8942,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     body: fd
 
                 });
+
+
 
                 if (res.ok) {
 
@@ -7499,6 +8977,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         // Lightbox
 
         function showLightbox(src) {
@@ -7509,13 +8989,19 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
         }
 
+
+
         function closeLightbox() {
 
             document.getElementById('lightbox').classList.remove('active');
 
         }
 
+
+
         // ─── UPDATER & SERVICES ───────────────────────────────────────────────
+
+
 
         async function fetchUpdatesProgress(force = false) {
 
@@ -7533,6 +9019,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 const arduinoRes = await fetch(`/system/update/arduino/progress${forceParam}`, { headers: { 'X-API-Token': apiToken } });
 
+
+
                 if (gatewayRes.ok) {
 
                     const gw = await gatewayRes.json();
@@ -7545,6 +9033,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     if (gwStatusLower.includes('failed') && gwUpToDate) gwDisplayStatus = 'À jour';
 
+
+
                     document.getElementById('gateway-update-status').textContent = gwDisplayStatus;
 
                     document.getElementById('gateway-update-bar').style.width = `${gw.percent}%`;
@@ -7554,6 +9044,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     document.getElementById('gateway-current-version').textContent = gw.current_version || 'Inconnu';
 
                     document.getElementById('gateway-latest-version').textContent = gw.latest_version || 'Inconnu';
+
+
 
                     const gwInProgress = gw.status &&
 
@@ -7566,6 +9058,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         !gwStatusLower.includes('failed') &&
 
                         gw.percent < 100;
+
+
 
                     const gwBtn = document.getElementById('btn-update-gateway');
 
@@ -7587,6 +9081,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 if (robotRes.ok) {
 
                     const rb = await robotRes.json();
@@ -7599,6 +9095,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     if (rbStatusLower.includes('failed') && rbUpToDate) rbDisplayStatus = 'À jour';
 
+
+
                     document.getElementById('robot-update-status').textContent = rbDisplayStatus;
 
                     document.getElementById('robot-update-bar').style.width = `${rb.percent}%`;
@@ -7608,6 +9106,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     document.getElementById('robot-current-version').textContent = rb.current_version || 'Inconnu';
 
                     document.getElementById('robot-latest-version').textContent = rb.latest_version || 'Inconnu';
+
+
 
                     rbInProgress = rb.status &&
 
@@ -7620,6 +9120,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                         !rbStatusLower.includes('failed') &&
 
                         rb.percent < 100;
+
+
 
                     const rbBtn = document.getElementById('btn-update-robot');
 
@@ -7641,6 +9143,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 if (arduinoRes.ok) {
 
                     const ard = await arduinoRes.json();
@@ -7650,6 +9154,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     const ardStatusLower = (ard.status || '').toLowerCase();
 
                     const ardStatusLabels = {
+
+
 
         failed_launch: "❌ Échec lancement (voir logs agent)",
 
@@ -7685,6 +9191,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                     if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = '✓ À jour';
 
+
+
                     document.getElementById('arduino-update-status').textContent = ardDisplayStatus;
 
                     document.getElementById('arduino-update-bar').style.width = `${ard.percent}%`;
@@ -7694,6 +9202,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     document.getElementById('arduino-current-version').textContent = ard.current_version || 'Inconnu';
 
                     document.getElementById('arduino-latest-version').textContent = ard.latest_version || 'Inconnu';
+
+
 
                     ardInProgress = ard.status &&
 
@@ -7707,6 +9217,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                         ard.percent < 100;
 
+
+
                     const telemetryState = window.lastTelemetryState || {};
 
                     const robotOnline = telemetryState.robot_status === 'online' || telemetryState.robot_status === 'hibernating';
@@ -7714,6 +9226,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     const telemetrySensors = telemetryState.sensors || {};
 
                     const arduinoConnected = telemetrySensors.arduino_connected === true;
+
+
 
                     const ardBtn = document.getElementById('btn-update-arduino');
 
@@ -7755,6 +9269,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 }
 
+
+
                 // Update zone opacity & interaction based on connection status
 
                 const telemetryState = window.lastTelemetryState || {};
@@ -7764,6 +9280,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                 const telemetrySensors = telemetryState.sensors || {};
 
                 const arduinoConnected = telemetrySensors.arduino_connected === true;
+
+
 
                 const robotZone = document.getElementById('update-zone-robot');
 
@@ -7784,6 +9302,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
                     }
 
                 }
+
+
 
                 const arduinoZone = document.getElementById('update-zone-arduino');
 
@@ -7812,6 +9332,8 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
             }
 
         }
+
+
 
         // ─── Release Rollback ────────────────────────────────────────────
 
@@ -7997,6 +9519,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         // ─── EASYCONFIG FUNCTIONS ──────────────────────────────────────────────
 
         let ecCurrentStep = 1;
@@ -8046,6 +9570,10 @@ async function triggerUpdate(target) {
         let ecCalibratedCam2 = false;
 
         let ecPeerConnections = { 1: null, 2: null };
+
+
+
+
 
         function ecInitJointCalibration() {
 
@@ -8341,6 +9869,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function openEasyConfig() {
 
             ecCurrentStep = 1;
@@ -8406,6 +9936,8 @@ async function triggerUpdate(target) {
             window.ecFeedbackInterval = setInterval(ecUpdateMotorFeedback, 500);
 
         }
+
+
 
         function closeEasyConfig() {
 
@@ -8475,6 +10007,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function ecUpdateMotorFeedback() {
 
             if (window.lastTelemetryState && window.lastTelemetryState.joints) {
@@ -8496,6 +10030,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         // Clickable step navigation
 
@@ -8686,6 +10222,10 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
+
+
 
     // Cleanup camera WebRTC connections when jumping steps
 
@@ -9011,6 +10551,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function ecSkipStep() {
 
             // If on step 1 (motor offsets), detach servo if attached and advance
@@ -9044,6 +10586,8 @@ async function triggerUpdate(target) {
             ecNextStep();
 
         }
+
+
 
         function ecPrevStep() {
 
@@ -9080,6 +10624,8 @@ async function triggerUpdate(target) {
                 return;
 
             }
+
+
 
             if (ecCurrentStep > 1) {
 
@@ -9138,6 +10684,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         function ecNextStep(targetStep = null) {
 
@@ -9227,6 +10775,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function ecCalculateOffsets(activateMotors = true) {
 
             const offsets = [];
@@ -9303,6 +10853,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         async function ecRunCameraCalib(camId) {
 
             const videoEl = document.getElementById(`ec-cam-video-${camId}`);
@@ -9347,6 +10899,8 @@ async function triggerUpdate(target) {
 
             let pc = null;
 
+
+
             const showEcWebRTCError = (msg) => {
 
                 if (ecPeerConnections[camId]) {
@@ -9385,6 +10939,8 @@ async function triggerUpdate(target) {
 
             };
 
+
+
             try {
 
                 pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
@@ -9393,11 +10949,15 @@ async function triggerUpdate(target) {
 
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
+
+
                 let trackTimeout = setTimeout(() => {
 
                     showEcWebRTCError('Timeout — aucun flux reçu après 8s');
 
                 }, 8000);
+
+
 
                 pc.oniceconnectionstatechange = () => {
 
@@ -9410,6 +10970,8 @@ async function triggerUpdate(target) {
                     }
 
                 };
+
+
 
                 pc.ontrack = (event) => {
 
@@ -9447,9 +11009,13 @@ async function triggerUpdate(target) {
 
                 };
 
+
+
                 const offer = await pc.createOffer();
 
                 await pc.setLocalDescription(offer);
+
+
 
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
 
@@ -9481,6 +11047,8 @@ async function triggerUpdate(target) {
 
                 }
 
+
+
                 if (!response || !response.ok) {
 
                     clearTimeout(trackTimeout);
@@ -9489,9 +11057,13 @@ async function triggerUpdate(target) {
 
                 }
 
+
+
                 const answerSdp = await response.text();
 
                 await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+
+
 
             } catch (err) {
 
@@ -9500,6 +11072,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         function ecConfirmCalibration(camId) {
 
@@ -9520,6 +11094,8 @@ async function triggerUpdate(target) {
             ecStartScanningSim(camId);
 
         }
+
+
 
         function ecStartScanningSim(camId) {
 
@@ -9587,6 +11163,8 @@ async function triggerUpdate(target) {
 
                         btnSkip.disabled = false;
 
+
+
                         // Save actual calibration data
 
                         const calibratedData = {
@@ -9641,6 +11219,8 @@ async function triggerUpdate(target) {
 
                         };
 
+
+
                         fetch(`/core/camera/calibration/${camId}`, {
 
                             method: 'POST',
@@ -9693,6 +11273,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function ecStartRobotAndClose() {
 
             if (appWs && appWs.readyState === WebSocket.OPEN) {
@@ -9707,6 +11289,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         // ─── VSLAM TEST FUNCTIONS ──────────────────────────────────────────────
 
         window.vslamTesting = false;
@@ -9718,6 +11302,8 @@ async function triggerUpdate(target) {
         let poseUpdateCount = 0;
 
         let vslamHzInterval = null;
+
+
 
         function toggleVSlamTest() {
 
@@ -9947,6 +11533,8 @@ async function triggerUpdate(target) {
 
                 }
 
+
+
                 if (vslamPeerConnection) {
 
                     try { vslamPeerConnection.close(); } catch(e) {}
@@ -9964,6 +11552,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         async function startVSlamTestWebRTC() {
 
@@ -9993,6 +11583,8 @@ async function triggerUpdate(target) {
 
             let pc = null;
 
+
+
             const showVslamWebRTCError = (msg) => {
 
                 if (vslamPeerConnection) {
@@ -10013,6 +11605,8 @@ async function triggerUpdate(target) {
 
             };
 
+
+
             try {
 
                 pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
@@ -10021,11 +11615,15 @@ async function triggerUpdate(target) {
 
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
+
+
                 let trackTimeout = setTimeout(() => {
 
                     showVslamWebRTCError('Timeout — aucun flux reçu après 8s');
 
                 }, 8000);
+
+
 
                 pc.oniceconnectionstatechange = () => {
 
@@ -10038,6 +11636,8 @@ async function triggerUpdate(target) {
                     }
 
                 };
+
+
 
                 pc.ontrack = (event) => {
 
@@ -10065,9 +11665,13 @@ async function triggerUpdate(target) {
 
                 };
 
+
+
                 const offer = await pc.createOffer();
 
                 await pc.setLocalDescription(offer);
+
+
 
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam1/whep`;
 
@@ -10099,6 +11703,8 @@ async function triggerUpdate(target) {
 
                 }
 
+
+
                 if (!response || !response.ok) {
 
                     clearTimeout(trackTimeout);
@@ -10107,9 +11713,13 @@ async function triggerUpdate(target) {
 
                 }
 
+
+
                 const answerSdp = await response.text();
 
                 await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+
+
 
             } catch(err) {
 
@@ -10118,6 +11728,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         // ─── TELECOMMANDE & NAVIGATION CONTROLS ──────────────────────────────────
 
@@ -10128,6 +11740,10 @@ async function triggerUpdate(target) {
         let controlSpeed = 0.15; // default speed in m/s
 
         let navTarget = null; // { x, y } in meters
+
+        let keysPressed = {};
+
+
 
         function initControlTab() {
 
@@ -10163,15 +11779,9 @@ async function triggerUpdate(target) {
 
                         's': 'down', 'KeyS': 'down', 'ArrowDown': 'down',
 
-                        'q': 'strafe-left',
+                        'q': 'left', 'KeyA': 'left', 'ArrowLeft': 'left',
 
-                        'd': 'strafe-right',
-
-                        'KeyA': 'turn-left', 'ArrowLeft': 'turn-left',
-
-                        'a': 'turn-left', 'A': 'turn-left',
-
-                        'e': 'turn-right', 'E': 'turn-right', 'KeyE': 'turn-right'
+                        'd': 'right', 'KeyD': 'right', 'ArrowRight': 'right'
 
                     };
 
@@ -10211,15 +11821,9 @@ async function triggerUpdate(target) {
 
                         's': 'down', 'KeyS': 'down', 'ArrowDown': 'down',
 
-                        'q': 'strafe-left',
+                        'q': 'left', 'KeyA': 'left', 'ArrowLeft': 'left',
 
-                        'd': 'strafe-right',
-
-                        'KeyA': 'turn-left', 'ArrowLeft': 'turn-left',
-
-                        'a': 'turn-left', 'A': 'turn-left',
-
-                        'e': 'turn-right', 'E': 'turn-right', 'KeyE': 'turn-right'
+                        'd': 'right', 'KeyD': 'right', 'ArrowRight': 'right'
 
                     };
 
@@ -10251,6 +11855,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function updateControlSpeed() {
 
             const val = document.getElementById('control-speed-slider').value;
@@ -10260,6 +11866,8 @@ async function triggerUpdate(target) {
             document.getElementById('control-speed-val').textContent = controlSpeed + ' m/s';
 
         }
+
+
 
         function sendControlCmd(cmd) {
 
@@ -10287,6 +11895,8 @@ async function triggerUpdate(target) {
 
             }
 
+
+
         function sendControlStop() {
 
             stopWalking();
@@ -10297,7 +11907,7 @@ async function triggerUpdate(target) {
 
             if (appWs && appWs.readyState === WebSocket.OPEN) {
 
-                appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, lateral: 0.0, angular: 0.0 }));
+                appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, angular: 0.0 }));
 
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
 
@@ -10322,6 +11932,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         function startWalking(dir) {
 
@@ -10351,6 +11963,8 @@ async function triggerUpdate(target) {
 
             }
 
+
+
             if (controlWalkInterval) clearInterval(controlWalkInterval);
 
             
@@ -10363,8 +11977,6 @@ async function triggerUpdate(target) {
 
                 let vx = 0.0;
 
-                let lateral = 0.0;
-
                 let wz = 0.0;
 
                 
@@ -10373,25 +11985,17 @@ async function triggerUpdate(target) {
 
                 else if (dir === 'down') vx = -controlSpeed;
 
-                else if (dir === 'strafe-left') lateral = -controlSpeed;
+                else if (dir === 'left') wz = 1.0; // rotate left rad/s
 
-                else if (dir === 'strafe-right') lateral = controlSpeed;
+                else if (dir === 'right') wz = -1.0; // rotate right rad/s
 
-                else if (dir === 'turn-left') wz = 1.0; // rotate left rad/s
-
-                else if (dir === 'turn-right') wz = -1.0; // rotate right rad/s
-
-                else if (dir === 'left') wz = 1.0;
-
-                else if (dir === 'right') wz = -1.0;
+                
 
                 appWs.send(JSON.stringify({
 
                     type: "cmd_vel",
 
                     linear: vx,
-
-                    lateral: lateral,
 
                     angular: wz
 
@@ -10406,6 +12010,8 @@ async function triggerUpdate(target) {
             controlWalkInterval = setInterval(sendVel, 100);
 
         }
+
+
 
         function stopWalking() {
 
@@ -10445,11 +12051,13 @@ async function triggerUpdate(target) {
 
             if (appWs && appWs.readyState === WebSocket.OPEN) {
 
-                appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, lateral: 0.0, angular: 0.0 }));
+                appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, angular: 0.0 }));
 
             }
 
         }
+
+
 
         // Map Click interaction
 
@@ -10515,6 +12123,8 @@ async function triggerUpdate(target) {
 
         }
 
+
+
         function clearNavGoal() {
 
             navTarget = null;
@@ -10532,6 +12142,8 @@ async function triggerUpdate(target) {
             drawControlMap();
 
         }
+
+
 
         function sendNavGoal() {
 
@@ -10584,6 +12196,8 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
 
         function drawControlMap() {
 
@@ -10862,5 +12476,9 @@ async function triggerUpdate(target) {
             }
 
         }
+
+
+
+
 
         checkAuth();
