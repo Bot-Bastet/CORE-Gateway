@@ -6,9 +6,9 @@
             
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/app?token=${apiToken}`;
-            appWs = new WebSocket(wsUrl);
+            window.appWs = new WebSocket(wsUrl);
             
-            appWs.onopen = () => {
+            window.appWs.onopen = () => {
                 console.log("Global WebSocket connecté.");
                 const consoleEl = document.getElementById('json-traffic-console');
                 if (consoleEl) consoleEl.textContent = '[WebSocket connecté - En attente de trafic...]';
@@ -27,16 +27,16 @@
                 }
             };
             
-            appWs.onmessage = (event) => {
+            window.appWs.onmessage = (event) => {
                 handleIncomingWebSocketMessage(event.data);
             };
             
-            appWs.onclose = () => {
+            window.appWs.onclose = () => {
                 console.log("Global WebSocket déconnecté. Reconnexion...");
                 setTimeout(connectGlobalWebSocket, 3000);
             };
             
-            appWs.onerror = (e) => {
+            window.appWs.onerror = (e) => {
                 console.error("Global WebSocket erreur:", e);
             };
         }

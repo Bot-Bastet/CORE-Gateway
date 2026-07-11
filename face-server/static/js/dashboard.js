@@ -146,21 +146,21 @@
 
 
 
-let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token || '';
+window.apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token || '';
 
-        let activeTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
+window.activeTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
 
-        let telemetryInterval = null;
+window.telemetryInterval = null;
 
-        let updateInterval = null;
+window.updateInterval = null;
 
-        let accountsCached = {};
+window.accountsCached = {};
 
-        let activeFolderName = null;
+window.activeFolderName = null;
 
-        let facesCached = [];
+window.facesCached = [];
 
-        let appWs = null;
+window.appWs = null;
 
         window.activeStreams = { 1: false, 2: false };
 
@@ -388,7 +388,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             initDragAndDrop();
 
-            connectGlobalWebSocket();
+            (window.connectGlobalWebSocket || connectGlobalWebSocket)();
 
             loadSavedOffsets();
 
@@ -512,7 +512,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             appWs.onmessage = (event) => {
 
-                handleIncomingWebSocketMessage(event.data);
+                (window.handleIncomingWebSocketMessage || handleIncomingWebSocketMessage)(event.data);
 
             };
 
@@ -522,7 +522,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
                 console.log("Global WebSocket déconnecté. Reconnexion...");
 
-                setTimeout(connectGlobalWebSocket, 3000);
+                setTimeout(window.connectGlobalWebSocket || connectGlobalWebSocket, 3000);
 
             };
 
@@ -5295,7 +5295,7 @@ let apiToken = localStorage.getItem('bastet_api_token') || window._bastet_token 
 
             } else if (tabId === 'control') {
 
-                setTimeout(initControlTab, 100);
+                setTimeout(window.initControlTab || initControlTab, 100);
 
             }
 

@@ -194,18 +194,21 @@ function toggleDemoMode(checked) {
     appWs.send(JSON.stringify({ type: 'demo_mode', enabled: checked }));
 
   if (checked) {
-    // Passage en SIMULATION : reset le viewer 3D à la position neutre (stand)
+    // Passage en SIMULATION : reset la posture locale
+    robotPosture.height = 100.0;
+    robotPosture.roll = 0.0;
+    robotPosture.pitch = 0.0;
+    robotPosture.yaw = 0.0;
+    robotPosture.speed = 50.0;
+
+    // Reset le viewer 3D à la position neutre (stand)
     if (typeof window.resetSpotMicro3D === 'function') {
       window.resetSpotMicro3D();
     } else if (typeof window.updateSpotMicroPosture === 'function') {
       window.updateSpotMicroPosture({ height: 100, roll: 0, pitch: 0, yaw: 0 });
     }
-    // Sync viewer avec la posture actuelle des sliders
-    if (typeof window.updateSpotMicroPosture === 'function') {
-      window.updateSpotMicroPosture(robotPosture);
-    }
   } else {
-    // Passage en mode ACTIF : synchroniser le viewer avec les angles réels du robot
+    // Passage en mode ACTIF : synchroniser immédiatement le viewer avec les angles réels du robot
     if (window.latestServoAngles && typeof window.updateSpotMicroServos === 'function') {
       window.updateSpotMicroServos(window.latestServoAngles);
     }
