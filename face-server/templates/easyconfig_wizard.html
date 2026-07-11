@@ -1,0 +1,326 @@
+<div id="easyconfig-overlay" class="modal-overlay" style="justify-content: flex-start; align-items: stretch; background-color: rgba(9, 9, 11, 0.45); backdrop-filter: none; transition: all 0.3s ease;">
+        <div style="width: 480px; max-width: 100vw; height: 100vh; background-color: var(--bg-card); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);">
+            <!-- Header -->
+            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.3rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <span>✨ Assistant de Configuration Guidée</span>
+                        <span style="font-size: 0.75rem; background: var(--accent); color: white; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: normal;">EasyConfig</span>
+                    </h2>
+                </div>
+                <button class="modal-close" style="position: static;" onclick="closeEasyConfig()">&times;</button>
+            </div>
+            
+            <!-- Steps Indicator -->
+            <div style="display: flex; background: var(--bg-main); border-bottom: 1px solid var(--border-color); padding: 0.75rem 1.5rem; justify-content: space-between; font-size: 0.8rem;">
+                <div id="step-dot-1" onclick="ecGoToStep(1)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--accent); font-weight: 600;">
+                    <span style="width:20px; height:20px; border-radius:50%; background:var(--accent); color:white; display:flex; align-items:center; justify-content:center; font-size:0.7rem;">1</span>
+                    <span>Offsets Moteurs</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-lr" onclick="ecGoToStep(2)" style="display:none; cursor:pointer; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
+                    <span>Attribution G/D</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-2" onclick="ecGoToStep(2)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">2</span>
+                    <span>Caméra Gauche</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-3" onclick="ecGoToStep(3)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">3</span>
+                    <span>Caméra Droite</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-stereo" onclick="ecGoToStep(5)" style="display:none; cursor:pointer; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">5</span>
+                    <span>Stereo</span>
+                </div>
+                <div style="width: 2rem; border-bottom: 1px dashed var(--border-color); align-self: center;"></div>
+                <div id="step-dot-4" onclick="ecGoToStep(4)" style="cursor:pointer; display:flex; align-items:center; gap:0.5rem; color: var(--text-secondary);">
+                    <span style="width:20px; height:20px; border-radius:50%; background:#27272a; color:var(--text-secondary); display:flex; align-items:center; justify-content:center; font-size:0.7rem;">4</span>
+                    <span>Finalisation</span>
+                </div>
+            </div>
+            
+            <!-- Content Area -->
+            <div style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column;">
+                
+                <!-- STEP 1 CONTENT -->
+                <div id="ec-step-1" style="display: none; flex-direction: column; gap: 1.5rem; padding: 1.5rem; flex: 1;">
+        <!-- ===== Joint Calibration Wizard View ===== -->
+        <div id="ec-joint-calibration-view" style="display: flex; flex-direction: column; gap: 1.5rem; flex: 1;">
+            <!-- Leg banner -->
+            <div id="ec-joint-leg-banner" style="background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(99,102,241,0.05)); border: 1px solid rgba(99,102,241,0.2); border-radius: 10px; padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 600; color: var(--accent); text-align: center;">
+                Patte <span id="ec-joint-leg-name">Arrière Gauche</span>
+            </div>
+            
+            <!-- Joint name and progress -->
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="ec-joint-name" style="margin: 0; font-size: 1.4rem;">Hanche</h3>
+                <span id="ec-joint-progress" style="font-size: 0.85rem; color: var(--text-secondary); background: rgba(255,255,255,0.05); padding: 0.35rem 0.85rem; border-radius: 20px; border: 1px solid var(--border-color);">Articulation 1/12</span>
+            </div>
+            
+            <!-- Instruction text -->
+            <div id="ec-joint-description" style="color: var(--text-secondary); font-size: 0.88rem; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; background: rgba(99,102,241,0.04); padding: 0.85rem 1.1rem; border-radius: 8px; border-left: 3px solid var(--accent);">
+                <!-- Dynamically populated by easyconfig.js -->
+            </div>
+            
+            <!-- Joint visualization & slider area -->
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                <!-- Servo icon (Hidden since full 3D is visible) -->
+                <div style="text-align: center; font-size: 3rem; opacity: 0.6; display: none;" id="ec-joint-icon"></div>
+                
+                <!-- Slider -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-90</span>
+                    <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" aria-label="Angle du joint" autocomplete="off" 
+                           oninput="ecUpdateJointSlider(this.value)" 
+                           style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+90</span>
+                </div>
+                
+                <!-- Value display -->
+                <div style="text-align: center;">
+                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
+                    <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
+                </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <div style="display: flex; gap: 1rem; justify-content: center; align-items: center;">
+                <button id="ec-btn-attach-servo" class="btn btn-secondary" onclick="ecAttachCurrentJoint()" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    🔌 Allumer le servo
+                </button>
+                <button id="ec-btn-validate-joint" class="btn btn-primary" onclick="ecValidateJoint()" disabled style="gap: 0.5rem; padding: 0.75rem 1.5rem; opacity: 0.5;">
+                    ✅ Valider cet offset
+                </button>
+            </div>
+            <button class="btn btn-secondary" onclick="ecSkipStep()" style="align-self: center; margin-top: 0.5rem; font-size: 0.8rem; padding: 0.5rem 1rem; color: var(--text-secondary); border-color: var(--border-color);">
+                ⏭️ Passer cette étape
+            </button>
+        </div>
+        
+        <!-- ===== Final View (all 12 joints done) ===== -->
+        <div id="ec-joint-final-view" style="display: none; flex-direction: column; gap: 1.5rem; align-items: center; justify-content: center; flex: 1; padding: 2rem;">
+            <div style="font-size: 4rem; line-height: 1;">✅</div>
+            <h3 style="margin: 0; font-size: 1.3rem;">Offset de toutes les articulations définis !</h3>
+            <p style="color: var(--text-secondary); text-align: center; max-width: 400px;">
+                12 offsets collectés. Vous pouvez maintenant enregistrer la configuration pour activer les moteurs ou garder le robot éteint.
+            </p>
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                <button class="btn btn-primary" onclick="ecCalculateOffsets(true)" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    ⚡ Enregistrer & Activer les Moteurs
+                </button>
+                <button class="btn btn-secondary" onclick="ecCalculateOffsets(false)" style="gap: 0.5rem; padding: 0.75rem 1.5rem;">
+                    💾 Enregistrer Uniquement (Garder Éteint)
+                </button>
+            </div>
+            <button class="btn btn-secondary" onclick="ecSkipStep()" style="margin-top: 0.5rem; font-size: 0.8rem; padding: 0.5rem 1rem; color: var(--text-secondary); border-color: var(--border-color);">
+                ⏭️ Passer sans enregistrer
+            </button>
+        </div>
+        
+        <!-- Success animation (kept for compatibility, hidden) -->
+        <div id="ec-motor-success-anim" style="display: none;"></div>
+                </div><!-- /ec-step-1 -->
+
+                <!-- STEP LR: Attribution Gauche/Droite (2 cameras only) -->
+                <div id="ec-step-lr" style="display: none; flex-direction: column; gap: 1.5rem; height: 100%; padding: 1.5rem;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1.1rem; margin-bottom:0.5rem;">Attribution des Cameras : Gauche / Droite</p>
+                        <p style="color: var(--text-secondary);">Deux cameras sont detectees. Regardez les flux ci-dessous et indiquez laquelle est la <strong>gauche</strong> et laquelle est la <strong>droite</strong>.</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Camera A preview -->
+                        <div style="border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; background: #000; position: relative; display: flex; flex-direction: column;">
+                            <div style="padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 1px solid var(--border-color);">
+                                Camera A
+                            </div>
+                            <div style="flex: 1; position: relative; min-height: 150px;">
+                                <video id="ec-lr-video-a" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <div id="ec-lr-status-a" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Chargement...
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; padding: 0.5rem;">
+                                <button class="btn btn-primary" onclick="ecAssignLR('left', 'a')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a GAUCHE
+                                </button>
+                                <button class="btn btn-secondary" onclick="ecAssignLR('right', 'a')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a DROITE
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Camera B preview -->
+                        <div style="border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; background: #000; position: relative; display: flex; flex-direction: column;">
+                            <div style="padding: 0.4rem 0.75rem; background: rgba(255,255,255,0.05); font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); text-align: center; border-bottom: 1px solid var(--border-color);">
+                                Camera B
+                            </div>
+                            <div style="flex: 1; position: relative; min-height: 150px;">
+                                <video id="ec-lr-video-b" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                                <div id="ec-lr-status-b" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--text-secondary); font-size: 0.8rem;">
+                                    Chargement...
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; padding: 0.5rem;">
+                                <button class="btn btn-primary" onclick="ecAssignLR('left', 'b')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a GAUCHE
+                                </button>
+                                <button class="btn btn-secondary" onclick="ecAssignLR('right', 'b')" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.4rem;">
+                                    Cette camera est a DROITE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="ec-lr-assignment-result" style="display: none; text-align: center; padding: 0.75rem; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px;">
+                        <span style="color: var(--success); font-weight: 600;" id="ec-lr-result-text"></span>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: center; gap: 1rem; padding-top: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="ecSkipLR()" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
+                            Passer (garder defaut : video0=gauche, video2=droite)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- STEP 2 CONTENT (CAMERA GAUCHE) -->
+                <div id="ec-step-2" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 2 : Alignement & Calibration Caméra Gauche (1)</p>
+                        Placez la feuille de calibration (damier noir et blanc) bien à plat devant la caméra gauche.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Live stream frame -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative;">
+                            <video id="ec-cam-video-1" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            
+                            <!-- Scanner HUD Overlay -->
+                            <div id="ec-cam-hud-1" style="display: none; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--accent); animation: pulse 2s infinite;">
+                                <div style="position: absolute; top: 10%; left: 10%; right: 10%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: scanLine 2s linear infinite;"></div>
+                                <div style="position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.65rem; color: var(--accent); background: rgba(0,0,0,0.8); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                    MIRE DE CALIBRATION EN COURS D'ANALYSE
+                                </div>
+                            </div>
+                            
+                            <!-- Initial state / loader / Success / Failure overlay -->
+                            <div id="ec-cam-status-overlay-1" style="position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                <span id="ec-cam-status-text-1" style="color: var(--text-secondary);">Le flux vidéo de la caméra s'affiche dès le lancement.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Calibration details and buttons -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+                            <button id="btn-ec-run-calib-1" class="btn btn-primary" onclick="ecRunCameraCalib(1)" style="width:100%; justify-content:center;">
+                                📷 Lancer la Calibration Cam1
+                            </button>
+                            <button id="btn-ec-skip-1" class="btn btn-secondary" onclick="ecNextStep(3)" style="width:100%; justify-content:center;">
+                                Passer cette étape (Conserver l'ancienne)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 3 CONTENT (CAMERA DROITE) -->
+                <div id="ec-step-3" style="display: none; flex-direction: column; gap: 1rem; height: 100%;">
+                    <div style="line-height:1.5; font-size:0.9rem;">
+                        <p style="font-weight:600; color:var(--text-primary); font-size:1rem; margin-bottom:0.5rem;">Étape 3 : Alignement & Calibration Caméra Droite (2)</p>
+                        Placez la feuille de calibration devant la caméra droite.
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; flex: 1; min-height: 220px;">
+                        <!-- Live stream frame -->
+                        <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; position: relative;">
+                            <video id="ec-cam-video-2" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                            
+                            <!-- Scanner HUD Overlay -->
+                            <div id="ec-cam-hud-2" style="display: none; position: absolute; inset: 0; pointer-events: none; border: 2px solid var(--accent); animation: pulse 2s infinite;">
+                                <div style="position: absolute; top: 10%; left: 10%; right: 10%; height: 2px; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: scanLine 2s linear infinite;"></div>
+                                <div style="position: absolute; bottom: 0.5rem; right: 0.5rem; font-size: 0.65rem; color: var(--accent); background: rgba(0,0,0,0.8); padding: 0.2rem 0.4rem; border-radius: 4px;">
+                                    MIRE DE CALIBRATION EN COURS D'ANALYSE
+                                </div>
+                            </div>
+                            
+                            <!-- Initial state / loader / Success / Failure overlay -->
+                            <div id="ec-cam-status-overlay-2" style="position: absolute; inset: 0; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.8rem; text-align: center; padding: 1rem;">
+                                <span id="ec-cam-status-text-2" style="color: var(--text-secondary);">Le flux vidéo de la caméra s'affiche dès le lancement.</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Calibration details and buttons -->
+                        <div style="display: flex; flex-direction: column; gap: 1rem; justify-content: center;">
+                            <button id="btn-ec-run-calib-2" class="btn btn-primary" onclick="ecRunCameraCalib(2)" style="width:100%; justify-content:center;">
+                                📷 Lancer la Calibration Cam2
+                            </button>
+                            <button id="btn-ec-skip-2" class="btn btn-secondary" onclick="ecNextStep(4)" style="width:100%; justify-content:center;">
+                                Passer cette étape
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4 CONTENT (FINALISATION) -->
+                <div id="ec-step-4" style="display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 1.5rem; height: 100%; padding: 2rem 0;">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: rgba(72, 209, 204, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; color: var(--success); animation: scaleUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                        ✓
+                    </div>
+                    <div>
+                        <h3 class="font-outfit" style="font-size: 1.4rem; color: var(--text-primary); margin-bottom: 0.5rem;">Configuration Guidée Réussie !</h3>
+                        <p style="color: var(--text-secondary); max-width: 500px; line-height: 1.5; font-size: 0.9rem;">
+                            Tous les offsets des moteurs et les réglages des caméras ont été enregistrés avec succès. Le robot Bastet est parfaitement initialisé et prêt à démarrer.
+                        </p>
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; width: 100%; max-width: 500px; margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="ecStartRobotAndClose()" style="flex: 1; justify-content: center; padding: 0.75rem;">
+                            🚀 Démarrer & Allumer le Robot
+                        </button>
+                        <button class="btn btn-secondary" onclick="closeEasyConfig()" style="flex: 1; justify-content: center; padding: 0.75rem;">
+                            Fermer l'Assistant
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="padding: 1rem 1.5rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-main);">
+                <button id="ec-btn-prev" class="btn btn-secondary" disabled onclick="ecPrevStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    ← Précédent
+                </button>
+                <button id="ec-btn-skip" class="btn btn-secondary" onclick="ecSkipStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem; margin-right: 0.5rem;">Passer</button>
+                    <span id="ec-progress-text" style="font-size:0.75rem; color: var(--text-secondary);">Étape 1 sur 4</span>
+                <button id="ec-btn-next" class="btn btn-primary" disabled onclick="ecNextStep()" style="font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                    Suivant →
+                </button>
+            </div>
+        </div>
+
+    <div id="cam-preview-overlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background: rgba(9,9,11,0.95); backdrop-filter: blur(8px); z-index: 3000; justify-content: center; align-items: center; flex-direction: column; padding: 2rem;">
+        <div style="width: 90%; max-width: 720px; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h3 id="cam-preview-title" class="font-outfit" style="font-size: 1.2rem; margin: 0;">Apercu Camera</h3>
+                <button class="btn btn-secondary" onclick="closeCalibPreview()" style="font-size: 0.85rem;">Fermer</button>
+            </div>
+            <div style="background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3; position: relative;">
+                <video id="calib-preview-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; background: #000;"></video>
+                <div id="calib-preview-loader" style="position: absolute; inset: 0; background: rgba(0,0,0,0.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; color: white; font-size: 0.85rem;">
+                    <div style="width: 24px; height: 24px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <span>Connexion au flux HLS...</span>
+                </div>
+                <div id="calib-preview-error" style="display:none; position: absolute; inset: 0; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--danger); padding: 1.5rem; text-align: center; font-size: 0.9rem;">
+                    <svg viewBox="0 0 24 24" width="40" height="40"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Flux camera indisponible. Verifiez camera + MediaMTX (port 48889).</span>
+                    <button class="btn btn-secondary" onclick="closeCalibPreview()" style="font-size: 0.8rem; margin-top: 0.5rem;">Fermer</button>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; font-size: 0.8rem; color: var(--text-secondary);">Le flux identifie visuellement la camera. Start/stop via la Vue d'ensemble.</div>
+        </div>
+    </div>
+</body>
+</html>

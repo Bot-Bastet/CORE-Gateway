@@ -400,10 +400,10 @@
     if (posture.powered) processKeys();
   }
   function processKeys() {
-    if (keys["z"] || keys["arrowup"]) { cmd = "fw"; return; }
-    if (keys["s"] || keys["arrowdown"]) { cmd = "bk"; return; }
-    if (keys["q"] || keys["arrowleft"]) { cmd = "sl"; return; }
-    if (keys["d"] || keys["arrowright"]) { cmd = "sr"; return; }
+    if (keys["z"] || keys["arrowup"]) { cmd = "bk"; return; }
+    if (keys["s"] || keys["arrowdown"]) { cmd = "fw"; return; }
+    if (keys["q"] || keys["arrowleft"]) { cmd = "sr"; return; }
+    if (keys["d"] || keys["arrowright"]) { cmd = "sl"; return; }
     if (keys["a"]) { cmd = "tl"; return; }
     if (keys["e"]) { cmd = "tr"; return; }
     if (keys[" "]) { cmd = "s"; return; }

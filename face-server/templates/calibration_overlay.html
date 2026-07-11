@@ -1,0 +1,284 @@
+    <div id="calibration-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
+        <div style="width: 95vw; height: 95vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+            <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
+                <div>
+                    <h2 class="font-outfit" style="font-size: 1.5rem; color: var(--text-primary);">Console de Calibration Système</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.15rem;">Ajustez les offsets des moteurs, testez les caméras et configurez leur mapping L/R et la qualité de stream.</p>
+                </div>
+                <button class="btn btn-secondary" onclick="closeCalibrationOverlay()">&times; Fermer la Console</button>
+            </div>
+            
+            <div style="flex: 1; display: grid; grid-template-columns: 1.5fr 1fr; overflow: hidden;">
+                <!-- Offsets sliders -->
+                <div style="padding: 1.5rem; overflow-y: auto; border-right: 1px solid var(--border-color);">
+                    <h3 class="font-outfit" style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Offsets des Angles Moteurs (-90° à +90°)</span>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetMotorCalibration()">Réinitialiser</button>
+                    </h3>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                        <!-- FR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">FR (Avant Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Abad Offset</span><span id="calib-val-0">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Upper Offset</span><span id="calib-val-1">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Lower Offset</span><span id="calib-val-2">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)"/>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- FL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">FL (Avant Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Abad Offset</span><span id="calib-val-3">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Upper Offset</span><span id="calib-val-4">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Lower Offset</span><span id="calib-val-5">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BR -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">BR (Arrière Droite)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Abad Offset</span><span id="calib-val-6">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Upper Offset</span><span id="calib-val-7">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Lower Offset</span><span id="calib-val-8">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BL -->
+                        <div class="joint-group-card">
+                            <h4 style="font-size:0.85rem; color: var(--accent); margin-bottom: 0.75rem; font-weight:600;">BL (Arrière Gauche)</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Abad Offset</span><span id="calib-val-9">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Upper Offset</span><span id="calib-val-10">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)"/>
+                                </div>
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Lower Offset</span><span id="calib-val-11">0</span></div>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                        <button class="btn btn-primary" onclick="saveCalibrationOffsets()" style="flex:1;">
+                            💾 Sauvegarder & Transmettre les Offsets
+                        </button>
+                        <button class="btn btn-secondary" onclick="sendCalibrationOffsets()" style="flex:1;">
+                            ⚡ Tester Directement
+                        </button>
+                    </div>
+                    <div style="margin-top: 0.75rem; display: flex; gap: 1rem;">
+                        <button class="btn btn-secondary" onclick="resetAndSendZeroOffsets()" style="flex:1; border-color: #f59e0b; color: #f59e0b;">
+                            🔄 Remettre à zéro les offsets
+                        </button>
+                        <button class="btn btn-secondary" onclick="sendStopServos()" style="flex:1; border-color: #ef4444; color: #ef4444;">
+                            🚫 Désactiver servos
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Qualité Stream & V-SLAM -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-title" style="font-size:0.95rem;">Qualité Stream & V-SLAM</div>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 1rem;">Résolution et framerate par caméra pour le stream et le V-SLAM.</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div id="quality-card-1" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                            <h4 id="quality-title-cam-1" style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Gauche</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution Stream <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.65rem; border-radius:3px; height:auto; margin:0; margin-left:0.5rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" id="detect-res-btn-1" onclick="queryCameraResolutions(1)" title="Détecter les résolutions disponibles">🔍 Détecter</button></label>
+                                    <select id="stream-res-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480">640x480 (480p)</option>
+                                        <option value="1280x720" selected>1280x720 (720p)</option>
+                                        <option value="1920x1080">1920x1080 (1080p)</option>
+                                        <option value="640x360">640x360 (360p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Framerate Stream</label>
+                                    <select id="stream-fps-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="15">15 fps</option>
+                                        <option value="20" selected>20 fps</option>
+                                        <option value="25">25 fps</option>
+                                        <option value="30">30 fps</option>
+                                    </select>
+                                </div>
+                                <div style="border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.25rem;">
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution V-SLAM</label>
+                                    <select id="vslam-res-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480" selected>640x480 (480p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                        <option value="1280x720">1280x720 (720p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Encodage WebRTC</label>
+                                    <select id="stream-codec-1" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="auto" selected>Auto (négociation)</option>
+                                        <option value="h264">H.264</option>
+                                        <option value="vp8">VP8</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="quality-card-2" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem;">
+                            <h4 style="font-size:0.8rem; font-weight:700; margin-bottom:0.75rem; color: var(--accent);">Caméra Droite</h4>
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution Stream <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.65rem; border-radius:3px; height:auto; margin:0; margin-left:0.5rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" id="detect-res-btn-2" onclick="queryCameraResolutions(2)" title="Détecter les résolutions disponibles">🔍 Détecter</button></label>
+                                    <select id="stream-res-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480">640x480 (480p)</option>
+                                        <option value="1280x720" selected>1280x720 (720p)</option>
+                                        <option value="1920x1080">1920x1080 (1080p)</option>
+                                        <option value="640x360">640x360 (360p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Framerate Stream</label>
+                                    <select id="stream-fps-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="15">15 fps</option>
+                                        <option value="20" selected>20 fps</option>
+                                        <option value="25">25 fps</option>
+                                        <option value="30">30 fps</option>
+                                    </select>
+                                </div>
+                                <div style="border-top: 1px solid var(--border-color); padding-top: 0.5rem; margin-top: 0.25rem;">
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Résolution V-SLAM</label>
+                                    <select id="vslam-res-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="640x480" selected>640x480 (480p)</option>
+                                        <option value="320x240">320x240 (240p)</option>
+                                        <option value="1280x720">1280x720 (720p)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="font-size:0.7rem; color:var(--text-secondary);">Encodage WebRTC</label>
+                                    <select id="stream-codec-2" class="form-input" style="font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                        <option value="auto" selected>Auto (négociation)</option>
+                                        <option value="h264">H.264</option>
+                                        <option value="vp8">VP8</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+                        <button class="btn btn-primary" onclick="saveStreamQualityConfig()" style="font-size:0.8rem; padding:0.35rem 0.75rem;">Appliquer la configuration</button>
+                        <span id="stream-quality-status" style="font-size:0.75rem; color:var(--text-secondary);"></span>
+                    </div>
+<div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color);">
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Configuration des Cam&eacute;ras</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.75rem;">Mapping USB &rarr; Cam1/Cam2 (L/R), statut, calibration et pr&eacute;visualisation.</p>
+                        <div id="camera-change-warning" style="display:none; margin-top:0.5rem; padding:0.5rem 0.75rem; border-radius:6px; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); font-size:0.75rem; color:#f59e0b;">
+                            ⚠️ Changement de caméra détecté ! Recalibration requise avant V-SLAM.
+                        </div>
+                        
+                        <!-- Mapping Selection -->
+                        <div id="camera-ports-grid-main" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--border-color);">
+                            <div>
+                                <label id="label-port-left-main" class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Gauche</label>
+                                <select id="cam-port-left" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="syncCamPorts('left', this.value);">
+                                    <option value="/dev/video0">/dev/video0</option>
+                                    <option value="/dev/video1">/dev/video1</option>
+                                    <option value="/dev/video2">/dev/video2</option>
+                                    <option value="/dev/video3">/dev/video3</option>
+                                    <option value="/dev/video4">/dev/video4</option>
+                                </select>
+                            </div>
+                        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <button id="btn-save-camera-mapping" class="btn btn-primary" onclick="saveCameraPortsMapping()" style="font-size: 0.85rem; padding: 0.5rem 1rem;">Enregistrer la configuration</button>
+                            <span id="camera-mapping-save-status" style="font-size: 0.85rem; color: var(--text-secondary);"></span>
+                        </div>
+                            <div id="container-port-right-main">
+                                <label class="form-label" style="font-size:0.75rem; margin-bottom:0.25rem;">Port Droite</label>
+                                <select id="cam-port-right" class="form-input" style="padding: 0.35rem; font-size: 0.8rem;" onchange="syncCamPorts('right', this.value);">
+                                    <option value="/dev/video0">/dev/video0</option>
+                                    <option value="/dev/video1">/dev/video1</option>
+                                    <option value="/dev/video2">/dev/video2</option>
+                                    <option value="/dev/video3">/dev/video3</option>
+                                    <option value="/dev/video4">/dev/video4</option>
+                                </select>
+                                <span id="cam-port-single-info" style="display:none;">(Caméra central — seule caméra branchée)</span>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top: 0.75rem;">
+                            <div id="calib-cam-container-1" style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <span id="title-cam-left-main" style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Gauche</span>
+                                    <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
+                                        <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-1" style="color:var(--success);">Connectée</span></span>
+                                        <span id="calib-badge-1" style="font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:3px; background:rgba(239,68,68,0.15); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-weight:600;">⚠ Non calibrée</span>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(1)">📷 Calibrer</button>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.05);" onclick="openCameraConfigModal(1)">👁️ Voir</button>
+                                        <button class="btn btn-secondary" id="calib-cam-preview-1" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" onclick="toggleCalibPreview(1)">▶ Aperçu</button>
+                                    </div>
+                                </div>
+                                <input type="checkbox" checked style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-1" onchange="toggleCalibCamera(1)"/>
+                            </div>
+                            
+                            <div id="actions-cam-main" style="display:flex; justify-content:center; gap:0.5rem; padding: 0.25rem 0; border-top: 1px solid var(--border-color);">
+                                <button id="btn-add-camera-main" class="btn btn-secondary" onclick="forceStereoMode()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #10b981;">➕ Ajouter une caméra</button>
+                                <button id="btn-remove-camera-main" class="btn btn-secondary" onclick="forceMonoMode()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); color: #ef4444; display:none;">➖ Supprimer la 2e caméra</button>
+                                <button id="btn-swap-cam-main" class="btn btn-secondary" onclick="swapCameraLR()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.03);">🔄 Échanger Gauche/Droite</button>
+                                <button id="btn-config-cam-main" class="btn btn-secondary" onclick="openCameraAssignModal()" style="padding:0.15rem 0.5rem; font-size:0.65rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);">🎥 Configurer G/D (Live)</button>
+                            </div>
+                            <div id="calib-cam-container-2" style="display:flex; justify-content:space-between; align-items:center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                                <div>
+                                    <span style="font-size: 0.85rem; font-weight:600; display:block;">Caméra Droite</span>
+                                    <div style="display:flex; align-items:center; gap:0.3rem; margin-top:0.1rem;">
+                                        <span style="font-size:0.75rem; color:var(--text-secondary); margin-right:0.2rem;">Statut: <span id="calib-cam-status-2" style="color:var(--text-secondary);">Déconnectée</span></span>
+                                        <span id="calib-badge-2" style="font-size:0.65rem; padding:0.1rem 0.3rem; border-radius:3px; background:rgba(239,68,68,0.15); color:var(--danger); border:1px solid rgba(239,68,68,0.3); font-weight:600;">⚠ Non calibrée</span>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0;" onclick="openCameraCalibModal(2)">📷 Calibrer</button>
+                                        <button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(255,255,255,0.05);" onclick="openCameraConfigModal(2)">👁️ Voir</button>
+                                        <button class="btn btn-secondary" id="calib-cam-preview-2" style="padding:0.2rem 0.5rem; font-size:0.7rem; border-radius:4px; height:auto; margin:0; background-color: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3);" onclick="toggleCalibPreview(2)">▶ Aperçu</button>
+                                    </div>
+                                </div>
+                                <input type="checkbox" style="accent-color: var(--accent); width:18px; height:18px;" id="calib-cam-enable-2" onchange="toggleCalibCamera(2)"/>
+                            </div>
+                        </div>
+                </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
