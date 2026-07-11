@@ -1283,6 +1283,7 @@
     </div>
 
     <script src="/static/js/dashboard.js?v=4" defer></script>
+    <script src="/static/js/easyconfig.js?v=4" defer></script>
     <script src="/static/js/dashboard_calib.js?v=4" defer></script>
     <script src="/static/js/ws.js?v=4" defer></script>
     <script src="/static/js/control.js?v=4" defer></script>
@@ -1979,8 +1980,8 @@
             
             <!-- Joint visualization & slider area -->
             <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
-                <!-- Servo icon -->
-                <div style="text-align: center; font-size: 3rem; opacity: 0.6;" id="ec-joint-icon">🦵</div>
+                <!-- Servo icon (Hidden since full 3D is visible) -->
+                <div style="text-align: center; font-size: 3rem; opacity: 0.6; display: none;" id="ec-joint-icon"></div>
                 
                 <!-- Slider -->
                 <div style="display: flex; align-items: center; gap: 1rem;">
