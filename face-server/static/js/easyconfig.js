@@ -458,10 +458,10 @@ var ecLRStreamA = null;
             var sideEl = document.getElementById('ec-joint-side-label');
             if (sideEl) sideEl.textContent = joint.side === 'left' ? '🛅 Gauche — peut nécessiter inversion' : '🛅 Droit';
 
-            // --- Slider positionné à l'offset temporaire ou à 90 (neutre) ---
+            // --- Slider positionné à l'offset temporaire ou à 0 (neutre) ---
             var slider = document.getElementById('ec-joint-slider');
             var savedOffset = ecTempOffsets[joint.idx] || 0;
-            slider.value = 90 + savedOffset;  // 90 = neutre, offset = décalage
+            slider.value = savedOffset;  // 0 = neutre, offset = décalage
             document.getElementById('ec-joint-slider-value').textContent = slider.value;
             document.getElementById('ec-joint-slider-value').style.color = 'var(--accent)';
             var limitWarnInit = document.getElementById('ec-joint-limit-warning');
@@ -695,16 +695,19 @@ var ecLRStreamA = null;
         var ecSliderThrottle = null;
         function ecUpdateJointSlider(value) {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var intVal = parseInt(value) || 90;
+            var intVal = parseInt(value) || 0; // valeur de -90 à 90 (offset)
             var valueEl = document.getElementById('ec-joint-slider-value');
             var limitWarn = document.getElementById('ec-joint-limit-warning');
             if (valueEl) valueEl.textContent = intVal;
             
-            // L'offset stocké = slider_value - 90 (90 = neutre logique du Pi)
-            ecTempOffsets[joint.idx] = intVal - 90;
+            // L'offset stocké = la valeur du slider directement
+            ecTempOffsets[joint.idx] = intVal;
 
-            // Indicateur couleur si aux limites
-            if (intVal <= 5 || intVal >= 175) {
+            // Calculer l'angle absolu théorique à envoyer au moteur physique (90 = neutre)
+            var absoluteAngle = 90 + intVal;
+
+            // Indicateur couleur si aux limites de l'angle absolu (0° ou 180°)
+            if (absoluteAngle <= 5 || absoluteAngle >= 175) {
                 if (valueEl) valueEl.style.color = '#f59e0b';
                 if (limitWarn) limitWarn.style.display = 'inline-block';
             } else {
@@ -716,11 +719,8 @@ var ecLRStreamA = null;
             if (ecSliderThrottle) clearTimeout(ecSliderThrottle);
             ecSliderThrottle = setTimeout(function() {
                 if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
-                    // Envoi de l'angle brut au servo (sans offset, l'Arduino n'a pas encore
-                    // l'offset en EEPROM — il sera enregistré à la validation)
-                    // Le flag miroir est appliqué ici pour visualiser l'effet
                     var isInverted = ecTempInverts[joint.idx];
-                    var angle = isInverted ? (180 - intVal) : intVal;
+                    var angle = isInverted ? (180 - absoluteAngle) : absoluteAngle;
                     appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle }));
                 }
             }, 50);
@@ -728,15 +728,13 @@ var ecLRStreamA = null;
         
         function ecValidateJoint() {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var sliderVal = parseInt(document.getElementById('ec-joint-slider').value) || 90;
+            var sliderVal = parseInt(document.getElementById('ec-joint-slider').value) || 0;
             
-            // Calculer l'offset : différence entre la position physique choisie et le neutre logique (90°)
-            var offset = sliderVal - 90;
+            // L'offset est exactement la valeur du slider
+            var offset = sliderVal;
             ecTempOffsets[joint.idx] = offset;
 
             // ⚠️ IMPORTANT : avant de sauvegarder, on doit effacer l'offset temporaire de l'Arduino
-            // car pendant la calibration le Pi envoyait des angles bruts (sans offset).
-            // On envoie set_offset et set_invert directement dans l'EEPROM Arduino.
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 // 1. Enregistrer l'offset dans l'EEPROM Arduino
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: offset }));

@@ -1908,8 +1908,8 @@
 
 
 
-<div id="easyconfig-overlay" class="modal-overlay" style="justify-content: center; align-items: center; background-color: rgba(9, 9, 11, 0.95); backdrop-filter: blur(8px);">
-        <div style="width: 800px; max-width: 95vw; max-height: 90vh; background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+<div id="easyconfig-overlay" class="modal-overlay" style="justify-content: flex-start; align-items: stretch; background-color: rgba(9, 9, 11, 0.45); backdrop-filter: none; transition: all 0.3s ease;">
+        <div style="width: 480px; max-width: 100vw; height: 100vh; background-color: var(--bg-card); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);">
             <!-- Header -->
             <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-card);">
                 <div>
@@ -1984,18 +1984,18 @@
                 
                 <!-- Slider -->
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">0</span>
-                    <input type="range" id="ec-joint-slider" min="0" max="180" value="90" aria-label="Angle du joint" autocomplete="off" 
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-90</span>
+                    <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" aria-label="Angle du joint" autocomplete="off" 
                            oninput="ecUpdateJointSlider(this.value)" 
                            style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">180</span>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+90</span>
                 </div>
                 
                 <!-- Value display -->
                 <div style="text-align: center;">
-                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">90</span>
+                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
                     <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
-                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° (absolu)</span>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
                 </div>
             </div>
             
