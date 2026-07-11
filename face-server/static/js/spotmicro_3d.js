@@ -118,10 +118,10 @@
       if (moving) {
         var wave = Math.sin(gaitT + ph), wave2 = Math.sin(gaitT + ph + PI * 0.5);
         gait_dz = Math.max(0, 0.04 * wave2);
-        if (cmd === "fw" || cmd === "bk") { gait_dx = (cmd === "bk" ? -1 : 1) * 0.05 * wave; }
-        else if (cmd === "sl" || cmd === "sr") { gait_dy = (cmd === "sl" ? -1 : 1) * 0.04 * wave; }
+        if (cmd === "fw" || cmd === "bk") { gait_dx = (cmd === "fw" ? -1 : 1) * 0.05 * wave; }
+        else if (cmd === "sl" || cmd === "sr") { gait_dy = (cmd === "sl" ? 1 : -1) * 0.04 * wave; }
         else if (cmd === "tl" || cmd === "tr") {
-          var tdir = cmd === "tl" ? -1 : 1;
+          var tdir = cmd === "tl" ? 1 : -1;
           var fwd = tdir * (isLeft ? 1 : -1);
           gait_dx = fwd * 0.045 * wave;
           gait_dy = tdir * (isLeft ? -1 : 1) * 0.04 * wave;
@@ -400,12 +400,12 @@
     if (posture.powered) processKeys();
   }
   function processKeys() {
-    if (keys["z"] || keys["arrowup"]) { cmd = "bk"; return; }
-    if (keys["s"] || keys["arrowdown"]) { cmd = "fw"; return; }
-    if (keys["q"] || keys["arrowleft"]) { cmd = "sr"; return; }
-    if (keys["d"] || keys["arrowright"]) { cmd = "sl"; return; }
-    if (keys["a"]) { cmd = "tr"; return; }
-    if (keys["e"]) { cmd = "tl"; return; }
+    if (keys["z"] || keys["arrowup"]) { cmd = "fw"; return; }
+    if (keys["s"] || keys["arrowdown"]) { cmd = "bk"; return; }
+    if (keys["q"] || keys["arrowleft"]) { cmd = "sl"; return; }
+    if (keys["d"] || keys["arrowright"]) { cmd = "sr"; return; }
+    if (keys["a"]) { cmd = "tl"; return; }
+    if (keys["e"]) { cmd = "tr"; return; }
     if (keys[" "]) { cmd = "s"; return; }
     if (!Object.values(keys).some(Boolean)) cmd = "s";
   }
@@ -616,8 +616,8 @@
       var sign = isRight ? -1 : 1;
       
       tgt[m.id + "_s"] = sign * (s_deg - 90) * DEG;
-      tgt[m.id + "_t"] = sign * (t_deg - 90) * DEG;
-      tgt[m.id + "_c"] = sign * (c_deg - 90) * DEG;
+      tgt[m.id + "_t"] = 1.25 + sign * (t_deg - 90) * DEG;
+      tgt[m.id + "_c"] = -2.59 + sign * (c_deg - 90) * DEG;
     });
     cmd = "s";
   };

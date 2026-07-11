@@ -3965,6 +3965,7 @@ window.appWs = null;
             if (vslamResEl && vslamResEl.value) params.vslam_res = vslamResEl.value;
             return params;
         }
+        window.getStreamQualityParams = getStreamQualityParams;
 
 
         async function loadStreamQualityConfig() {

@@ -786,8 +786,8 @@ var ecLRStreamA = null;
             // Sauvegarder l'onglet actif actuel pour pouvoir le restaurer à la fermeture
             window.ecPreviousTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
             // Forcer l'affichage de l'onglet télécommande où se trouve le modèle 3D
-            if (typeof switchTab === 'function') {
-                switchTab('control');
+            if (typeof window.switchTab === 'function') {
+                window.switchTab('control');
             }
             
             const o = document.getElementById('easyconfig-overlay');
@@ -818,8 +818,8 @@ var ecLRStreamA = null;
                 window.highlightSpotMicroJoint(null, null);
             }
             // Restaurer l'onglet précédent
-            if (window.ecPreviousTab && typeof switchTab === 'function') {
-                switchTab(window.ecPreviousTab);
+            if (window.ecPreviousTab && typeof window.switchTab === 'function') {
+                window.switchTab(window.ecPreviousTab);
             }
             const o = document.getElementById('easyconfig-overlay');
             o.style.position = '';
@@ -1291,7 +1291,7 @@ var ecLRStreamA = null;
             btnRun.innerHTML = `<span>📷 Connexion...</span>`;
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false, ...getStreamQualityParams(camId) }));
+                appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false, ...((window.getStreamQualityParams && window.getStreamQualityParams(camId)) || {}) }));
             }
             
             statusText.innerHTML = `
