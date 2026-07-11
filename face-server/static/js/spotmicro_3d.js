@@ -318,10 +318,23 @@
 
     if (posture.powered && cmd !== "s") {
       var v = 0.15 * (posture.speed / 10);
-      if (cmd === "fw") { worldPos.x += Math.cos(worldPos.yaw) * v * dt; worldPos.z += Math.sin(worldPos.yaw) * v * dt; }
-      else if (cmd === "bk") { worldPos.x -= Math.cos(worldPos.yaw) * v * dt; worldPos.z -= Math.sin(worldPos.yaw) * v * dt; }
-      else if (cmd === "tl") { worldPos.yaw -= 0.8 * (posture.speed / 10) * dt; }
-      else if (cmd === "tr") { worldPos.yaw += 0.8 * (posture.speed / 10) * dt; }
+      if (cmd === "fw") {
+        worldPos.x += Math.cos(worldPos.yaw) * v * dt;
+        worldPos.z += Math.sin(worldPos.yaw) * v * dt;
+      } else if (cmd === "bk") {
+        worldPos.x -= Math.cos(worldPos.yaw) * v * dt;
+        worldPos.z -= Math.sin(worldPos.yaw) * v * dt;
+      } else if (cmd === "sl") {
+        worldPos.x -= Math.sin(worldPos.yaw) * v * 0.7 * dt;
+        worldPos.z += Math.cos(worldPos.yaw) * v * 0.7 * dt;
+      } else if (cmd === "sr") {
+        worldPos.x += Math.sin(worldPos.yaw) * v * 0.7 * dt;
+        worldPos.z -= Math.cos(worldPos.yaw) * v * 0.7 * dt;
+      } else if (cmd === "tl") {
+        worldPos.yaw -= 0.8 * (posture.speed / 10) * dt;
+      } else if (cmd === "tr") {
+        worldPos.yaw += 0.8 * (posture.speed / 10) * dt;
+      }
     }
 
     worldGrp.position.x = worldPos.x;
@@ -555,6 +568,7 @@
   window.setSpotMicroPowered = function (on) { posture.powered = on; if (!on) { cmd = "s"; keys = {}; } };
   window.getSpotMicroPosture = function () { return posture; };
   window.stopSpotMicroMovement = function () { cmd = "s"; keys = {}; };
+  window.setSpotMicroCmd = function (newCmd) { cmd = newCmd; };
 
   // ─── Sync viewer with real servo angles from Arduino/WebSocket ─────
   // angles12 : tableau de 12 valeurs en degrés (0-180, 90 = neutre)
@@ -579,9 +593,14 @@
       var s_deg = angles12[m.s] !== undefined ? angles12[m.s] : 90;
       var t_deg = angles12[m.t] !== undefined ? angles12[m.t] : 90;
       var c_deg = angles12[m.c] !== undefined ? angles12[m.c] : 90;
-      tgt[m.id + "_s"] = (s_deg - 90) * DEG;
-      tgt[m.id + "_t"] = (t_deg - 90) * DEG;
-      tgt[m.id + "_c"] = (c_deg - 90) * DEG;
+      
+      // Inversion de signe pour le côté droit (fr, rr) pour annuler la symétrie appliquée par l'Arduino/ROS
+      var isRight = (m.id === "fr" || m.id === "rr");
+      var sign = isRight ? -1 : 1;
+      
+      tgt[m.id + "_s"] = sign * (s_deg - 90) * DEG;
+      tgt[m.id + "_t"] = sign * (t_deg - 90) * DEG;
+      tgt[m.id + "_c"] = sign * (c_deg - 90) * DEG;
     });
     cmd = "s";
   };

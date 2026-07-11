@@ -90,6 +90,35 @@ function initControlTab() {
 // Speed is now controlled via Posture & Allure slider (posture-slider-speed)
 
 function sendControlCmd(cmd) {
+  // En mode simulation : animer le modèle 3D
+  if (robotPosture.demo_mode) {
+    if (cmd === 'stand' && typeof window.setSpotMicroPowered === 'function') {
+      window.setSpotMicroPowered(true);
+      robotPosture.powered = true;
+      var btn = document.getElementById('power-toggle-btn');
+      if (btn) {
+        btn.textContent = '⏻ Allumé';
+        btn.style.background = 'rgba(16,185,129,0.15)';
+        btn.style.color = 'var(--success)';
+      }
+      var offOvl = document.getElementById('offOvl');
+      if (offOvl) { offOvl.style.opacity = '0'; offOvl.style.pointerEvents = 'none'; }
+      applyRobotPostureSync();
+    } else if (cmd === 'sit' && typeof window.setSpotMicroPowered === 'function') {
+      window.setSpotMicroPowered(false);
+      robotPosture.powered = false;
+      var btn = document.getElementById('power-toggle-btn');
+      if (btn) {
+        btn.textContent = '⏻ Éteint';
+        btn.style.background = 'rgba(239,68,68,0.15)';
+        btn.style.color = 'var(--danger)';
+      }
+      var offOvl = document.getElementById('offOvl');
+      if (offOvl) { offOvl.style.opacity = '1'; offOvl.style.pointerEvents = 'auto'; }
+      applyRobotPostureSync();
+    }
+  }
+
   if (appWs && appWs.readyState === WebSocket.OPEN) {
     // Envoyer la commande arduino directement
     appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: cmd }));
@@ -102,8 +131,15 @@ function sendControlCmd(cmd) {
       showToast('Télécommande', labels[cmd] || cmd + ' envoyé', 'info');
     }
   } else {
-    if (typeof showToast === 'function') {
-      showToast('Erreur', 'WebSocket non connecte. Le robot est peut-etre hors ligne.', 'error');
+    if (robotPosture.demo_mode) {
+      if (typeof showToast === 'function') {
+        var labels = { stand: 'Se lever (Sim)', sit: "S'asseoir (Sim)", stop: 'Stop (Sim)' };
+        showToast('Simulation', labels[cmd] || cmd, 'info');
+      }
+    } else {
+      if (typeof showToast === 'function') {
+        showToast('Erreur', 'WebSocket non connecté. Le robot est peut-être hors ligne.', 'error');
+      }
     }
   }
 }
@@ -113,6 +149,9 @@ function sendControlStop() {
   window.keysPressed = {};
   // Stop the 3D viewer animation
   if (typeof stopSpotMicroMovement === "function") stopSpotMicroMovement();
+  if (robotPosture.demo_mode && typeof window.setSpotMicroCmd === "function") {
+    window.setSpotMicroCmd("s");
+  }
   if (appWs && appWs.readyState === WebSocket.OPEN) {
     appWs.send(JSON.stringify({ type: "cmd_vel", linear: 0.0, lateral: 0.0, angular: 0.0 }));
     appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
@@ -143,6 +182,20 @@ function startWalking(dir) {
 
   if (controlWalkInterval) clearInterval(controlWalkInterval);
 
+  // Mettre à jour la direction dans la simulation en mode démo (simulation)
+  if (robotPosture.demo_mode && typeof window.setSpotMicroCmd === "function") {
+    var simCmd = "s";
+    if (dir === "up") simCmd = "fw";
+    else if (dir === "down") simCmd = "bk";
+    else if (dir === "strafe-left") simCmd = "sl";
+    else if (dir === "strafe-right") simCmd = "sr";
+    else if (dir === "turn-left") simCmd = "tl";
+    else if (dir === "turn-right") simCmd = "tr";
+    else if (dir === "left") simCmd = "tl";
+    else if (dir === "right") simCmd = "tr";
+    window.setSpotMicroCmd(simCmd);
+  }
+
   function sendVel() {
     if (!appWs || appWs.readyState !== WebSocket.OPEN) return;
     var vx = 0.0, vy = 0.0, wz = 0.0;
@@ -165,6 +218,11 @@ function startWalking(dir) {
 function stopWalking() {
   if (controlWalkInterval) { clearInterval(controlWalkInterval); controlWalkInterval = null; }
   controlActiveDir = null;
+  
+  if (robotPosture.demo_mode && typeof window.setSpotMicroCmd === "function") {
+    window.setSpotMicroCmd("s");
+  }
+  
   document.querySelectorAll(".dpad-btn").forEach(function (btn) {
     btn.style.backgroundColor = "";
     btn.style.color = "";
@@ -241,7 +299,7 @@ function toggleRobotPower() {
   }
   var btnStand = document.getElementById('btn-posture-stand');
   var btnSit = document.getElementById('btn-posture-sit');
-  if (btnStand) btnStand.disabled = !robotPosture.powered;
+  if (btnStand) btnStand.disabled = robotPosture.powered;
   if (btnSit) btnSit.disabled = !robotPosture.powered;
 
   var offOvl = document.getElementById('offOvl');
@@ -274,7 +332,9 @@ function toggleLLMControl() {
 }
 
 function applyRobotPostureSync(postureData) {
-  Object.keys(postureData).forEach(function(key) { if (robotPosture.hasOwnProperty(key)) robotPosture[key] = postureData[key]; });
+  if (postureData) {
+    Object.keys(postureData).forEach(function(key) { if (robotPosture.hasOwnProperty(key)) robotPosture[key] = postureData[key]; });
+  }
   ['height', 'speed', 'roll', 'pitch', 'yaw'].forEach(function(key) {
     var slider = document.getElementById('posture-slider-' + key);
     var label  = document.getElementById('posture-val-' + key);
@@ -299,7 +359,7 @@ function applyRobotPostureSync(postureData) {
   }
   var btnStand = document.getElementById('btn-posture-stand');
   var btnSit = document.getElementById('btn-posture-sit');
-  if (btnStand) btnStand.disabled = !robotPosture.powered;
+  if (btnStand) btnStand.disabled = robotPosture.powered;
   if (btnSit) btnSit.disabled = !robotPosture.powered;
 
   var offOvl = document.getElementById('offOvl');
