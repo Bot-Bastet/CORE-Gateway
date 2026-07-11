@@ -121,7 +121,7 @@
         if (cmd === "fw" || cmd === "bk") { gait_dx = (cmd === "bk" ? -1 : 1) * 0.05 * wave; }
         else if (cmd === "sl" || cmd === "sr") { gait_dy = (cmd === "sl" ? -1 : 1) * 0.04 * wave; }
         else if (cmd === "tl" || cmd === "tr") {
-          var tdir = cmd === "tl" ? -1 : 1;
+          var tdir = cmd === "tl" ? 1 : -1;
           var fwd = tdir * (isLeft ? 1 : -1);
           gait_dx = fwd * 0.045 * wave;
           gait_dy = tdir * (isLeft ? -1 : 1) * 0.04 * wave;
@@ -338,9 +338,9 @@
         worldPos.x += Math.sin(worldPos.yaw) * v * 0.7 * dt;
         worldPos.z -= Math.cos(worldPos.yaw) * v * 0.7 * dt;
       } else if (cmd === "tl") {
-        worldPos.yaw -= 0.8 * (posture.speed / 10) * dt;
-      } else if (cmd === "tr") {
         worldPos.yaw += 0.8 * (posture.speed / 10) * dt;
+      } else if (cmd === "tr") {
+        worldPos.yaw -= 0.8 * (posture.speed / 10) * dt;
       }
     }
 

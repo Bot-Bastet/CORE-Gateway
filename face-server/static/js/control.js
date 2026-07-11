@@ -198,11 +198,11 @@ function startWalking(dir) {
     else if (dir === "down") vx = -controlSpeed;
     else if (dir === "strafe-left") vy = -controlSpeed;
     else if (dir === "strafe-right") vy = controlSpeed;
-    else if (dir === "turn-left") wz = 1.0;
-    else if (dir === "turn-right") wz = -1.0;
+    else if (dir === "turn-left") wz = -1.0;
+    else if (dir === "turn-right") wz = 1.0;
     // Legacy: left/right keyboard still rotate
-    else if (dir === "left") wz = 1.0;
-    else if (dir === "right") wz = -1.0;
+    else if (dir === "left") wz = -1.0;
+    else if (dir === "right") wz = 1.0;
     appWs.send(JSON.stringify({ type: "cmd_vel", linear: vx, lateral: vy, angular: wz }));
   }
 
