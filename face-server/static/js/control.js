@@ -235,11 +235,24 @@ function toggleRobotPower() {
   robotPosture.powered = !robotPosture.powered;
   var btn = document.getElementById('power-toggle-btn');
   if (btn) {
-    btn.textContent = robotPosture.powered ? '⏻ Éteindre' : '⏻ Allumer';
-    btn.style.background = robotPosture.powered ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)';
-    btn.style.color = robotPosture.powered ? 'var(--danger)' : 'var(--success)';
+    btn.textContent = robotPosture.powered ? '⏻ Allumé' : '⏻ Éteint';
+    btn.style.background = robotPosture.powered ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+    btn.style.color = robotPosture.powered ? 'var(--success)' : 'var(--danger)';
   }
+  var btnStand = document.getElementById('btn-posture-stand');
+  var btnSit = document.getElementById('btn-posture-sit');
+  if (btnStand) btnStand.disabled = !robotPosture.powered;
+  if (btnSit) btnSit.disabled = !robotPosture.powered;
+
+  var offOvl = document.getElementById('offOvl');
+  if (offOvl) {
+    offOvl.style.opacity = robotPosture.powered ? '0' : '1';
+    offOvl.style.pointerEvents = robotPosture.powered ? 'none' : 'auto';
+  }
+
   if (typeof updateSpotMicroPosture === 'function') updateSpotMicroPosture(robotPosture);
+  if (typeof setSpotMicroPowered === 'function') setSpotMicroPowered(robotPosture.powered);
+  
   if (appWs && appWs.readyState === WebSocket.OPEN) {
     appWs.send(JSON.stringify({ type: 'robot_posture_update', key: 'powered', value: robotPosture.powered }));
     if (!robotPosture.powered) {
@@ -280,12 +293,24 @@ function applyRobotPostureSync(postureData) {
   if (demoCheck) demoCheck.checked = robotPosture.demo_mode;
   var powerBtn = document.getElementById('power-toggle-btn');
   if (powerBtn) {
-    powerBtn.textContent = robotPosture.powered ? '⏻ Éteindre' : '⏻ Allumer';
-    powerBtn.style.background = robotPosture.powered ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)';
-    powerBtn.style.color = robotPosture.powered ? 'var(--danger)' : 'var(--success)';
+    powerBtn.textContent = robotPosture.powered ? '⏻ Allumé' : '⏻ Éteint';
+    powerBtn.style.background = robotPosture.powered ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)';
+    powerBtn.style.color = robotPosture.powered ? 'var(--success)' : 'var(--danger)';
   }
+  var btnStand = document.getElementById('btn-posture-stand');
+  var btnSit = document.getElementById('btn-posture-sit');
+  if (btnStand) btnStand.disabled = !robotPosture.powered;
+  if (btnSit) btnSit.disabled = !robotPosture.powered;
+
+  var offOvl = document.getElementById('offOvl');
+  if (offOvl) {
+    offOvl.style.opacity = robotPosture.powered ? '0' : '1';
+    offOvl.style.pointerEvents = robotPosture.powered ? 'none' : 'auto';
+  }
+
   if (typeof updateSpotMicroPosture === 'function') updateSpotMicroPosture(robotPosture);
   if (typeof setSpotMicroDemoMode === 'function') setSpotMicroDemoMode(robotPosture.demo_mode);
+  if (typeof setSpotMicroPowered === 'function') setSpotMicroPowered(robotPosture.powered);
   _setBadge(robotPosture.powered, robotPosture.demo_mode);
 }
 

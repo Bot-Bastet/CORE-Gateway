@@ -556,11 +556,9 @@
       var t_deg = angles12[m.t] !== undefined ? angles12[m.t] : 90;
       var c_deg = angles12[m.c] !== undefined ? angles12[m.c] : 90;
       tgt[m.id + "_s"] = (s_deg - 90) * DEG;
-      tgt[m.id + "_t"] = 1.25  + (t_deg - 90) * DEG;
-      tgt[m.id + "_c"] = -2.59 + (c_deg - 90) * DEG;
+      tgt[m.id + "_t"] = (t_deg - 90) * DEG;
+      tgt[m.id + "_c"] = (c_deg - 90) * DEG;
     });
-    // Forcer powered ON pour voir les pattes
-    posture.powered = true;
     cmd = "s";
   };
 
