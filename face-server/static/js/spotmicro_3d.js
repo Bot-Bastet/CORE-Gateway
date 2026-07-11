@@ -192,6 +192,16 @@
   var matGold = new THREE.MeshStandardMaterial({ color: 0xead400, roughness: 0.38, metalness: 0.45 });
   var matDark = new THREE.MeshStandardMaterial({ color: 0x1b1b1f, roughness: 0.55, metalness: 0.25 });
   var matFoot = new THREE.MeshStandardMaterial({ color: 0x4a4a52, roughness: 0.70, metalness: 0.05 });
+  
+  // Custom glowing highlight material for calibration steps
+  var matHighlight = new THREE.MeshStandardMaterial({
+    color: 0x6366f1,
+    emissive: 0x6366f1,
+    emissiveIntensity: 1.0,
+    roughness: 0.2,
+    metalness: 0.5
+  });
+  window._calibModeActive = false;
 
   function buildRobotFromCache() {
     // Body
@@ -284,7 +294,15 @@
       toeMesh.castShadow = toeMesh.receiveShadow = true;
       toeGrp.add(toeMesh);
 
-      legData[id] = { shoulderGrp: shoulderGrp, legGrp: legGrp, footGrp: footGrp };
+      legData[id] = {
+        shoulderGrp: shoulderGrp,
+        legGrp: legGrp,
+        footGrp: footGrp,
+        shoulderMesh: shoulderMesh,
+        armMesh: armMesh,
+        coverMesh: coverMesh,
+        footMesh: footMesh
+      };
     });
   }
 
@@ -310,7 +328,7 @@
     worldGrp.position.z = -worldPos.z;
     worldGrp.rotation.y = worldPos.yaw;
 
-    if (posture.demo_mode) {
+    if (posture.demo_mode && !window._calibModeActive) {
       computeTargets(dt);
     }
 
@@ -330,7 +348,13 @@
     bodyGrp.rotation.set(posture.roll * DEG * powerFrac, posture.pitch * DEG * powerFrac, posture.yaw * DEG * powerFrac, "ZXY");
     if (posture.powered && cmd === "s") bodyGrp.position.z += Math.sin(timestamp * 0.003) * 0.001;
 
-    controls.target.set(worldGrp.position.x, currentH * 0.5, worldGrp.position.z);
+    if (!window._calibModeActive) {
+      controls.target.set(worldGrp.position.x, currentH * 0.5, worldGrp.position.z);
+    } else if (matHighlight) {
+      // Animate emissive intensity to pulse glowing color
+      var intensity = 0.55 + Math.sin(timestamp * 0.007) * 0.45;
+      matHighlight.emissiveIntensity = intensity;
+    }
     controls.update();
     refreshMotorDisplay();
     if (renderer && scene && camera) renderer.render(scene, camera);
@@ -560,6 +584,60 @@
       tgt[m.id + "_c"] = (c_deg - 90) * DEG;
     });
     cmd = "s";
+  };
+
+  window.highlightSpotMicroJoint = function (legId, jointType) {
+    // 1. Restore all original materials
+    Object.keys(legData).forEach(function (id) {
+      var leg = legData[id];
+      if (leg.shoulderMesh) leg.shoulderMesh.material = matDark;
+      if (leg.armMesh) leg.armMesh.material = matDark;
+      if (leg.coverMesh) leg.coverMesh.material = matGold;
+      if (leg.footMesh) leg.footMesh.material = matDark;
+    });
+
+    if (!legId || !jointType) {
+      window._calibModeActive = false;
+      return;
+    }
+
+    window._calibModeActive = true;
+
+    // 2. Set all joints of the 3D model to calibration reference pose (all 0)
+    Object.keys(LEGS).forEach(function (id) {
+      tgt[id + "_s"] = 0;
+      tgt[id + "_t"] = 0;
+      tgt[id + "_c"] = 0;
+    });
+
+    // 3. Highlight the target joint mesh
+    var targetLeg = legData[legId];
+    if (targetLeg) {
+      if (jointType === "hip" && targetLeg.shoulderMesh) {
+        targetLeg.shoulderMesh.material = matHighlight;
+      } else if (jointType === "upper") {
+        if (targetLeg.armMesh) targetLeg.armMesh.material = matHighlight;
+        if (targetLeg.coverMesh) targetLeg.coverMesh.material = matHighlight;
+      } else if (jointType === "lower" && targetLeg.footMesh) {
+        targetLeg.footMesh.material = matHighlight;
+      }
+
+      // 4. Focus camera on the target leg/joint
+      var targetPos = new THREE.Vector3();
+      if (targetLeg.shoulderGrp) {
+        targetLeg.shoulderGrp.getWorldPosition(targetPos);
+        if (controls) {
+          controls.target.copy(targetPos);
+          if (camera) {
+            camera.position.set(
+              targetPos.x + (legId.includes("r") ? 0.25 : -0.25),
+              targetPos.y + 0.15,
+              targetPos.z + 0.25
+            );
+          }
+        }
+      }
+    }
   };
 
   // Reset viewer au stand neutre (toutes pattes à 90°)

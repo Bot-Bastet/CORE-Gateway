@@ -1972,11 +1972,9 @@
             </div>
             
             <!-- Instruction text -->
-            <p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">
-                1. Cliquez sur <strong>"Allumer le servo"</strong> pour activer l'articulation<br>
-                2. Utilisez le curseur pour positionner l'articulation à sa <strong>position neutre</strong><br>
-                3. Cliquez sur <strong>"Valider"</strong> pour enregistrer l'offset et passer à la suivante
-            </p>
+            <div id="ec-joint-description" style="color: var(--text-secondary); font-size: 0.88rem; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; background: rgba(99,102,241,0.04); padding: 0.85rem 1.1rem; border-radius: 8px; border-left: 3px solid var(--accent);">
+                <!-- Dynamically populated by easyconfig.js -->
+            </div>
             
             <!-- Joint visualization & slider area -->
             <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
@@ -1985,18 +1983,18 @@
                 
                 <!-- Slider -->
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-30</span>
-                    <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" aria-label="Angle du joint" autocomplete="off" 
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">0</span>
+                    <input type="range" id="ec-joint-slider" min="0" max="180" value="90" aria-label="Angle du joint" autocomplete="off" 
                            oninput="ecUpdateJointSlider(this.value)" 
                            style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+30</span>
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">180</span>
                 </div>
                 
                 <!-- Value display -->
                 <div style="text-align: center;">
-                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
+                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">90</span>
                     <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
-                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">° (absolu)</span>
                 </div>
             </div>
             

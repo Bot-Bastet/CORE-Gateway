@@ -6,18 +6,18 @@
 // L'Arduino calcule : offset = slider_value - 90
 // (90° = valeur logique neutre envoyée par le Pi quand l'URDF dit 0)
 var EC_JOINT_ORDER = [
-    { leg: "Avant Droite",   joint: "Hanche",   idx: 0,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "right" },
-    { leg: "Avant Droite",   joint: "Tibia",    idx: 1,  icon: "🦵", type: "upper", urdf_angle: 90, side: "right" },
-    { leg: "Avant Droite",   joint: "Genou",    idx: 2,  icon: "🦵", type: "lower", urdf_angle: 90, side: "right" },
-    { leg: "Avant Gauche",   joint: "Hanche",   idx: 3,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "left"  },
-    { leg: "Avant Gauche",   joint: "Tibia",    idx: 4,  icon: "🦵", type: "upper", urdf_angle: 90, side: "left"  },
-    { leg: "Avant Gauche",   joint: "Genou",    idx: 5,  icon: "🦵", type: "lower", urdf_angle: 90, side: "left"  },
-    { leg: "Arrière Droite", joint: "Hanche",   idx: 6,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "right" },
-    { leg: "Arrière Droite", joint: "Tibia",    idx: 7,  icon: "🦵", type: "upper", urdf_angle: 90, side: "right" },
-    { leg: "Arrière Droite", joint: "Genou",    idx: 8,  icon: "🦵", type: "lower", urdf_angle: 90, side: "right" },
-    { leg: "Arrière Gauche", joint: "Hanche",   idx: 9,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "left"  },
-    { leg: "Arrière Gauche", joint: "Tibia",    idx: 10, icon: "🦵", type: "upper", urdf_angle: 90, side: "left"  },
-    { leg: "Arrière Gauche", joint: "Genou",    idx: 11, icon: "🦵", type: "lower", urdf_angle: 90, side: "left"  },
+    { leg: "Avant Droite",   joint: "Hanche",   idx: 0,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "right", leg_id: "fr" },
+    { leg: "Avant Droite",   joint: "Tibia",    idx: 1,  icon: "🦵", type: "upper", urdf_angle: 90, side: "right", leg_id: "fr" },
+    { leg: "Avant Droite",   joint: "Genou",    idx: 2,  icon: "🦵", type: "lower", urdf_angle: 90, side: "right", leg_id: "fr" },
+    { leg: "Avant Gauche",   joint: "Hanche",   idx: 3,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "fl" },
+    { leg: "Avant Gauche",   joint: "Tibia",    idx: 4,  icon: "🦵", type: "upper", urdf_angle: 90, side: "left",  leg_id: "fl" },
+    { leg: "Avant Gauche",   joint: "Genou",    idx: 5,  icon: "🦵", type: "lower", urdf_angle: 90, side: "left",  leg_id: "fl" },
+    { leg: "Arrière Droite", joint: "Hanche",   idx: 6,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Droite", joint: "Tibia",    idx: 7,  icon: "🦵", type: "upper", urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Droite", joint: "Genou",    idx: 8,  icon: "🦵", type: "lower", urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Gauche", joint: "Hanche",   idx: 9,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Gauche", joint: "Tibia",    idx: 10, icon: "🦵", type: "upper", urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Gauche", joint: "Genou",    idx: 11, icon: "🦵", type: "lower", urdf_angle: 90, side: "left",  leg_id: "rl" },
 ];
 var ecCurrentStep = 1;
 var ecJointIndex = 0;
@@ -415,19 +415,19 @@ var ecLRStreamA = null;
         // Descriptions pédagogiques par type d'articulation
         var EC_JOINT_DESCRIPTIONS = {
             hip:   [
-                "La hanche (abduction) contrôle l'écart latéral de la patte.",
-                "Position URDF neutre (📏 0°) : patte dans l'axe du corps, ni écartée ni rapprochée.",
-                "Faites glisser jusqu'à ce que la patte soit exactement dans l'axe du corps comme sur l'image."
+                "1. <b>Abduction (Hanche)</b> : Contrôle l'écartement latéral de la patte.",
+                "2. <b>Consigne</b> : Ajustez le curseur jusqu'à ce que la hanche soit <b>parfaitement verticale</b> par rapport au sol (comme illustré par la pièce clignotante Indigo sur le modèle 3D).",
+                "3. <b>Validation</b> : Une fois perpendiculaire au sol, cliquez sur Valider."
             ],
             upper: [
-                "Le tibia (hanche fémorale) contrôle l'avant/arrière de la cuisse.",
-                "Position URDF neutre (📏 0°) : cuisse à 90°, parallèle au sol.",
-                "Faites glisser jusqu'à ce que la cuisse soit parfaitement horizontale comme sur l'image."
+                "1. <b>Cuisse (Thigh)</b> : Contrôle l'inclinaison avant/arrière de la cuisse.",
+                "2. <b>Consigne</b> : Ajustez le curseur jusqu'à ce que la cuisse soit <b>parfaitement perpendiculaire au corps</b> (faisant un angle droit de 90° vers le bas, comme illustré par la pièce clignotante Indigo sur le modèle 3D).",
+                "3. <b>Validation</b> : Une fois la cuisse bien verticale, cliquez sur Valider."
             ],
             lower: [
-                "Le genou contrôle l'angle du bas de la patte.",
-                "Position URDF neutre (📏 0°) : bas de patte vertical, perpendiculaire au sol.",
-                "Faites glisser jusqu'à ce que le bas de la patte soit parfaitement vertical comme sur l'image."
+                "1. <b>Genou (Calf)</b> : Contrôle l'extension de la patte.",
+                "2. <b>Consigne</b> : Ajustez le curseur pour mettre le genou dans la <b>position la plus droite possible</b>, tibia et pied alignés verticalement dans le prolongement de la cuisse (comme illustré par la pièce clignotante Indigo sur le modèle 3D).",
+                "3. <b>Validation</b> : Une fois la jambe bien tendue et droite, cliquez sur Valider."
             ]
         };
 
@@ -444,10 +444,15 @@ var ecLRStreamA = null;
             // --- Image de référence URDF (dessinée en canvas) ---
             ecDrawReferenceCanvas(joint);
 
+            // --- Déclencher le surbrillance 3D sur le viewer ---
+            if (typeof window.highlightSpotMicroJoint === 'function') {
+                window.highlightSpotMicroJoint(joint.leg_id, joint.type);
+            }
+
             // --- Description pédagogique ---
             var descLines = EC_JOINT_DESCRIPTIONS[joint.type] || [];
             var descEl = document.getElementById('ec-joint-description');
-            if (descEl) descEl.innerHTML = descLines.map(function(l) { return '<p style="margin:0.2rem 0;opacity:0.85">' + l + '</p>'; }).join('');
+            if (descEl) descEl.innerHTML = descLines.map(function(l) { return '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">' + l + '</p>'; }).join('');
 
             // --- Côté du servo ---
             var sideEl = document.getElementById('ec-joint-side-label');
@@ -801,6 +806,9 @@ var ecLRStreamA = null;
 
         function closeEasyConfig() {
             clearInterval(window.ecFeedbackInterval);
+            if (typeof window.highlightSpotMicroJoint === 'function') {
+                window.highlightSpotMicroJoint(null, null);
+            }
             const o = document.getElementById('easyconfig-overlay');
             o.style.position = '';
             o.style.top = '';
