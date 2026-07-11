@@ -1,4 +1,4 @@
-"""Dashboard and logo routes."""
+﻿"""Dashboard and logo routes."""
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -19,10 +19,4 @@ def dashboard():
     """Dashboard d'administration complet de Bastet."""
     with open(TEMPLATE_PATH, "r", encoding="utf-8") as f:
         html = f.read()
-    # Assembler les fragments HTML extraits
-    for fname in ["easyconfig_wizard.html", "calibration_overlay.html"]:
-        fpath = TEMPLATE_PATH.parent / fname
-        if fpath.exists():
-            fragment = fpath.read_text(encoding="utf-8")
-            html = html.replace(f"<!-- INCLUDE:{fname} -->", fragment)
     return HTMLResponse(content=html)
