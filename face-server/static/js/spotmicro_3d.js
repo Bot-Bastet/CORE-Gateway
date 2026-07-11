@@ -6,7 +6,7 @@
   var PI = Math.PI, DEG = PI / 180;
 
   // ─── STL Files (from chvmp/spotmicro_description — CDN verified alive) ──
-  var STL_BASE = "https://raw.githubusercontent.com/chvmp/spotmicro_description/master/meshes/stl/";
+  var STL_BASE = "/static/meshes/";
   var UNIQUE_STLS = [
     { id: "mainbody",   file: "mainbody.stl" },
     { id: "frontpart",  file: "frontpart.stl" },
@@ -556,15 +556,24 @@
       if (k.endsWith("_c")) { cur[k] = 0;     tgt[k] = 0; }
     });
     posture.height = 100;
+    posture.speed = 10;
     posture.roll = 0; posture.pitch = 0; posture.yaw = 0;
     cmd = "s";
     keys = {};
     // Sync sliders HTML si présents
-    ["height", "roll", "pitch", "yaw"].forEach(function (k) {
+    ["height", "speed", "roll", "pitch", "yaw"].forEach(function (k) {
       var sl = document.getElementById("posture-slider-" + k);
       var vl = document.getElementById("posture-val-" + k);
-      if (sl) sl.value = k === "height" ? 100 : 0;
-      if (vl) vl.textContent = k === "height" ? "100%" : "0°";
+      if (sl) {
+        if (k === "height") sl.value = 100;
+        else if (k === "speed") sl.value = 10;
+        else sl.value = 0;
+      }
+      if (vl) {
+        if (k === "height") vl.textContent = "100%";
+        else if (k === "speed") vl.textContent = "1.0x";
+        else vl.textContent = "0°";
+      }
     });
   };
 

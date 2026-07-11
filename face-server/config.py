@@ -53,11 +53,11 @@ class GatewayState:
             "yolo": "disabled", "face_rec": "disabled",
         }
         self.robot_posture: dict = {
-            "height": 0.0,      # 0..100  (stand height %)
-            "speed": 50.0,      # 0..100  (gait speed %)
-            "roll": 0.0,        # -30..30 (body roll deg)
-            "pitch": 0.0,       # -30..30 (body pitch deg)
-            "yaw": 0.0,         # -30..30 (body yaw deg)
+            "height": 100.0,    # 60..140 (stand height %)
+            "speed": 10.0,      # 3..30   (gait speed x0.1)
+            "roll": 0.0,        # -15..15 (body roll deg)
+            "pitch": 0.0,       # -15..15 (body pitch deg)
+            "yaw": 0.0,         # -15..15 (body yaw deg)
             "demo_mode": False, # True = simulation, motors off
             "powered": False,    # True = robot active
         }

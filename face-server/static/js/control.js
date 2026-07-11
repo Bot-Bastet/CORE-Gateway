@@ -8,7 +8,7 @@ controlActiveDir = null;
 controlWalkInterval = null;
 navPointA = null;
 navPointB = null;
-robotPosture = { height: 100.0, speed: 50.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false };
+robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false };
 
 // LLM auto-execute: disabled by default
 window.llmAutoControl = false;
@@ -32,10 +32,10 @@ function _setBadge(powered, demo_mode) {
       badge.style.color = '#888';
     } else if (demo_mode) {
       badge.textContent = 'SIMULATION';
-      badge.style.background = 'rgba(239,68,68,0.15)';
-      badge.style.color = 'var(--danger)';
+      badge.style.background = 'rgba(217,70,239,0.15)';
+      badge.style.color = 'var(--accent)';
     } else {
-      badge.textContent = 'ACTIF';
+      badge.textContent = 'PHYSIQUE';
       badge.style.background = 'rgba(16,185,129,0.15)';
       badge.style.color = 'var(--success)';
     }
@@ -171,9 +171,14 @@ function onPostureSliderChange(key, value) {
   robotPosture[key] = parseFloat(value);
   var labelEl = document.getElementById("posture-val-" + key);
   if (labelEl) {
-    // Affichage correct des unités
-    var suffix = (key === 'height' || key === 'speed') ? '%' : '°';
-    labelEl.textContent = value + suffix;
+    // Affichage correct des unités et multiplicateurs
+    if (key === 'speed') {
+      labelEl.textContent = (parseFloat(value) / 10).toFixed(1) + 'x';
+    } else if (key === 'height') {
+      labelEl.textContent = value + '%';
+    } else {
+      labelEl.textContent = value + '°';
+    }
   }
   if (typeof updateSpotMicroPosture === "function") updateSpotMicroPosture(robotPosture);
   debouncePostureSync(key, value);
@@ -199,7 +204,7 @@ function toggleDemoMode(checked) {
     robotPosture.roll = 0.0;
     robotPosture.pitch = 0.0;
     robotPosture.yaw = 0.0;
-    robotPosture.speed = 50.0;
+    robotPosture.speed = 10.0;
 
     // Reset le viewer 3D à la position neutre (stand)
     if (typeof window.resetSpotMicro3D === 'function') {
@@ -252,7 +257,15 @@ function applyRobotPostureSync(postureData) {
     var slider = document.getElementById('posture-slider-' + key);
     var label  = document.getElementById('posture-val-' + key);
     if (slider) slider.value = robotPosture[key];
-    if (label) { var units = (key === 'height' || key === 'speed') ? '%' : 'deg'; label.textContent = robotPosture[key] + units; }
+    if (label) {
+      if (key === 'speed') {
+        label.textContent = (parseFloat(robotPosture[key]) / 10).toFixed(1) + 'x';
+      } else if (key === 'height') {
+        label.textContent = robotPosture[key] + '%';
+      } else {
+        label.textContent = robotPosture[key] + '°';
+      }
+    }
   });
   var demoCheck = document.getElementById('demo-mode-checkbox');
   if (demoCheck) demoCheck.checked = robotPosture.demo_mode;

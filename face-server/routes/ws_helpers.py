@@ -256,11 +256,11 @@ async def handle_robot_posture_update(key: str, value, manager):
 
     # Clamp values to valid ranges
     if key == "height":
-        value = max(0.0, min(100.0, float(value)))
+        value = max(60.0, min(140.0, float(value)))
     elif key == "speed":
-        value = max(0.0, min(100.0, float(value)))
+        value = max(3.0, min(30.0, float(value)))
     elif key in ("roll", "pitch", "yaw"):
-        value = max(-30.0, min(30.0, float(value)))
+        value = max(-15.0, min(15.0, float(value)))
     elif key == "demo_mode":
         value = bool(value)
     elif key == "powered":
