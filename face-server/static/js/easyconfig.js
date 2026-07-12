@@ -721,7 +721,8 @@ var ecLRStreamA = null;
                 if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
                     var isInverted = ecTempInverts[joint.idx];
                     var angle = isInverted ? (180 - absoluteAngle) : absoluteAngle;
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle }));
+                    var chk = (joint.idx + Math.floor(angle)) % 100;
+                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, chk: chk }));
                 }
             }, 50);
         }

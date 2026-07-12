@@ -2158,7 +2158,9 @@ window.appWs = null;
 
 
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parseFloat(angle) }));
+                const parsedAngle = parseFloat(angle);
+                const chk = (idx + Math.floor(parsedAngle)) % 100;
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parsedAngle, chk: chk }));
             }
         }
 
