@@ -2044,10 +2044,10 @@ window.appWs = null;
 
         // ÔöÇÔöÇÔöÇ SERVO TESTER FUNCTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
         const TESTER_JOINT_NAMES = [
-            'Avant-Droit Abduction', 'Avant-Droit Hanche', 'Avant-Droit Genou',
-            'Avant-Gauche Abduction', 'Avant-Gauche Hanche', 'Avant-Gauche Genou',
-            'Arrière-Droit Abduction', 'Arrière-Droit Hanche', 'Arrière-Droit Genou',
-            'Arrière-Gauche Abduction', 'Arrière-Gauche Hanche', 'Arrière-Gauche Genou'
+            'Avant Droite Hanche', 'Avant Droite Tibia', 'Avant Droite Genou',
+            'Avant Gauche Hanche', 'Avant Gauche Tibia', 'Avant Gauche Genou',
+            'Arrière Droite Hanche', 'Arrière Droite Tibia', 'Arrière Droite Genou',
+            'Arrière Gauche Hanche', 'Arrière Gauche Tibia', 'Arrière Gauche Genou'
         ];
 
 
