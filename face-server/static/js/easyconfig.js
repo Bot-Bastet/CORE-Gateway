@@ -1,10 +1,10 @@
 // === EasyConfig Global State (must be at global scope for cross-file access) ===
-// Ordre des moteurs dans l'assistant, avec position neutre URDF de r├®f├®rence
-// urdf_angle : angle (en degr├®s, 0-180) que le servo doit physiquement faire
-//              pour ├¬tre dans la position neutre d├®finie par l'URDF
+// Ordre des moteurs dans l'assistant, avec position neutre URDF de référence
+// urdf_angle : angle (en degrés, 0-180) que le servo doit physiquement faire
+//              pour être dans la position neutre définie par l'URDF
 // Quand l'utilisateur voit la jam be dans la bonne position, le slider vaut urdf_angle.
 // L'Arduino calcule : offset = slider_value - 90
-// (90┬░ = valeur logique neutre envoy├®e par le Pi quand l'URDF dit 0)
+// (90° = valeur logique neutre envoyée par le Pi quand l'URDF dit 0)
 var EC_JOINT_ORDER = [
     { leg: "Avant Droite",   joint: "Hanche",   idx: 0,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "right", leg_id: "fr" },
     { leg: "Avant Droite",   joint: "Tibia",    idx: 1,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "right", leg_id: "fr" },
@@ -12,12 +12,12 @@ var EC_JOINT_ORDER = [
     { leg: "Avant Gauche",   joint: "Hanche",   idx: 3,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "fl" },
     { leg: "Avant Gauche",   joint: "Tibia",    idx: 4,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "left",  leg_id: "fl" },
     { leg: "Avant Gauche",   joint: "Genou",    idx: 5,  icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "left",  leg_id: "fl" },
-    { leg: "Arri├¿re Droite", joint: "Hanche",   idx: 6,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "right", leg_id: "rr" },
-    { leg: "Arri├¿re Droite", joint: "Tibia",    idx: 7,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "right", leg_id: "rr" },
-    { leg: "Arri├¿re Droite", joint: "Genou",    idx: 8,  icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "right", leg_id: "rr" },
-    { leg: "Arri├¿re Gauche", joint: "Hanche",   idx: 9,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "rl" },
-    { leg: "Arri├¿re Gauche", joint: "Tibia",    idx: 10, icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "left",  leg_id: "rl" },
-    { leg: "Arri├¿re Gauche", joint: "Genou",    idx: 11, icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Droite", joint: "Hanche",   idx: 6,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Droite", joint: "Tibia",    idx: 7,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Droite", joint: "Genou",    idx: 8,  icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Gauche", joint: "Hanche",   idx: 9,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Gauche", joint: "Tibia",    idx: 10, icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Gauche", joint: "Genou",    idx: 11, icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "left",  leg_id: "rl" },
 ];
 var ecCurrentStep = 1;
 var ecJointIndex = 0;
@@ -412,21 +412,21 @@ var ecLRStreamA = null;
             ecShowJoint(0);
         }
         
-        // Descriptions p├®dagogiques par type d'articulation
+        // Descriptions pédagogiques par type d'articulation
         var EC_JOINT_DESCRIPTIONS = {
             hip:   [
-                "1. <b>Abduction (Hanche)</b> : Contr├┤le l'├®cartement lat├®ral de la patte.",
-                "2. <b>Consigne</b> : Ajustez le curseur jusqu'├á ce que la hanche soit <b>parfaitement verticale</b> par rapport au sol (comme illustr├® par la pi├¿ce clignotante Indigo sur le mod├¿le 3D).",
+                "1. <b>Abduction (Hanche)</b> : Contrôle l'écartement latéral de la patte.",
+                "2. <b>Consigne</b> : Ajustez le curseur jusqu'à ce que la hanche soit <b>parfaitement verticale</b> par rapport au sol (comme illustré par la pièce clignotante Indigo sur le modèle 3D).",
                 "3. <b>Validation</b> : Une fois perpendiculaire au sol, cliquez sur Valider."
             ],
             upper: [
-                "1. <b>Cuisse (Thigh)</b> : Contr├┤le l'inclinaison avant/arri├¿re de la cuisse.",
-                "2. <b>Consigne</b> : Ajustez le curseur jusqu'├á ce que la cuisse soit <b>parfaitement perpendiculaire au corps</b> (faisant un angle droit de 90┬░ vers le bas, comme illustr├® par la pi├¿ce clignotante Indigo sur le mod├¿le 3D).",
+                "1. <b>Cuisse (Thigh)</b> : Contrôle l'inclinaison avant/arrière de la cuisse.",
+                "2. <b>Consigne</b> : Ajustez le curseur jusqu'à ce que la cuisse soit <b>parfaitement perpendiculaire au corps</b> (faisant un angle droit de 90° vers le bas, comme illustré par la pièce clignotante Indigo sur le modèle 3D).",
                 "3. <b>Validation</b> : Une fois la cuisse bien verticale, cliquez sur Valider."
             ],
             lower: [
-                "1. <b>Genou (Calf)</b> : Contr├┤le l'extension de la patte.",
-                "2. <b>Consigne</b> : Ajustez le curseur pour mettre le genou dans la <b>position la plus droite possible</b>, tibia et pied align├®s verticalement dans le prolongement de la cuisse (comme illustr├® par la pi├¿ce clignotante Indigo sur le mod├¿le 3D).",
+                "1. <b>Genou (Calf)</b> : Contrôle l'extension de la patte.",
+                "2. <b>Consigne</b> : Ajustez le curseur pour mettre le genou dans la <b>position la plus droite possible</b>, tibia et pied alignés verticalement dans le prolongement de la cuisse (comme illustré par la pièce clignotante Indigo sur le modèle 3D).",
                 "3. <b>Validation</b> : Une fois la jambe bien tendue et droite, cliquez sur Valider."
             ]
         };
@@ -441,27 +441,27 @@ var ecLRStreamA = null;
             document.getElementById('ec-joint-progress').textContent   = 'Articulation ' + (index + 1) + '/12';
             document.getElementById('ec-joint-icon').textContent       = joint.icon;
 
-            // --- Image de r├®f├®rence URDF (dessin├®e en canvas) ---
+            // --- Image de référence URDF (dessinée en canvas) ---
             ecDrawReferenceCanvas(joint);
 
-            // --- D├®clencher le surbrillance 3D sur le viewer ---
+            // --- Déclencher le surbrillance 3D sur le viewer ---
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(joint.leg_id, joint.type);
             }
 
-            // --- Description p├®dagogique ---
+            // --- Description pédagogique ---
             var descLines = EC_JOINT_DESCRIPTIONS[joint.type] || [];
             var descEl = document.getElementById('ec-joint-description');
             if (descEl) descEl.innerHTML = descLines.map(function(l) { return '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">' + l + '</p>'; }).join('');
 
-            // --- C├┤t├® du servo ---
+            // --- Côté du servo ---
             var sideEl = document.getElementById('ec-joint-side-label');
-            if (sideEl) sideEl.textContent = joint.side === 'left' ? '­ƒøà Gauche ÔÇö peut n├®cessiter inversion' : '­ƒøà Droit';
+            if (sideEl) sideEl.textContent = joint.side === 'left' ? '­ƒøà Gauche ÔÇö peut nécessiter inversion' : '­ƒøà Droit';
 
-            // --- Slider positionn├® ├á l'offset temporaire ou ├á 0 (neutre) ---
+            // --- Slider positionné à l'offset temporaire ou à 0 (neutre) ---
             var slider = document.getElementById('ec-joint-slider');
             var savedOffset = ecTempOffsets[joint.idx] || 0;
-            slider.value = savedOffset;  // 0 = neutre, offset = d├®calage
+            slider.value = savedOffset;  // 0 = neutre, offset = décalage
             document.getElementById('ec-joint-slider-value').textContent = slider.value;
             document.getElementById('ec-joint-slider-value').style.color = 'var(--accent)';
             var limitWarnInit = document.getElementById('ec-joint-limit-warning');
@@ -489,7 +489,7 @@ var ecLRStreamA = null;
             document.getElementById('ec-btn-next').onclick = ecNextStep;
         }
 
-        // Dessin canvas de r├®f├®rence URDF par type d'articulation
+        // Dessin canvas de référence URDF par type d'articulation
         function ecDrawReferenceCanvas(joint) {
             var canvas = document.getElementById('ec-ref-canvas');
             if (!canvas) return;
@@ -535,32 +535,32 @@ var ecLRStreamA = null;
                 ctx.moveTo(cx + dir * 30, cy);
                 ctx.lineTo(cx + dir * (30 + legL), cy);
                 ctx.stroke();
-                // Extremit├®
+                // Extremité
                 ctx.fillStyle = COL_NEUTRAL;
                 ctx.beginPath(); ctx.arc(cx + dir * (30 + legL), cy, 5, 0, Math.PI * 2); ctx.fill();
                 // Label
                 ctx.fillStyle = COL_ANGLE;
                 ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('90┬░ (neutre)', cx + dir * (30 + legL/2), cy - 14);
+                ctx.fillText('90° (neutre)', cx + dir * (30 + legL/2), cy - 14);
                 // Vue de dessus label
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
                 ctx.font = '10px monospace';
                 ctx.fillText('Vue de dessus', cx, h - 10);
 
             } else if (joint.type === 'upper') {
-                // Tibia (cuisse) : vue de c├┤t├®, cuisse horizontale
+                // Tibia (cuisse) : vue de côté, cuisse horizontale
                 var femurL = 60;
                 ctx.strokeStyle = COL_NEUTRAL;
                 ctx.lineWidth = 8;
                 ctx.lineCap = 'round';
-                // Corps attach├®
+                // Corps attaché
                 ctx.fillStyle = COL_BODY;
                 ctx.fillRect(cx - 20, cy - 20, 40, 40);
                 // Point articulation
                 ctx.fillStyle = COL_ACTIVE;
                 ctx.beginPath(); ctx.arc(cx, cy, 9, 0, Math.PI * 2); ctx.fill();
-                // Cuisse horizontale (neutre = 90┬░ par rapport au corps vertical)
+                // Cuisse horizontale (neutre = 90° par rapport au corps vertical)
                 ctx.strokeStyle = COL_NEUTRAL;
                 ctx.lineWidth = 6;
                 ctx.beginPath();
@@ -585,10 +585,10 @@ var ecLRStreamA = null;
                 ctx.fillStyle = COL_ANGLE;
                 ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('90┬░', cx + 28, cy - 8);
+                ctx.fillText('90°', cx + 28, cy - 8);
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
                 ctx.font = '10px monospace';
-                ctx.fillText('Vue de c├┤t├®', cx, h - 10);
+                ctx.fillText('Vue de côté', cx, h - 10);
 
             } else if (joint.type === 'lower') {
                 // Genou : bas de patte vertical
@@ -625,10 +625,10 @@ var ecLRStreamA = null;
                 ctx.fillStyle = COL_ANGLE;
                 ctx.font = 'bold 12px monospace';
                 ctx.textAlign = 'center';
-                ctx.fillText('90┬░', cx + 28, cy + 16);
+                ctx.fillText('90°', cx + 28, cy + 16);
                 ctx.fillStyle = 'rgba(255,255,255,0.3)';
                 ctx.font = '10px monospace';
-                ctx.fillText('Vue de c├┤t├®', cx, h - 10);
+                ctx.fillText('Vue de côté', cx, h - 10);
             }
 
             // Label position cible
@@ -647,13 +647,13 @@ var ecLRStreamA = null;
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: curVal }));
                 ecJointServoAttached = true;
                 document.getElementById('ec-btn-attach-servo').disabled = false;
-                document.getElementById('ec-btn-attach-servo').textContent = '­ƒöî ├ëteindre le servo';
+                document.getElementById('ec-btn-attach-servo').textContent = '­ƒöî Éteindre le servo';
                 document.getElementById('ec-btn-attach-servo').onclick = ecDetachCurrentJoint;
                 document.getElementById('ec-btn-validate-joint').disabled = false;
                 document.getElementById('ec-btn-validate-joint').style.opacity = '1';
-                if (typeof showToast === 'function') showToast('Servo', joint.joint + ' allum├® ÔÇö utilisez le curseur', 'info');
+                if (typeof showToast === 'function') showToast('Servo', joint.joint + ' allumé ÔÇö utilisez le curseur', 'info');
             } else {
-                if (typeof showToast === 'function') showToast('Erreur', 'WebSocket non connect├®', 'error');
+                if (typeof showToast === 'function') showToast('Erreur', 'WebSocket non connecté', 'error');
             }
         }
         
@@ -667,7 +667,7 @@ var ecLRStreamA = null;
             document.getElementById('ec-btn-attach-servo').onclick = ecAttachCurrentJoint;
             document.getElementById('ec-btn-validate-joint').disabled = true;
             document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
-            if (typeof showToast === 'function') showToast('Servo', joint.joint + ' ├®teint', 'info');
+            if (typeof showToast === 'function') showToast('Servo', joint.joint + ' éteint', 'info');
         }
 
         // Bascule le flag miroir du servo courant
@@ -681,32 +681,32 @@ var ecLRStreamA = null;
                 invertBtn.style.background = isInverted ? 'rgba(239,68,68,0.2)' : 'rgba(100,100,100,0.15)';
                 invertBtn.style.color = isInverted ? 'var(--danger)' : 'var(--text-secondary)';
             }
-            // Si servo allum├®, tester le miroir imm├®diatement
+            // Si servo allumé, tester le miroir immédiatement
             if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
                 var raw = parseInt(document.getElementById('ec-joint-slider').value) || 90;
                 var angle = isInverted ? (180 - raw) : raw;
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle }));
             }
             if (typeof showToast === 'function') {
-                showToast('Miroir', isInverted ? 'Sens invers├® activ├®' : 'Sens normal', 'info');
+                showToast('Miroir', isInverted ? 'Sens inversé activé' : 'Sens normal', 'info');
             }
         }
         
         var ecSliderThrottle = null;
         function ecUpdateJointSlider(value) {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var intVal = parseInt(value) || 0; // valeur de -90 ├á 90 (offset)
+            var intVal = parseInt(value) || 0; // valeur de -90 à 90 (offset)
             var valueEl = document.getElementById('ec-joint-slider-value');
             var limitWarn = document.getElementById('ec-joint-limit-warning');
             if (valueEl) valueEl.textContent = intVal;
             
-            // L'offset stock├® = la valeur du slider directement
+            // L'offset stocké = la valeur du slider directement
             ecTempOffsets[joint.idx] = intVal;
 
-            // Calculer l'angle absolu th├®orique ├á envoyer au moteur physique (90 = neutre)
+            // Calculer l'angle absolu théorique à envoyer au moteur physique (90 = neutre)
             var absoluteAngle = 90 + intVal;
 
-            // Indicateur couleur si aux limites de l'angle absolu (0┬░ ou 180┬░)
+            // Indicateur couleur si aux limites de l'angle absolu (0° ou 180°)
             if (absoluteAngle <= 5 || absoluteAngle >= 175) {
                 if (valueEl) valueEl.style.color = '#f59e0b';
                 if (limitWarn) limitWarn.style.display = 'inline-block';
@@ -715,7 +715,7 @@ var ecLRStreamA = null;
                 if (limitWarn) limitWarn.style.display = 'none';
             }
             
-            // Throttle 50ms pour ne pas saturer le buffer s├®rie Arduino
+            // Throttle 50ms pour ne pas saturer le buffer série Arduino
             if (ecSliderThrottle) clearTimeout(ecSliderThrottle);
             ecSliderThrottle = setTimeout(function() {
                 if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
@@ -740,27 +740,27 @@ var ecLRStreamA = null;
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: offset }));
                 // 2. Enregistrer le flag miroir dans l'EEPROM Arduino
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: ecTempInverts[joint.idx] }));
-                // 3. D├®tacher le servo avant de passer au suivant
+                // 3. Détacher le servo avant de passer au suivant
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx }));
             }
             ecJointServoAttached = false;
 
             if (typeof showToast === 'function') {
-                showToast('Ô£ö Calibr├®', joint.leg + ' ' + joint.joint + ' ÔÇö offset=' + offset + '┬░' + (ecTempInverts[joint.idx] ? ', miroir=ON' : ''), 'success');
+                showToast('Ô£ö Calibré', joint.leg + ' ' + joint.joint + ' ÔÇö offset=' + offset + '°' + (ecTempInverts[joint.idx] ? ', miroir=ON' : ''), 'success');
             }
             
             if (ecJointIndex < 11) {
                 ecJointIndex++;
                 ecShowJoint(ecJointIndex);
             } else {
-                // Toutes les articulations calibr├®es
+                // Toutes les articulations calibrées
                 ecAllJointsValidated = true;
                 document.getElementById('ec-joint-calibration-view').style.display = 'none';
                 document.getElementById('ec-joint-final-view').style.display = 'flex';
                 document.getElementById('ec-btn-prev').disabled = false;
                 document.getElementById('ec-btn-next').disabled = false;
-                document.getElementById('ec-progress-text').textContent = 'Toutes les articulations calibr├®es';
-                // Appliquer stand pour v├®rifier la calibration
+                document.getElementById('ec-progress-text').textContent = 'Toutes les articulations calibrées';
+                // Appliquer stand pour vérifier la calibration
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'stand' }));
                 }
@@ -783,9 +783,9 @@ var ecLRStreamA = null;
                 }
             }
 
-            // Sauvegarder l'onglet actif actuel pour pouvoir le restaurer ├á la fermeture
+            // Sauvegarder l'onglet actif actuel pour pouvoir le restaurer à la fermeture
             window.ecPreviousTab = localStorage.getItem('bastetActiveTab') || 'dashboard';
-            // Forcer l'affichage de l'onglet t├®l├®commande o├╣ se trouve le mod├¿le 3D
+            // Forcer l'affichage de l'onglet télécommande où se trouve le modèle 3D
             if (typeof window.switchTab === 'function') {
                 window.switchTab('control');
             }
@@ -817,7 +817,7 @@ var ecLRStreamA = null;
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(null, null);
             }
-            // Restaurer l'onglet pr├®c├®dent
+            // Restaurer l'onglet précédent
             if (window.ecPreviousTab && typeof window.switchTab === 'function') {
                 window.switchTab(window.ecPreviousTab);
             }
@@ -861,7 +861,7 @@ var ecLRStreamA = null;
                 for (let i = 0; i < 12; i++) {
                     const el2 = document.getElementById(`ec-j${i}`);
                     if (el2) {
-                        el2.textContent = `${Math.round(j[i])}┬░`;
+                        el2.textContent = `${Math.round(j[i])}°`;
                     }
                 }
             }
@@ -1046,7 +1046,7 @@ var ecLRStreamA = null;
             
             // Dynamic total steps based on camera count
             const totalSteps = ecCameraCount === 0 ? 2 : (ecCameraCount === 1 ? 3 : 5);
-            document.getElementById('ec-progress-text').textContent = `├ëtape ${step} sur ${totalSteps}`;
+            document.getElementById('ec-progress-text').textContent = `Étape ${step} sur ${totalSteps}`;
             document.getElementById('ec-btn-prev').disabled = (step === 1);
             
             // Start LR previews when entering step 2 for 2 cameras
@@ -1098,7 +1098,7 @@ var ecLRStreamA = null;
                         btnRun.innerHTML = `­ƒôÀ Lancer la Calibration Cam${camId}`;
                         btnRun.onclick = () => ecRunCameraCalib(camId);
                     }
-                    if (statusText) statusText.innerHTML = `Le flux vid├®o de la cam├®ra s'affiche d├¿s le lancement.`;
+                    if (statusText) statusText.innerHTML = `Le flux vidéo de la caméra s'affiche dès le lancement.`;
                 }
             }
             
@@ -1136,7 +1136,7 @@ var ecLRStreamA = null;
                     ecJointServoAttached = false;
                 }
                 if (typeof showToast === 'function') {
-                    showToast("EasyConfig", "├ëtape offsets moteur ignor├®e. Les offsets existants sont conserv├®s.", "info");
+                    showToast("EasyConfig", "Étape offsets moteur ignorée. Les offsets existants sont conservés.", "info");
                 }
                 ecNextStep();
                 return;
@@ -1296,7 +1296,7 @@ var ecLRStreamA = null;
             
             statusText.innerHTML = `
                 <div style="width:20px; height:20px; border:2px solid var(--accent); border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 0.5rem;"></div>
-                <span>Initialisation flux WebRTC cam├®ra...</span>
+                <span>Initialisation flux WebRTC caméra...</span>
             `;
             
             let pc = null;
@@ -1312,7 +1312,7 @@ var ecLRStreamA = null;
                 statusText.innerHTML = `
                     <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">Ô£ù</span>
                     <span style="color:var(--danger); font-weight:bold;">Erreur WebRTC : Flux indisponible.</span><br/>
-                    <span style="font-size:0.75rem; color:var(--text-secondary);">V├®rifiez que MediaMTX est actif et que la cam├®ra est d├®marr├®e.</span>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que MediaMTX est actif et que la caméra est démarrée.</span>
                 `;
                 btnRun.disabled = false;
                 btnSkip.disabled = false;
@@ -1327,7 +1327,7 @@ var ecLRStreamA = null;
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
                 let trackTimeout = setTimeout(() => {
-                    showEcWebRTCError('Timeout ÔÇö aucun flux re├ºu apr├¿s 8s');
+                    showEcWebRTCError('Timeout ÔÇö aucun flux reçu après 8s');
                 }, 8000);
 
                 pc.oniceconnectionstatechange = () => {
@@ -1423,8 +1423,8 @@ var ecLRStreamA = null;
                         overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
                         statusText.innerHTML = `
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(72, 209, 204, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--success); margin: 0 auto 0.5rem;">Ô£ô</div>
-                            <span style="color:var(--success); font-weight:bold; font-size: 0.95rem;">Calibration r├®ussie !</span><br/>
-                            <span style="font-size:0.75rem; color:var(--text-secondary);">Mire d├®tect├®e et param├¿tres intrins├¿ques enregistr├®s.</span>
+                            <span style="color:var(--success); font-weight:bold; font-size: 0.95rem;">Calibration réussie !</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Mire détectée et paramètres intrinsèques enregistrés.</span>
                         `;
                         
                         if (camId === 1) ecCalibratedCam1 = true;
@@ -1476,8 +1476,8 @@ var ecLRStreamA = null;
                         overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
                         statusText.innerHTML = `
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); border: 2px solid var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--danger); margin: 0 auto 0.5rem;">Ô£ù</div>
-                            <span style="color:var(--danger); font-weight:bold; font-size: 0.95rem;">├ëchec de la calibration</span><br/>
-                            <span style="font-size:0.75rem; color:var(--text-secondary);">Aucune mire de calibration d├®tect├®e ou flux cam├®ra instable.</span>
+                            <span style="color:var(--danger); font-weight:bold; font-size: 0.95rem;">Échec de la calibration</span><br/>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">Aucune mire de calibration détectée ou flux caméra instable.</span>
                         `;
                         btnRun.disabled = false;
                         btnSkip.disabled = false;

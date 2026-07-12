@@ -266,9 +266,9 @@ window.appWs = null;
             
 
             appWs.onopen = () => {
-                console.log("Global WebSocket connect├®.");
+                console.log("Global WebSocket connecté.");
                 const consoleEl = document.getElementById('json-traffic-console');
-                if (consoleEl) consoleEl.textContent = '[WebSocket connect├® - En attente de trafic...]';
+                if (consoleEl) consoleEl.textContent = '[WebSocket connecté - En attente de trafic...]';
                 window.lastArduinoTelemetry = Date.now();
                 if (!window.arduinoOfflineChecker) {
                     window.arduinoOfflineChecker = setInterval(() => {
@@ -291,7 +291,7 @@ window.appWs = null;
             
 
             appWs.onclose = () => {
-                console.log("Global WebSocket d├®connect├®. Reconnexion...");
+                console.log("Global WebSocket déconnecté. Reconnexion...");
                 setTimeout(window.connectGlobalWebSocket || connectGlobalWebSocket, 3000);
             };
             
@@ -373,7 +373,7 @@ window.appWs = null;
                             const valEl = document.getElementById(`joint-val-${i}`);
                             const sliderEl = document.getElementById(`joint-slider-${i}`);
                             if (!window.manualJointControlActive) {
-                                if (valEl) valEl.textContent = `${Math.round(angle)}┬░`;
+                                if (valEl) valEl.textContent = `${Math.round(angle)}°`;
                                 if (sliderEl) sliderEl.value = Math.round(angle);
                             }
                         }
@@ -392,9 +392,9 @@ window.appWs = null;
                         const elRoll = document.getElementById('imu-val-roll');
                         const elPitch = document.getElementById('imu-val-pitch');
                         const elYaw = document.getElementById('imu-val-yaw');
-                        if (elRoll) elRoll.textContent = `${roll.toFixed(1)}┬░`;
-                        if (elPitch) elPitch.textContent = `${pitch.toFixed(1)}┬░`;
-                        if (elYaw) elYaw.textContent = `${yaw.toFixed(1)}┬░`;
+                        if (elRoll) elRoll.textContent = `${roll.toFixed(1)}°`;
+                        if (elPitch) elPitch.textContent = `${pitch.toFixed(1)}°`;
+                        if (elYaw) elYaw.textContent = `${yaw.toFixed(1)}°`;
                         
 
                         // Rotate 3D IMU CSS Cube
@@ -418,9 +418,9 @@ window.appWs = null;
                         // IMU Vue d ensemble : lit le cache window._bastetLastImu maj par le 1er if(payload.imu).
                         // Permet de garder les valeurs affichees meme quand payload.imu est null/absent.
                         const cachedImu = window._bastetLastImu || { roll: 0, pitch: 0, yaw: 0 };
-                        document.getElementById('arduino-roll').textContent = `${cachedImu.roll.toFixed(1)}┬░`;
-                        document.getElementById('arduino-pitch').textContent = `${cachedImu.pitch.toFixed(1)}┬░`;
-                        document.getElementById('arduino-yaw').textContent = `${cachedImu.yaw.toFixed(1)}┬░`;
+                        document.getElementById('arduino-roll').textContent = `${cachedImu.roll.toFixed(1)}°`;
+                        document.getElementById('arduino-pitch').textContent = `${cachedImu.pitch.toFixed(1)}°`;
+                        document.getElementById('arduino-yaw').textContent = `${cachedImu.yaw.toFixed(1)}°`;
                     }
                     if (payload.joints && payload.joints.length === 12) {
                         const jointsGrid = document.getElementById('arduino-joints-grid');
@@ -430,14 +430,14 @@ window.appWs = null;
                             for (let i = 0; i < 12; i++) {
                                 const el = document.createElement('div');
                                 el.style.cssText = 'font-size:0.7rem; text-align:center; padding:0.2rem; background:var(--bg-main); border-radius:4px;';
-                                el.innerHTML = `<div style="color:var(--text-secondary);">${names[i]}</div><div style="font-weight:700; color:var(--accent);" id="gw-joint-${i}">${Math.round(payload.joints[i])}┬░</div>`;
+                                el.innerHTML = `<div style="color:var(--text-secondary);">${names[i]}</div><div style="font-weight:700; color:var(--accent);" id="gw-joint-${i}">${Math.round(payload.joints[i])}°</div>`;
                                 jointsGrid.appendChild(el);
                             }
                             jointsGrid.dataset.init = '1';
                         } else if (jointsGrid) {
                             for (let i = 0; i < 12; i++) {
                                 const el = document.getElementById(`gw-joint-${i}`);
-                                if (el) el.textContent = `${Math.round(payload.joints[i])}┬░`;
+                                if (el) el.textContent = `${Math.round(payload.joints[i])}°`;
                             }
                         }
                     }
@@ -591,11 +591,11 @@ window.appWs = null;
                     const previewBtn = document.getElementById('calib-cam-preview-' + camId);
                     if (previewBtn) {
                         if (isActive) {
-                            previewBtn.textContent = 'Ôûá Arr├¬ter';
+                            previewBtn.textContent = 'Ôûá Arrêter';
                             previewBtn.style.background = 'rgba(239,68,68,0.1)';
                             previewBtn.style.borderColor = 'rgba(239,68,68,0.3)';
                         } else {
-                            previewBtn.textContent = 'ÔûÂ Aper├ºu';
+                            previewBtn.textContent = 'ÔûÂ Aperçu';
                             previewBtn.style.background = 'rgba(99,102,241,0.1)';
                             previewBtn.style.borderColor = 'rgba(99,102,241,0.3)';
                         }
@@ -639,10 +639,10 @@ window.appWs = null;
                         if (currentVal && resolutions.includes(currentVal)) {
                             selectEl.value = currentVal;
                         }
-                        statusEl.textContent = 'Cam├®ra ' + camId + ' : ' + resolutions.length + ' r├®solutions d├®tect├®es';
+                        statusEl.textContent = 'Caméra ' + camId + ' : ' + resolutions.length + ' résolutions détectées';
                         statusEl.style.color = 'var(--success)';
                     } else {
-                        statusEl.textContent = 'Aucune r├®solution d├®tect├®e pour cam├®ra ' + camId;
+                        statusEl.textContent = 'Aucune résolution détectée pour caméra ' + camId;
                         statusEl.style.color = 'var(--danger)';
                     }
                     // Restore detect button
@@ -658,9 +658,9 @@ window.appWs = null;
                     if (vSlamCheck && camId === 1) vSlamCheck.checked = false;
                     // Show alert
                     if (typeof showToast === 'function') {
-                        showToast('V-SLAM bloqu├®', 'Cam├®ra ' + camId + ': ' + reason, 'warning');
+                        showToast('V-SLAM bloqué', 'Caméra ' + camId + ': ' + reason, 'warning');
                     } else {
-                        alert('V-SLAM bloqu├®: ' + reason);
+                        alert('V-SLAM bloqué: ' + reason);
                     }
                     // Reset stream UI
                     const statusEl2 = document.getElementById('stream-status-' + camId);
@@ -680,10 +680,10 @@ window.appWs = null;
                 }
                 else if (payload.type === "wifi_forget_result") {
                     if (payload.status === "success") {
-                        alert("Succ├¿s : R├®seau oubli├®.");
+                        alert("Succès : Réseau oublié.");
                         scanWifiNetworks();
                     } else {
-                        alert("Erreur lors de l'oubli du r├®seau : " + payload.message);
+                        alert("Erreur lors de l'oubli du réseau : " + payload.message);
                     }
                 } 
                 else if (payload.type === "chat_response" || payload.type === "chat") {
@@ -717,7 +717,7 @@ window.appWs = null;
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "chat", text: text }));
             } else {
-                appendLLMMessage('Syst├¿me', 'Erreur : WebSocket d├®connect├®.');
+                appendLLMMessage('Système', 'Erreur : WebSocket déconnecté.');
             }
             
 
@@ -730,7 +730,7 @@ window.appWs = null;
             if (!box) return;
             
 
-            if (box.textContent.includes("Aucun message ├®chang├®")) {
+            if (box.textContent.includes("Aucun message échangé")) {
                 box.innerHTML = '';
             }
             
@@ -748,7 +748,7 @@ window.appWs = null;
                 msgEl.style.backgroundColor = 'rgba(255, 111, 97, 0.2)';
                 msgEl.style.border = '1px solid var(--accent)';
                 msgEl.innerHTML = `<span style="font-weight:bold;color: var(--accent);display:block;font-size:0.75rem;">Moi</span>${text}`;
-            } else if (sender === 'Syst├¿me') {
+            } else if (sender === 'Système') {
                 msgEl.style.alignSelf = 'center';
                 msgEl.style.backgroundColor = 'rgba(225, 29, 72, 0.1)';
                 msgEl.style.border = '1px solid var(--danger)';
@@ -766,7 +766,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ T├ëL├ëCOMMANDE CHAT VOCAL & PILOTAGE IA ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ÔöÇÔöÇÔöÇ TÉLÉCOMMANDE CHAT VOCAL & PILOTAGE IA ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
         function sendControlChatMessage(e) {
             if (e) e.preventDefault();
             const input = document.getElementById('control-chat-input');
@@ -780,7 +780,7 @@ window.appWs = null;
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "chat", text: text }));
             } else {
-                appendControlChatMessage('Syst├¿me', 'Erreur : WebSocket d├®connect├®.');
+                appendControlChatMessage('Système', 'Erreur : WebSocket déconnecté.');
             }
             input.value = '';
         }
@@ -791,7 +791,7 @@ window.appWs = null;
             if (!box) return;
             
 
-            if (box.textContent.includes("Parlez ├á Bastet")) {
+            if (box.textContent.includes("Parlez à Bastet")) {
                 box.innerHTML = '';
             }
             
@@ -810,7 +810,7 @@ window.appWs = null;
                 msgEl.style.backgroundColor = 'rgba(255, 111, 97, 0.2)';
                 msgEl.style.border = '1px solid var(--accent)';
                 msgEl.innerHTML = `<span style="font-weight:bold;color: var(--accent);display:block;font-size:0.7rem;margin-bottom:0.15rem;">Moi</span>${text}`;
-            } else if (sender === 'Syst├¿me') {
+            } else if (sender === 'Système') {
                 msgEl.style.alignSelf = 'center';
                 msgEl.style.backgroundColor = 'rgba(225, 29, 72, 0.1)';
                 msgEl.style.border = '1px solid var(--danger)';
@@ -845,7 +845,7 @@ window.appWs = null;
 
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                appendControlChatMessage('Syst├¿me', "La reconnaissance vocale n'est pas support├®e par votre navigateur.");
+                appendControlChatMessage('Système', "La reconnaissance vocale n'est pas supportée par votre navigateur.");
                 return;
             }
             
@@ -878,7 +878,7 @@ window.appWs = null;
 
             voiceRecognition.onerror = (event) => {
                 console.error("Reconnaissance vocale erreur:", event.error);
-                appendControlChatMessage('Syst├¿me', "Erreur de reconnaissance vocale : " + event.error);
+                appendControlChatMessage('Système', "Erreur de reconnaissance vocale : " + event.error);
             };
             
 
@@ -925,7 +925,7 @@ window.appWs = null;
             cleanText = cleanText.replace(navRegex, '');
             
 
-            // Afficher dans le chat de la t├®l├®commande
+            // Afficher dans le chat de la télécommande
             appendControlChatMessage(sender, cleanText.trim());
         }
 
@@ -987,7 +987,7 @@ window.appWs = null;
 
         function clearJSONConsole() {
             const consoleEl = document.getElementById('json-traffic-console');
-            if (consoleEl) consoleEl.textContent = '[Console effac├®e]';
+            if (consoleEl) consoleEl.textContent = '[Console effacée]';
         }
 
 
@@ -1045,7 +1045,7 @@ window.appWs = null;
                         llmBadge.textContent = 'Robot Local';
                         llmBadge.style.backgroundColor = 'var(--accent)';
                     } else {
-                        llmBadge.textContent = 'D├®sactiv├®';
+                        llmBadge.textContent = 'Désactivé';
                         llmBadge.style.backgroundColor = 'var(--danger)';
                     }
                 }
@@ -1081,8 +1081,8 @@ window.appWs = null;
                     
 
                     const statusText = allZero 
-                        ? '­ƒÜ½ Offsets non configur├®s (Moteurs d├®sactiv├®s)' 
-                        : 'Ô£à Offsets configur├®s (Moteurs actifs)';
+                        ? '­ƒÜ½ Offsets non configurés (Moteurs désactivés)' 
+                        : 'Ô£à Offsets configurés (Moteurs actifs)';
                     const statusColor = allZero ? 'var(--danger)' : 'var(--success)';
                     
 
@@ -1764,7 +1764,7 @@ window.appWs = null;
             // Reset current labels
             for (let camId of [1, 2]) {
                 const label = document.getElementById('assign-current-' + camId);
-                if (label) { label.textContent = 'Non assign├®e'; label.style.color = 'var(--text-secondary)'; label.style.background = 'rgba(255,255,255,0.05)'; }
+                if (label) { label.textContent = 'Non assignée'; label.style.color = 'var(--text-secondary)'; label.style.background = 'rgba(255,255,255,0.05)'; }
                 // Reset button styles
                 for (let side of ['left', 'right']) {
                     const btn = document.getElementById('assign-btn-' + side + '-' + camId);
@@ -1855,7 +1855,7 @@ window.appWs = null;
 
             pc.oniceconnectionstatechange = () => {
                 if ((pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'closed') && !connected) {
-                    statusEl.innerHTML = 'Connexion WebRTC ├®chou├®e.<br>ICE : ' + pc.iceConnectionState;
+                    statusEl.innerHTML = 'Connexion WebRTC échouée.<br>ICE : ' + pc.iceConnectionState;
                     statusEl.style.display = 'flex';
                     videoEl.style.display = 'none';
                 }
@@ -1924,7 +1924,7 @@ window.appWs = null;
             // Prevent double-assignment
             if (assignAssigned[side] !== null) {
                 if (typeof showToast === 'function') {
-                    showToast("Attention", "La position " + (side === 'left' ? 'Gauche' : 'Droite') + " est d├®j├á assign├®e", "warning");
+                    showToast("Attention", "La position " + (side === 'left' ? 'Gauche' : 'Droite') + " est déjà assignée", "warning");
                 }
                 return;
             }
@@ -1967,11 +1967,11 @@ window.appWs = null;
                 const resultEl = document.getElementById('assign-result');
                 const resultText = document.getElementById('assign-result-text');
                 if (resultEl && resultText) {
-                    resultText.textContent = "Cam├®ra Gauche = " + leftDev + " (Cam" + leftCam + "), Cam├®ra Droite = " + rightDev + " (Cam" + rightCam + ")";
+                    resultText.textContent = "Caméra Gauche = " + leftDev + " (Cam" + leftCam + "), Caméra Droite = " + rightDev + " (Cam" + rightCam + ")";
                     resultEl.style.display = 'block';
                 }
                 if (typeof showToast === 'function') {
-                    showToast("Cam├®ras", "Gauche: " + leftDev + ", Droite: " + rightDev, "success");
+                    showToast("Caméras", "Gauche: " + leftDev + ", Droite: " + rightDev, "success");
                 }
             }
 
@@ -1998,7 +1998,7 @@ window.appWs = null;
                     label.style.color = '#ef4444';
                     label.style.background = 'rgba(239,68,68,0.15)';
                 } else {
-                    label.textContent = 'Non assign├®e';
+                    label.textContent = 'Non assignée';
                     label.style.color = 'var(--text-secondary)';
                     label.style.background = 'rgba(255,255,255,0.05)';
                 }
@@ -2031,7 +2031,7 @@ window.appWs = null;
             const checkbox = document.getElementById(`calib-cam-enable-${camId}`);
             const statusEl = document.getElementById(`calib-cam-status-${camId}`);
             if (checkbox && statusEl) {
-                statusEl.textContent = checkbox.checked ? 'Activ├®e' : 'D├®sactiv├®e';
+                statusEl.textContent = checkbox.checked ? 'Activée' : 'Désactivée';
                 statusEl.style.color = checkbox.checked ? 'var(--success)' : 'var(--text-secondary)';
             }
             
@@ -2046,8 +2046,8 @@ window.appWs = null;
         const TESTER_JOINT_NAMES = [
             'Avant-Droit Abduction', 'Avant-Droit Hanche', 'Avant-Droit Genou',
             'Avant-Gauche Abduction', 'Avant-Gauche Hanche', 'Avant-Gauche Genou',
-            'Arri├¿re-Droit Abduction', 'Arri├¿re-Droit Hanche', 'Arri├¿re-Droit Genou',
-            'Arri├¿re-Gauche Abduction', 'Arri├¿re-Gauche Hanche', 'Arri├¿re-Gauche Genou'
+            'Arrière-Droit Abduction', 'Arrière-Droit Hanche', 'Arrière-Droit Genou',
+            'Arrière-Gauche Abduction', 'Arrière-Gauche Hanche', 'Arrière-Gauche Genou'
         ];
 
 
@@ -2096,12 +2096,12 @@ window.appWs = null;
                         <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">${i + 1}. ${name}</span>
                         <div style="display: flex; gap: 0.5rem;">
                             <button class="btn btn-secondary" id="tester-btn-attach-${i}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;" onclick="testerAttach(${i})">Activer</button>
-                            <button class="btn btn-secondary" id="tester-btn-detach-${i}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="testerDetach(${i})">├ëteindre</button>
+                            <button class="btn btn-secondary" id="tester-btn-detach-${i}" style="font-size: 0.7rem; padding: 0.25rem 0.5rem; display: none;" onclick="testerDetach(${i})">Éteindre</button>
                         </div>
                     </div>
                     <div id="tester-slider-container-${i}" style="display: none; align-items: center; gap: 0.75rem; margin-top: 0.25rem;">
                         <input type="range" min="0" max="180" value="90" id="tester-slider-${i}" style="flex: 1; height: 4px; accent-color: var(--accent);" oninput="testerWrite(${i}, this.value)">
-                        <span id="tester-val-${i}" style="font-size: 0.8rem; font-family: monospace; min-width: 30px; text-align: right; color: var(--accent);">90┬░</span>
+                        <span id="tester-val-${i}" style="font-size: 0.8rem; font-family: monospace; min-width: 30px; text-align: right; color: var(--accent);">90°</span>
                     </div>
                 `;
                 container.appendChild(card);
@@ -2141,7 +2141,7 @@ window.appWs = null;
 
 
         function testerWrite(idx, angle) {
-            document.getElementById(`tester-val-${idx}`).textContent = angle + '┬░';
+            document.getElementById(`tester-val-${idx}`).textContent = angle + '°';
             
 
             const now = Date.now();
@@ -2202,7 +2202,7 @@ window.appWs = null;
             listContainer.innerHTML = `
                 <div style="text-align: center; color: var(--text-secondary); padding: 2.5rem 0; font-size: 0.85rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem;">
                     <div style="width: 24px; height: 24px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                    <span>Recherche des r├®seaux ├á proximit├® (nmcli)...</span>
+                    <span>Recherche des réseaux à proximité (nmcli)...</span>
                 </div>`;
                 
 
@@ -2220,7 +2220,7 @@ window.appWs = null;
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "scan_wifi" }));
             } else {
-                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem;">Erreur : WebSocket d├®connect├®.</div>`;
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem;">Erreur : WebSocket déconnecté.</div>`;
                 knownContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 1rem 0; font-size: 0.85rem;">Erreur.</div>`;
                 if (btn) btn.disabled = false;
             }
@@ -2242,14 +2242,14 @@ window.appWs = null;
             const btn = document.getElementById('btn-wifi-scan');
             if (btn) btn.disabled = false;
             if (listContainer) {
-                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem; line-height: 1.5;">ÔÜá´©Å Scan WiFi ├®chou├®<br><small style="color: var(--text-secondary);">${errMsg}<br>Interface : ${iface} ┬À Gestionnaire : ${mgr}</small></div>`;
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem; line-height: 1.5;">ÔÜá´©Å Scan WiFi échoué<br><small style="color: var(--text-secondary);">${errMsg}<br>Interface : ${iface} ┬À Gestionnaire : ${mgr}</small></div>`;
             }
             if (knownContainer) {
                 knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.85rem;">Surveillance WiFi indisponible.</div>`;
             }
             window.wifiPasswords = payload.known_passwords || {};
             window.wifiCurrentSsid = cur;
-            // R├®-afficher les r├®seaux connus (si fournis) m├¬me en cas d'├®chec du scan
+            // Ré-afficher les réseaux connus (si fournis) même en cas d'échec du scan
             try { displayWifiNetworks([], known, payload.known_passwords || {}, cur); } catch(e) { /* noop */ }
         }
 
@@ -2283,7 +2283,7 @@ window.appWs = null;
 
             // Display known networks
             if (knownSsids.length === 0 && !window.wifiCurrentSsid) {
-                knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">Aucun r├®seau enregistr├® configur├® sur le robot.</div>`;
+                knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.8rem;">Aucun réseau enregistré configuré sur le robot.</div>`;
             } else {
                 // Ensure current connected SSID is in the list of known SSIDs (if it isn't already)
                 let allKnown = [...knownSsids];
@@ -2319,22 +2319,22 @@ window.appWs = null;
                     }
                     
 
-                    const signalText = inRange ? `${scannedNet.signal}%` : (isConnected ? 'Connect├®' : 'Hors de port├®e');
+                    const signalText = inRange ? `${scannedNet.signal}%` : (isConnected ? 'Connecté' : 'Hors de portée');
                     const signalColor = isConnected ? 'var(--success)' : (inRange ? 'var(--success)' : 'var(--text-secondary)');
                     
 
                     let badge = '';
                     if (isConnected) {
-                        badge = `<span style="font-size:0.65rem; background:rgba(76,175,80,0.2); color: #4CAF50; padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Ô£ô Connect├®</span>`;
+                        badge = `<span style="font-size:0.65rem; background:rgba(76,175,80,0.2); color: #4CAF50; padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Ô£ô Connecté</span>`;
                     } else {
-                        badge = `<span style="font-size:0.65rem; background:rgba(255,111,97,0.15); color: var(--accent); padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:600;">Enregistr├®</span>`;
+                        badge = `<span style="font-size:0.65rem; background:rgba(255,111,97,0.15); color: var(--accent); padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:600;">Enregistré</span>`;
                     }
                     
 
                     item.innerHTML = `
                         <div style="flex: 1;">
                             <span style="font-weight: 600; font-size: 0.9rem; display: block; color: ${isConnected ? '#4CAF50' : 'var(--accent)'};">${ssid} ${badge}</span>
-                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' ÔÇó ' + scannedNet.security) : 'Profil de connexion sauvegard├®'}</span>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' ÔÇó ' + scannedNet.security) : 'Profil de connexion sauvegardé'}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:0.5rem;">
                             <span style="font-size: 0.85rem; font-weight: bold; color: ${signalColor};">${signalText}</span>
@@ -2355,7 +2355,7 @@ window.appWs = null;
             
 
             if (otherNetworks.length === 0) {
-                listContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.8rem;">Aucun autre r├®seau WiFi ├á proximit├®.</div>`;
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1.5rem 0; font-size: 0.8rem;">Aucun autre réseau WiFi à proximité.</div>`;
             } else {
                 otherNetworks.forEach(net => {
                     const item = document.createElement('div');
@@ -2402,7 +2402,7 @@ window.appWs = null;
                 pwdInput.type = 'text'; // Show saved password clearly
                 if (isSecure) {
                     pwdGroup.style.display = 'block';
-                    pwdInput.placeholder = 'Mot de passe enregistr├®';
+                    pwdInput.placeholder = 'Mot de passe enregistré';
                 } else {
                     pwdGroup.style.display = 'none';
                     pwdInput.placeholder = '';
@@ -2450,7 +2450,7 @@ window.appWs = null;
                     password: password
                 }));
             } else {
-                alert("WebSocket d├®connect├®.");
+                alert("WebSocket déconnecté.");
                 if (submitBtn) {
                     submitBtn.disabled = false;
                     submitBtn.textContent = 'Se connecter au WiFi';
@@ -2468,7 +2468,7 @@ window.appWs = null;
             
 
             if (res.status === 'success') {
-                alert("Succ├¿s : " + res.message);
+                alert("Succès : " + res.message);
                 closeWifiModal();
             } else {
                 alert("Erreur de connexion : " + res.message);
@@ -2477,11 +2477,11 @@ window.appWs = null;
 
 
         function forgetWifiNetwork(ssid) {
-            if (confirm(`├ètes-vous s├╗r de vouloir oublier le r├®seau WiFi "${ssid}" sur le robot ?`)) {
+            if (confirm(`Êtes-vous sûr de vouloir oublier le réseau WiFi "${ssid}" sur le robot ?`)) {
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     appWs.send(JSON.stringify({ type: "forget_wifi", ssid: ssid }));
                 } else {
-                    alert("WebSocket d├®connect├®.");
+                    alert("WebSocket déconnecté.");
                 }
             }
         }
@@ -2667,445 +2667,6 @@ window.appWs = null;
 
         
 
-        // ÔöÇÔöÇÔöÇ SLAM Mode Detection & UI ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-        
-
-        // ÔöÇÔöÇÔöÇ Left/Right Camera Attribution ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-        let ecLRPeerA = null;
-        let ecLRPeerB = null;
-        let ecLRAssigned = { left: null, right: null };
-        let ecLRStreamA = null;
-        let ecLRStreamB = null;
-        
-
-        async function ecStartLRPreviews() {
-            // Show both camera feeds via WebRTC for user to identify left/right
-            ecLRAssigned = { left: null, right: null };
-            document.getElementById('ec-lr-assignment-result').style.display = 'none';
-            
-
-            // Get camera A (camera 1)
-            await ecStartSinglePreview('a', 1);
-            // Get camera B (camera 2)
-            await ecStartSinglePreview('b', 2);
-        }
-        
-
-        function ecStartSinglePreview(slot, camId) {
-            const videoEl = document.getElementById(`ec-lr-video-${slot}`);
-            const statusEl = document.getElementById(`ec-lr-status-${slot}`);
-            if (!videoEl || !statusEl) return;
-            
-
-            statusEl.style.display = 'flex';
-            statusEl.textContent = 'Connexion au flux HLS...';
-            
-
-            // Use HLS stream via MediaMTX (already working and reliable)
-            const hlsUrl = `${window.location.protocol}//${window.location.hostname}:48888/robot/cam${camId}/index.m3u8`;
-            
-
-            // Check if HLS.js is available, otherwise try native HLS (Safari) or show error
-            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-                const hls = new Hls({ 
-                    maxBufferLength: 5,
-                    maxMaxBufferLength: 10,
-                    liveDurationInfinity: true,
-                    lowLatencyMode: false
-                });
-                hls.loadSource(hlsUrl);
-                hls.attachMedia(videoEl);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                    videoEl.play().catch(() => {});
-                    videoEl.style.display = 'block';
-                    statusEl.style.display = 'none';
-                });
-                hls.on(Hls.Events.ERROR, (event, data) => {
-                    if (data.fatal) {
-                        statusEl.innerHTML = 'Flux HLS indisponible.<br>La camera est peut-etre deconnectee.';
-                    }
-                });
-                // Store for cleanup
-                videoEl._hls = hls;
-            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                // Native HLS (Safari)
-                videoEl.src = hlsUrl;
-                videoEl.play().catch(() => {});
-                videoEl.style.display = 'block';
-                statusEl.style.display = 'none';
-            } else {
-                statusEl.innerHTML = 'Navigateur non compatible HLS.<br>Observez les flux dans le dashboard pour identifier les cameras.';
-            }
-        }
-        
-
-        function ecStopLRPreviews() {
-            if (ecLRPeerA) { try { ecLRPeerA.close(); } catch(e) {} ecLRPeerA = null; }
-            if (ecLRPeerB) { try { ecLRPeerB.close(); } catch(e) {} ecLRPeerB = null; }
-            const va = document.getElementById('ec-lr-video-a');
-            const vb = document.getElementById('ec-lr-video-b');
-            if (va) { 
-                if (va._hls) { try { va._hls.destroy(); } catch(e) {} va._hls = null; }
-                va.srcObject = null; va.src = ''; va.style.display = 'none'; 
-            }
-            if (vb) { 
-                if (vb._hls) { try { vb._hls.destroy(); } catch(e) {} vb._hls = null; }
-                vb.srcObject = null; vb.src = ''; vb.style.display = 'none'; 
-            }
-            document.getElementById('ec-lr-status-a').style.display = 'flex';
-            document.getElementById('ec-lr-status-a').textContent = 'Chargement...';
-            document.getElementById('ec-lr-status-b').style.display = 'flex';
-            document.getElementById('ec-lr-status-b').textContent = 'Chargement...';
-            // Reset assignment state
-            ecLRAssigned = { left: null, right: null };
-            // Re-enable buttons
-            document.querySelectorAll('#ec-step-lr .ec-lr-assign-btn').forEach(btn => {
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            });
-        }
-        
-
-        function ecAssignLR(which, slot) {
-            // Guard against double-assignment
-            if (ecLRAssigned[which] !== null) {
-                if (typeof showToast === 'function') {
-                    showToast("Attention", `La camera ${which.toUpperCase()} est deja assignee`, "warning");
-                }
-                return;
-            }
-            // User clicked "left" or "right" for camera A or B
-            const camId = slot === 'a' ? 1 : 2;
-            ecLRAssigned[which] = camId;
-            
-
-            // Determine the other camera
-            const otherCam = camId === 1 ? 2 : 1;
-            const otherWhich = which === 'left' ? 'right' : 'left';
-            ecLRAssigned[otherWhich] = otherCam;
-            
-
-            // Disable all assignment buttons after assignment
-            document.querySelectorAll('#ec-step-lr .ec-lr-assign-btn').forEach(btn => {
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-            });
-            
-
-            // Show result
-            const resultEl = document.getElementById('ec-lr-assignment-result');
-            const resultText = document.getElementById('ec-lr-result-text');
-            if (resultEl && resultText) {
-                resultEl.style.display = 'block';
-                resultText.textContent = `Camera GAUCHE = video${ecLRAssigned.left}, Camera DROITE = video${ecLRAssigned.right}`;
-            }
-            
-
-            // Save to robot
-            const leftDev = `/dev/video${ecLRAssigned.left}`;
-            const rightDev = `/dev/video${ecLRAssigned.right}`;
-            
-
-            if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({
-                    type: "save_camera_mapping",
-                    left: leftDev,
-                    right: rightDev
-                }));
-            }
-            
-
-            if (typeof showToast === 'function') {
-                showToast("Cameras", `Gauche: ${leftDev}, Droite: ${rightDev}`, "success");
-            }
-            
-
-            // Enable next button
-            document.getElementById('ec-btn-next').disabled = false;
-            document.getElementById('ec-btn-next').textContent = 'Suivant \u2192';
-        }
-        
-
-        function ecSkipLR() {
-            ecStopLRPreviews();
-            // Use default mapping: video0=left, video2=right
-            if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({
-                    type: "save_camera_mapping",
-                    left: "/dev/video0",
-                    right: "/dev/video2"
-                }));
-            }
-            if (typeof showToast === 'function') {
-                showToast("Cameras", "Mapping par defaut: video0=gauche, video2=droite", "info");
-            }
-            document.getElementById('ec-btn-next').disabled = false;
-        }
-        
-
-        // Auto-start previews when entering the LR step (called from ecShowStep)
-
-
-
-
-        // --- Stereo Calibration ---
-        function ecStartStereoPreviews() {
-            ecStartStereoSinglePreview('left', 1);
-            ecStartStereoSinglePreview('right', 2);
-        }
-        
-
-        function ecStartStereoSinglePreview(side, camId) {
-            const videoEl = document.getElementById('ec-stereo-video-' + side);
-            const statusEl = document.getElementById('ec-stereo-status-' + side);
-            if (!videoEl || !statusEl) return;
-            
-
-            statusEl.style.display = 'flex';
-            statusEl.textContent = 'Connexion au flux HLS...';
-            
-
-            const hlsUrl = window.location.protocol + '//' + window.location.hostname + ':48888/robot/cam' + camId + '/index.m3u8';
-            
-
-            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-                const hls = new Hls({ 
-                    maxBufferLength: 5,
-                    maxMaxBufferLength: 10,
-                    liveDurationInfinity: true,
-                    lowLatencyMode: false
-                });
-                hls.loadSource(hlsUrl);
-                hls.attachMedia(videoEl);
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    videoEl.play().catch(function(){});
-                    videoEl.style.display = 'block';
-                    statusEl.style.display = 'none';
-                });
-                hls.on(Hls.Events.ERROR, function(event, data) {
-                    if (data.fatal) {
-                        statusEl.innerHTML = 'Flux HLS indisponible.';
-                    }
-                });
-                videoEl._hls = hls;
-            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                videoEl.src = hlsUrl;
-                videoEl.play().catch(function(){});
-                videoEl.style.display = 'block';
-                statusEl.style.display = 'none';
-            } else {
-                statusEl.innerHTML = 'Navigateur non compatible HLS.';
-            }
-        }
-        
-
-        function ecStopStereoPreviews() {
-            ['left', 'right'].forEach(function(side) {
-                var videoEl = document.getElementById('ec-stereo-video-' + side);
-                if (videoEl) {
-                    if (videoEl._hls) { try { videoEl._hls.destroy(); } catch(e) {} videoEl._hls = null; }
-                    videoEl.srcObject = null;
-                    videoEl.src = '';
-                    videoEl.style.display = 'none';
-                }
-                var statusEl = document.getElementById('ec-stereo-status-' + side);
-                if (statusEl) {
-                    statusEl.style.display = 'flex';
-                    statusEl.textContent = 'Chargement...';
-                }
-            });
-        }
-        
-
-        // Cleanup function for stereo listeners/intervals
-        var _ecStereoInterval = null;
-        var _ecStereoTimeout = null;
-        var _ecStereoOrigOnMessage = null;
-        
-
-        function ecCleanupStereoListeners() {
-            if (_ecStereoInterval) { clearInterval(_ecStereoInterval); _ecStereoInterval = null; }
-            if (_ecStereoTimeout) { clearTimeout(_ecStereoTimeout); _ecStereoTimeout = null; }
-            if (_ecStereoOrigOnMessage !== null && appWs) {
-                appWs.onmessage = _ecStereoOrigOnMessage;
-                _ecStereoOrigOnMessage = null;
-            }
-        }
-        
-
-        function ecRunStereoCalib() {
-            // Clean up any previous run
-            ecCleanupStereoListeners();
-            
-
-            var btnRun = document.getElementById('btn-ec-run-stereo');
-            var btnSkip = document.getElementById('btn-ec-skip-stereo');
-            var progressDiv = document.getElementById('ec-stereo-progress');
-            var progressText = document.getElementById('ec-stereo-progress-text');
-            var progressBar = document.getElementById('ec-stereo-progress-bar');
-            var resultDiv = document.getElementById('ec-stereo-result');
-            var resultText = document.getElementById('ec-stereo-result-text');
-            
-
-            if (btnRun) { btnRun.disabled = true; btnRun.style.opacity = '0.5'; }
-            if (btnSkip) { btnSkip.disabled = true; btnSkip.style.opacity = '0.5'; }
-            if (progressDiv) progressDiv.style.display = 'block';
-            if (progressText) progressText.textContent = 'Lancement de la calibration stereo...';
-            if (progressBar) progressBar.style.width = '10%';
-            
-
-            if (appWs && appWs.readyState === WebSocket.OPEN) {
-                var _cols = parseInt((document.getElementById('mcc-cols')||{}).value) || 9;
-                var _rows = parseInt((document.getElementById('mcc-rows')||{}).value) || 6;
-                var _sqmm = parseInt((document.getElementById('mcc-square')||{}).value) || 25;
-                appWs.send(JSON.stringify({ type: "run_stereo_calib", chessboard_cols: _cols, chessboard_rows: _rows, square_size_mm: _sqmm, num_pairs: 20 }));
-                if (typeof showToast === 'function') {
-                    showToast("Stereo", "Calibration stereo lancee sur le robot", "info");
-                }
-            } else {
-                if (progressText) progressText.textContent = 'Erreur: WebSocket non connecte';
-                if (resultDiv) {
-                    resultDiv.style.display = 'block';
-                    resultDiv.style.background = 'rgba(239,68,68,0.1)';
-                    resultDiv.style.border = '1px solid rgba(239,68,68,0.3)';
-                }
-                if (resultText) {
-                    resultText.textContent = 'Impossible de lancer la calibration. Verifiez la connexion au robot.';
-                    resultText.style.color = '#ef4444';
-                }
-                return;
-            }
-            
-
-            var progress = 10;
-            _ecStereoInterval = setInterval(function() {
-                // No-op: real progress driven by stereo_calib_progress WS messages from robot
-            }, 999999);  // effectively disabled (replaces old fake Math.random progress)
-            
-
-            // Listen for result
-            var origOnMessage = appWs.onmessage;
-            _ecStereoOrigOnMessage = origOnMessage;
-            appWs.onmessage = function(event) {
-                try {
-                    var data = JSON.parse(event.data);
-                    if (data.type === 'stereo_calib_progress') {
-                        var _pbar = document.getElementById('ec-stereo-progress-bar');
-                        var _ptxt = document.getElementById('ec-stereo-progress-text');
-                        if (_pbar) _pbar.style.width = data.progress + '%';
-                        if (_ptxt) _ptxt.textContent = data.message || ('Calibration... ' + data.progress + '%');
-                    }
-                    if (data.type === 'mono_calib_frame' || data.type === 'stereo_calib_frame') {
-                        var _imgs = document.querySelectorAll('#mcc-cam-img');
-                        _imgs.forEach(function(img) {
-                            img.src = 'data:image/jpeg;base64,' + data.image;
-                            img.style.display = 'block';
-                        });
-                        var _videos = document.querySelectorAll('#mcc-cam-video');
-                        _videos.forEach(function(v) { v.style.display = 'none'; });
-                        var _ovls = document.querySelectorAll('#mcc-cam-status-overlay');
-                        _ovls.forEach(function(ovl) {
-                            ovl.style.backgroundColor = 'rgba(9,9,11,0.2)';
-                            ovl.style.justifyContent = 'flex-end';
-                            ovl.style.paddingBottom = '0.5rem';
-                        });
-                    }
-                    if (data.type === 'mono_calib_progress') {
-                        var _ovl = document.getElementById('mcc-cam-status-overlay');
-                        var _txt = document.getElementById('mcc-cam-status-text');
-                        if (_ovl) _ovl.style.display = 'flex';
-                        if (_txt) _txt.innerHTML = '<span style="font-size:1rem; color:var(--text-primary);">' + (data.message || '').replace(/\n/g, '<br/>') + '</span><br/><span style="font-size:0.75rem; color:var(--text-secondary);">' + (data.progress || 0) + '%</span>';
-                    }
-                    if (data.type === 'mono_calib_result') {
-                        window.isCalibrating = false;
-                        var _ovl2 = document.getElementById('mcc-cam-status-overlay');
-                        var _txt2 = document.getElementById('mcc-cam-status-text');
-                        var _btn2 = document.getElementById('btn-mcc-run-calib');
-                        if (data.success) {
-                            if (_ovl2) { _ovl2.style.display = 'flex'; _ovl2.style.backgroundColor = 'rgba(9,9,11,0.9)'; }
-                            if (_txt2) _txt2.innerHTML = '<span style="font-size:2rem; color:var(--success); display:block; margin-bottom:0.5rem;">OK</span><span style="color:var(--success); font-weight:bold; font-size:1.05rem;">Calibration reussie !</span><br/><span style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem; display:block;">fx=' + (data.fx || '?') + 'px  reproj=' + (data.reprojection_error || '?') + '</span>';
-                            if (_btn2) { _btn2.disabled = false; _btn2.innerHTML = '<span>Fermer la Calibration</span>'; _btn2.onclick = closeCameraCalibModal; }
-                        } else {
-                            if (_ovl2) { _ovl2.style.display = 'flex'; _ovl2.style.backgroundColor = 'rgba(9,9,11,0.9)'; }
-                            if (_txt2) _txt2.innerHTML = '<span style="font-size:2rem; color:var(--danger); display:block; margin-bottom:0.5rem;">X</span><span style="color:var(--danger); font-weight:bold; font-size:1.05rem;">Echec</span><br/><span style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem; display:block;">' + (data.message || 'Erreur') + '</span>';
-                            if (_btn2) { _btn2.disabled = false; _btn2.innerHTML = '<span>Reessayer la Calibration</span>'; _btn2.onclick = function() { confirmIndividualCameraCalib(); }; }
-                        }
-                    }
-                    if (data.type === 'stereo_calib_result') {
-                        window.isCalibrating = false;
-                        clearInterval(_ecStereoInterval);
-                        if (progressBar) progressBar.style.width = '100%';
-                        if (data.success) {
-                            if (progressText) progressText.textContent = 'Calibration stereo reussie !';
-                            if (resultDiv) {
-                                resultDiv.style.display = 'block';
-                                resultDiv.style.background = 'rgba(34,197,94,0.1)';
-                                resultDiv.style.border = '1px solid rgba(34,197,94,0.3)';
-                            }
-                            if (resultText) {
-                                resultText.textContent = 'Parametres stereo enregistres. Vous pouvez passer a la finalisation.';
-                                resultText.style.color = '#22c55e';
-                            }
-                            document.getElementById('ec-btn-next').disabled = false;
-                            document.getElementById('ec-btn-next').textContent = 'Suivant';
-                        } else {
-                            if (progressText) progressText.textContent = 'Echec de la calibration stereo';
-                            if (resultDiv) {
-                                resultDiv.style.display = 'block';
-                                resultDiv.style.background = 'rgba(239,68,68,0.1)';
-                                resultDiv.style.border = '1px solid rgba(239,68,68,0.3)';
-                            }
-                            if (resultText) {
-                                resultText.textContent = data.message || 'Erreur lors de la calibration stereo.';
-                                resultText.style.color = '#ef4444';
-                            }
-                        }
-                        if (btnRun) { btnRun.disabled = true; }
-                        if (btnSkip) { btnSkip.disabled = false; btnSkip.style.opacity = '1'; }
-                        appWs.onmessage = origOnMessage;
-                        _ecStereoOrigOnMessage = null;
-                        _ecStereoInterval = null;
-                        _ecStereoTimeout = null;
-                        _ecStereoOrigOnMessage = null;
-                        _ecStereoInterval = null;
-                        _ecStereoTimeout = null;
-                    }
-                } catch(e) {}
-                if (origOnMessage) origOnMessage.call(this, event);
-            };
-            
-
-            _ecStereoTimeout = setTimeout(function() {
-                clearInterval(_ecStereoInterval);
-                if (progressBar && parseInt(progressBar.style.width) < 100) {
-                    if (progressText) progressText.textContent = 'Delai depasse. Reessayez.';
-                    if (resultDiv) {
-                        resultDiv.style.display = 'block';
-                        resultDiv.style.background = 'rgba(245,158,11,0.1)';
-                        resultDiv.style.border = '1px solid rgba(245,158,11,0.3)';
-                    }
-                    if (resultText) {
-                        resultText.textContent = 'La calibration a pris trop de temps.';
-                        resultText.style.color = '#f59e0b';
-                    }
-                }
-                if (btnRun) { btnRun.disabled = false; btnRun.style.opacity = '1'; }
-                if (btnSkip) { btnSkip.disabled = false; btnSkip.style.opacity = '1'; }
-            }, 180000);
-        }
-        
-
-        function ecSkipStereo() {
-            ecCleanupStereoListeners();
-            ecStopStereoPreviews();
-            document.getElementById('ec-btn-next').disabled = false;
-            document.getElementById('ec-btn-next').textContent = 'Suivant';
-            if (typeof showToast === 'function') {
-                showToast("Stereo", "Etape passee. Calibration stereo existante conservee.", "info");
-            }
-        }
-
-
 // ÔöÇÔöÇÔöÇ V-SLAM mode helper (used by updateSLAMMode + toggleVSlamTest pre-flight)
         function getCurrentSlamMode() {
             const sensors = window.lastTelemetryState && window.lastTelemetryState.sensors;
@@ -3116,13 +2677,13 @@ window.appWs = null;
             let modeColor = '#ef4444';
             let bgColor = 'rgba(239,68,68,0.12)';
             if (camCount === 0) {
-                mode = 'Aucune cam├®ra';
+                mode = 'Aucune caméra';
             } else if (camCount === 1) {
                 mode = 'Mono';
                 modeColor = '#f59e0b';
                 bgColor = 'rgba(245,158,11,0.12)';
             } else {
-                mode = 'St├®r├®o';
+                mode = 'Stéréo';
                 modeColor = '#22c55e';
                 bgColor = 'rgba(34,197,94,0.12)';
             }
@@ -3186,9 +2747,9 @@ window.appWs = null;
                 testBadge.textContent = 'Mode: ' + mode;
                 testBadge.style.background = bgColor;
                 testBadge.style.color = modeColor;
-                testBadge.title = (mode === 'St├®r├®o' ? 'Cam1 + Cam2 connect├®es au robot'
-                                   : (mode === 'Mono' ? 'Cam├®ra 1 seule connect├®e au robot'
-                                   : 'Aucune cam├®ra d├®tect├®e par le robot'));
+                testBadge.title = (mode === 'Stéréo' ? 'Cam1 + Cam2 connectées au robot'
+                                   : (mode === 'Mono' ? 'Caméra 1 seule connectée au robot'
+                                   : 'Aucune caméra détectée par le robot'));
             }
         }
 
@@ -3238,14 +2799,14 @@ window.appWs = null;
 
 
             const titles = {
-                'dashboard': { title: "Vue d'ensemble", subtitle: "Statistiques en direct et flux cam├®ras du robot Bastet." },
-                'control': { title: "T├®l├®commande & Navigation", subtitle: "Contr├┤le manuel des mouvements, de la posture et des objectifs du robot." },
-                'users': { title: "Comptes & MyGES", subtitle: "G├®rer les profils utilisateurs et leurs identifiants d'agenda." },
-                'faces': { title: "Galerie Visages", subtitle: "G├®rer les visages enregistr├®s pour la reconnaissance faciale." },
-                'system': { title: "Syst├¿me & Updates", subtitle: "Suivi des mises ├á jour logicielles et des services ROS." },
-                'chat': { title: "Chat & Contr├┤le IA", subtitle: "Dialogue temps r├®el avec le robot et supervision de l'IA." },
-                'diagnostics': { title: "Arduino & Calib", subtitle: "T├®l├®m├®trie des moteurs, gyroscope de l'IMU et calibrages." },
-                'map': { title: "SLAM & Map", subtitle: "Navigation cartographique, nuage de points et param├¿tres d'├®vitement." }
+                'dashboard': { title: "Vue d'ensemble", subtitle: "Statistiques en direct et flux caméras du robot Bastet." },
+                'control': { title: "Télécommande & Navigation", subtitle: "Contrôle manuel des mouvements, de la posture et des objectifs du robot." },
+                'users': { title: "Comptes & MyGES", subtitle: "Gérer les profils utilisateurs et leurs identifiants d'agenda." },
+                'faces': { title: "Galerie Visages", subtitle: "Gérer les visages enregistrés pour la reconnaissance faciale." },
+                'system': { title: "Système & Updates", subtitle: "Suivi des mises à jour logicielles et des services ROS." },
+                'chat': { title: "Chat & Contrôle IA", subtitle: "Dialogue temps réel avec le robot et supervision de l'IA." },
+                'diagnostics': { title: "Arduino & Calib", subtitle: "Télémétrie des moteurs, gyroscope de l'IMU et calibrages." },
+                'map': { title: "SLAM & Map", subtitle: "Navigation cartographique, nuage de points et paramètres d'évitement." }
             };
 
 
@@ -3299,7 +2860,7 @@ window.appWs = null;
                     const sensors = state.sensors || {};
                     
 
-                    // Mise ├á jour du statut Arduino Mega depuis les capteurs de l'├®tat
+                    // Mise à jour du statut Arduino Mega depuis les capteurs de l'état
                     const arduinoBadge = document.getElementById('arduino-status-badge');
                     const arduinoOfflineMsg = document.getElementById('arduino-offline-msg');
                     const arduinoContent = document.getElementById('arduino-telemetry-content');
@@ -3331,7 +2892,7 @@ window.appWs = null;
 
 
                     updateGaugeCircle('gauge-temp', (temp / 100) * 100);
-                    document.getElementById('gauge-temp-val').textContent = `${Math.round(temp)}┬░C`;
+                    document.getElementById('gauge-temp-val').textContent = `${Math.round(temp)}°C`;
 
 
                     document.getElementById('sensor-seen-person').textContent = state.seen_person || 'Personne';
@@ -3400,7 +2961,7 @@ window.appWs = null;
                                 statusEl.className = isActive ? 'status-badge active' : 'status-badge';
                             }
                             if (btnText) {
-                                btnText.textContent = isActive ? 'Rejoindre le flux' : 'D├®marrer le flux';
+                                btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
                             }
                             
 
@@ -3423,11 +2984,11 @@ window.appWs = null;
 
 
                     if (cam1Status) {
-                        cam1Status.textContent = cam1Connected ? 'Connect├®e' : 'D├®connect├®e';
+                        cam1Status.textContent = cam1Connected ? 'Connectée' : 'Déconnectée';
                         cam1Status.style.color = cam1Connected ? 'var(--success)' : 'var(--text-secondary)';
                     }
                     if (cam2Status) {
-                        cam2Status.textContent = cam2Connected ? 'Connect├®e' : 'D├®connect├®e';
+                        cam2Status.textContent = cam2Connected ? 'Connectée' : 'Déconnectée';
                         cam2Status.style.color = cam2Connected ? 'var(--success)' : 'var(--text-secondary)';
                     }
 
@@ -3482,7 +3043,7 @@ window.appWs = null;
                         if (btnStop) btnStop.style.display = '';
                         if (btnRestart) btnRestart.style.display = '';
                     } else if (isSpotbotActive === false) {
-                        serviceBadge.textContent = 'Arr├¬t├®';
+                        serviceBadge.textContent = 'Arrêté';
                         serviceBadge.className = 'status-badge offline';
                         if (btnStart) btnStart.style.display = '';
                         if (btnStop) btnStop.style.display = 'none';
@@ -3507,7 +3068,7 @@ window.appWs = null;
                     document.getElementById('gw-gauge-ram-val').textContent = `${Math.round(gw.ram_percent)}%`;
                     updateGaugeCircle('gw-gauge-disk', gw.disk_percent);
                     document.getElementById('gw-gauge-disk-val').textContent = `${Math.round(gw.disk_percent)}%`;
-                    document.getElementById('gw-temp-val').textContent = `${Math.round(gw.temp_c)}┬░C`;
+                    document.getElementById('gw-temp-val').textContent = `${Math.round(gw.temp_c)}°C`;
                     const days = Math.floor(gw.uptime_s / 86400);
                     const hrs = Math.floor((gw.uptime_s % 86400) / 3600);
                     const mins = Math.floor((gw.uptime_s % 3600) / 60);
@@ -3583,13 +3144,13 @@ window.appWs = null;
             const qualityTitleLeft = document.getElementById('quality-title-cam-1');
             const qualityTitleLeftModal = document.getElementById('quality-title-cam-1-modal');
             const streamTitleLeft = document.getElementById('stream-title-cam-1');
-            if (titleLeftMain) titleLeftMain.textContent = cam2Active ? 'Cam├®ra Gauche' : 'Cam├®ra';
-            if (titleLeftModal) titleLeftModal.textContent = cam2Active ? 'Cam├®ra Gauche' : 'Cam├®ra';
-            if (labelPortLeftMain) labelPortLeftMain.textContent = cam2Active ? 'Port Gauche' : 'Port Cam├®ra';
-            if (labelPortLeftModal) labelPortLeftModal.textContent = cam2Active ? 'Port Gauche' : 'Port Cam├®ra';
-            if (qualityTitleLeft) qualityTitleLeft.textContent = cam2Active ? 'Cam├®ra Gauche' : 'Cam├®ra';
-            if (qualityTitleLeftModal) qualityTitleLeftModal.textContent = cam2Active ? 'Cam├®ra Gauche' : 'Cam├®ra';
-            if (streamTitleLeft) streamTitleLeft.textContent = cam2Active ? 'Cam├®ra Gauche' : 'Cam├®ra';
+            if (titleLeftMain) titleLeftMain.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (titleLeftModal) titleLeftModal.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (labelPortLeftMain) labelPortLeftMain.textContent = cam2Active ? 'Port Gauche' : 'Port Caméra';
+            if (labelPortLeftModal) labelPortLeftModal.textContent = cam2Active ? 'Port Gauche' : 'Port Caméra';
+            if (qualityTitleLeft) qualityTitleLeft.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (qualityTitleLeftModal) qualityTitleLeftModal.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
+            if (streamTitleLeft) streamTitleLeft.textContent = cam2Active ? 'Caméra Gauche' : 'Caméra';
             const containerPortRightMain = document.getElementById('container-port-right-main');
             const containerPortRightModal = document.getElementById('container-port-right-modal');
             if (containerPortRightMain) containerPortRightMain.style.display = cam2Active ? 'block' : 'none';
@@ -3612,7 +3173,7 @@ window.appWs = null;
             if (btnConfigModal) btnConfigModal.style.display = cam2Active ? 'inline-block' : 'none';
             const vslamSpan = document.getElementById('vslam-text-mode');
             if (vslamSpan) {
-                vslamSpan.textContent = cam2Active ? 'Superposer V-SLAM St├®r├®o' : 'Superposer V-SLAM Mono';
+                vslamSpan.textContent = cam2Active ? 'Superposer V-SLAM Stéréo' : 'Superposer V-SLAM Mono';
             }
         }
 
@@ -3654,11 +3215,11 @@ window.appWs = null;
 
 
             placeholder.style.display = 'flex';
-            // On affiche l'├®tat R├ëEL du flux robot, pas l'├®tat de visionnage local
+            // On affiche l'état RÉEL du flux robot, pas l'état de visionnage local
             const isActive = window.activeStreams && window.activeStreams[camId];
-            statusEl.textContent = isActive ? 'En direct (non visionn├®)' : 'Inactif';
+            statusEl.textContent = isActive ? 'En direct (non visionné)' : 'Inactif';
             statusEl.className = isActive ? 'status-badge active' : 'status-badge';
-            btnText.textContent = isActive ? 'Rejoindre le flux' : 'D├®marrer le flux';
+            btnText.textContent = isActive ? 'Rejoindre le flux' : 'Démarrer le flux';
         }
 
 
@@ -3751,8 +3312,8 @@ window.appWs = null;
                     if (peerConnections[camId] === pc) peerConnections[camId] = null;
                 }
                 window.localViewing[camId] = false;
-                // FIX: NE PAS set userClosedStream ici ÔÇö le stream tourne c├┤t├® robot,
-                // c'est juste le WebRTC local qui a ├®chou├®. On garde le loader
+                // FIX: NE PAS set userClosedStream ici ÔÇö le stream tourne côté robot,
+                // c'est juste le WebRTC local qui a échoué. On garde le loader
                 // visible pour que l'utilisateur voie qu'on attend.
                 streamingState[camId] = 'idle';
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
@@ -3779,7 +3340,7 @@ window.appWs = null;
 
 
                 let trackTimeout = setTimeout(() => {
-                    if (!trackReceived) showWebRTCError('Timeout ÔÇö aucun flux re├ºu apr├¿s 25s');
+                    if (!trackReceived) showWebRTCError('Timeout ÔÇö aucun flux reçu après 25s');
                 }, 25000);
 
 
@@ -3809,7 +3370,7 @@ window.appWs = null;
                     fsBtn.style.display = 'block';
                     statusEl.textContent = 'En direct';
                     statusEl.className = 'status-badge active';
-                    btnText.textContent = 'Couper Cam├®ra';
+                    btnText.textContent = 'Couper Caméra';
                 };
 
 
@@ -3819,7 +3380,7 @@ window.appWs = null;
 
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
                 let response = null;
-                // 48 retries ├ù 250ms = 12s pour laisser le temps ├á la cam├®ra de d├®marrer
+                // 48 retries × 250ms = 12s pour laisser le temps à la caméra de démarrer
                 let retries = 48;
                 while (retries > 0 && !aborted) {
                     try {
@@ -3842,7 +3403,7 @@ window.appWs = null;
 
                 if (!response || !response.ok) {
                     clearTimeout(trackTimeout);
-                    throw new Error(`WHEP cam${camId} non disponible apr├¿s 12s.`);
+                    throw new Error(`WHEP cam${camId} non disponible après 12s.`);
                 }
 
 
@@ -3864,7 +3425,7 @@ window.appWs = null;
                 btn.textContent = 'ÔÅ│...';
                 btn.disabled = true;
             }
-            statusEl.textContent = 'D├®tection des r├®solutions cam├®ra ' + camId + '...';
+            statusEl.textContent = 'Détection des résolutions caméra ' + camId + '...';
             statusEl.style.color = 'var(--text-secondary)';
 
 
@@ -3882,8 +3443,8 @@ window.appWs = null;
                     btn.textContent = originalText;
                     btn.disabled = false;
                 }
-                if (statusEl.textContent.startsWith('D├®tection')) {
-                    statusEl.textContent = 'D├®lai d├®pass├® ÔÇö essayez de connecter la cam├®ra';
+                if (statusEl.textContent.startsWith('Détection')) {
+                    statusEl.textContent = 'Délai dépassé ÔÇö essayez de connecter la caméra';
                     statusEl.style.color = 'var(--danger)';
                     setTimeout(() => { statusEl.textContent = ''; }, 4000);
                 }
@@ -3933,14 +3494,14 @@ window.appWs = null;
                             config: config
                         }));
                     }
-                    statusEl.textContent = 'Configuration appliqu├®e';
+                    statusEl.textContent = 'Configuration appliquée';
                     statusEl.style.color = 'var(--success)';
                 } else {
                     statusEl.textContent = 'Erreur sauvegarde';
                     statusEl.style.color = 'var(--danger)';
                 }
             } catch (e) {
-                statusEl.textContent = 'Erreur r├®seau';
+                statusEl.textContent = 'Erreur réseau';
                 statusEl.style.color = 'var(--danger)';
             }
 
@@ -4002,7 +3563,7 @@ window.appWs = null;
         // ÔöÇÔöÇÔöÇ Smart Camera Port Dropdowns ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
         // - Filter to only /dev/videoX that have live USB data (from telemetry)
         // - Disallow selecting same port on left AND right (rollback to last-good on conflict)
-        // - When only 1 active device: disable right + show "cam├®ra central" helper
+        // - When only 1 active device: disable right + show "caméra central" helper
         function syncCamPorts(side, val) {
             const mainEl = document.getElementById(`cam-port-${side}`);
             const modalEl = document.getElementById(`cam-port-${side}-modal`);
@@ -4058,7 +3619,7 @@ window.appWs = null;
                 leftSelects.forEach(sel => sel.value  = lastGoodLeft);
                 rightSelects.forEach(sel => sel.value = lastGoodRight || '');
                 if (typeof showToast === 'function') {
-                    showToast('Cam├®ras', 'Mapping invalide (m├¬me port choisi sur les deux c├┤t├®s). Retour au dernier mapping valide.', 'warning');
+                    showToast('Caméras', 'Mapping invalide (même port choisi sur les deux côtés). Retour au dernier mapping valide.', 'warning');
                 }
             }
 
@@ -4118,9 +3679,9 @@ window.appWs = null;
             const ts = window.lastTelemetryState;
             const cam2Connected = ts && ts.sensors && ts.sensors.cam2_connected === true;
             if (!cam2Connected) {
-                document.getElementById('mcv-modal-title').textContent = 'Configuration Cam├®ra';
+                document.getElementById('mcv-modal-title').textContent = 'Configuration Caméra';
             } else {
-                document.getElementById('mcv-modal-title').textContent = `Configuration Cam├®ra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
+                document.getElementById('mcv-modal-title').textContent = `Configuration Caméra ${camId === 1 ? 'Gauche (1)' : 'Droite (2)'}`;
             }
             
 
@@ -4135,17 +3696,17 @@ window.appWs = null;
                     document.getElementById('mcv-camera-name').value = data.camera_name || 'usb_cam';
                     document.getElementById('mcv-resolution').textContent = `${data.image_width || 640} x ${data.image_height || 480}`;
                     document.getElementById('mcv-distortion-model').value = data.distortion_model || 'plumb_bob';
-                    document.getElementById('mcv-calibrated-at').value = data.calibrated_at || 'Jamais (D├®faut)';
+                    document.getElementById('mcv-calibrated-at').value = data.calibrated_at || 'Jamais (Défaut)';
                     
 
                     const badge = document.getElementById('mcv-profile-badge');
                     if (data.is_calibrated) {
-                        badge.textContent = 'Calibr├® (Actif)';
+                        badge.textContent = 'Calibré (Actif)';
                         badge.className = 'status-badge active';
                         badge.style.backgroundColor = 'var(--success)';
                         badge.style.color = 'white';
                     } else {
-                        badge.textContent = 'D├®faut (Non calibr├®)';
+                        badge.textContent = 'Défaut (Non calibré)';
                         badge.className = 'status-badge';
                         badge.style.backgroundColor = 'rgba(255,255,255,0.1)';
                         badge.style.color = 'var(--text-secondary)';
@@ -4636,7 +4197,7 @@ window.appWs = null;
                     keep: !current
                 }));
             } else {
-                alert("WebSocket d├®connect├®.");
+                alert("WebSocket déconnecté.");
             }
         }
 
@@ -4651,12 +4212,12 @@ window.appWs = null;
 
 
             if (!window.localViewing[camId]) {
-                // === D├ëMARRER ===
+                // === DÉMARRER ===
                 if (streamingState[camId] === 'requesting' || streamingState[camId] === 'connecting' || streamingState[camId] === 'active') {
-                    console.warn('[Stream] Cam ' + camId + ' d├®j├á en cours (' + streamingState[camId] + '), ignor├®.');
+                    console.warn('[Stream] Cam ' + camId + ' déjà en cours (' + streamingState[camId] + '), ignoré.');
                     return;
                 }
-                // Marquer imm├®diatement pour ├®viter les double-clics
+                // Marquer immédiatement pour éviter les double-clics
                 streamingState[camId] = 'requesting';
                 if (appWs && appWs.readyState === WebSocket.OPEN) {
                     let vSlamVal = false;
@@ -4699,7 +4260,7 @@ window.appWs = null;
 
                     statusEl.textContent = 'Connexion WebRTCÔÇª';
                     statusEl.className = 'status-badge';
-                    btnText.textContent = 'Couper Cam├®ra';
+                    btnText.textContent = 'Couper Caméra';
 
 
                     // FIX: Ne pas lancer WebRTC tout de suite. Le robot n'a pas encore
@@ -4722,7 +4283,7 @@ window.appWs = null;
                     if (_vc3) _vc3.style.display = 'block';
                     if (_ld3) _ld3.style.display = 'flex';
                 } else {
-                    if (isExplicit) alert("WebSocket d├®connect├®. Impossible d'activer la cam├®ra.");
+                    if (isExplicit) alert("WebSocket déconnecté. Impossible d'activer la caméra.");
                     else console.warn("[Auto] WebSocket not open, deferring stream startup.");
                 }
             } else {
@@ -4751,7 +4312,7 @@ window.appWs = null;
                 }
 
 
-                // Fermer la PeerConnection imm├®diatement
+                // Fermer la PeerConnection immédiatement
                 if (peerConnections[camId]) {
                     try { peerConnections[camId].close(); } catch(e) {}
                     peerConnections[camId] = null;
@@ -4761,8 +4322,8 @@ window.appWs = null;
                 stopStreamUI(camId);
 
 
-                // Forcer l'affichage correct apr├¿s stop
-                statusEl.textContent = 'Coup├®';
+                // Forcer l'affichage correct après stop
+                statusEl.textContent = 'Coupé';
                 statusEl.className = 'status-badge';
                 btnText.textContent = 'Rejoindre le flux';
             }
@@ -4795,13 +4356,13 @@ window.appWs = null;
                 const camData = calStatus[String(camId)] || calStatus[camId] || {};
                 const calibrated = camData.calibrated === true;
                 if (calibrated) {
-                    badge.textContent = 'Ô£à Calibr├®e';
+                    badge.textContent = 'Ô£à Calibrée';
                     badge.style.background = 'rgba(34,197,94,0.15)';
                     badge.style.color = 'var(--success)';
                     badge.style.borderColor = 'rgba(34,197,94,0.3)';
                     badge.setAttribute('data-calibrated', 'true');
                 } else {
-                    badge.textContent = 'ÔÜá Non calibr├®e';
+                    badge.textContent = 'ÔÜá Non calibrée';
                     badge.style.background = 'rgba(239,68,68,0.15)';
                     badge.style.color = 'var(--danger)';
                     badge.style.borderColor = 'rgba(239,68,68,0.3)';
@@ -4830,7 +4391,7 @@ window.appWs = null;
                     if (vSlamVal && !isCameraCalibrated(1)) {
                         if (vSlamCheck) vSlamCheck.checked = false;
                         if (typeof showToast === 'function') {
-                            showToast('V-SLAM bloqu├®', 'Calibrez la cam├®ra 1 dans Arduino & Calib avant d\'activer le V-SLAM.', 'warning');
+                            showToast('V-SLAM bloqué', 'Calibrez la caméra 1 dans Arduino & Calib avant d\'activer le V-SLAM.', 'warning');
                         }
                         return;
                     }
@@ -4886,7 +4447,7 @@ window.appWs = null;
                     if (keys.length === 0) {
                         container.innerHTML = `
                             <div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-secondary);">
-                                Aucun compte utilisateur configur├®.
+                                Aucun compte utilisateur configuré.
                             </div>`;
                         return;
                     }
@@ -4902,7 +4463,7 @@ window.appWs = null;
                         const mygesCreds = mygesList[fullName];
                         const mygesBadge = mygesCreds 
                             ? `<span class="status-badge active" style="font-size: 0.75rem;">Ô£à MyGES : ${mygesCreds.username}</span>`
-                            : `<span class="status-badge" style="font-size: 0.75rem; background-color: rgba(225, 29, 72, 0.05); color: var(--danger); border: 1px solid rgba(225, 29, 72, 0.15)">ÔØî MyGES non configur├®</span>`;
+                            : `<span class="status-badge" style="font-size: 0.75rem; background-color: rgba(225, 29, 72, 0.05); color: var(--danger); border: 1px solid rgba(225, 29, 72, 0.15)">ÔØî MyGES non configuré</span>`;
 
 
                         const card = document.createElement('div');
@@ -4926,7 +4487,7 @@ window.appWs = null;
                                     </div>
                                     <div class="user-detail-item">
                                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 9.24z"/></svg>
-                                        <span>${u.phone || 'Non renseign├®'}</span>
+                                        <span>${u.phone || 'Non renseigné'}</span>
                                     </div>
                                     <div style="margin-top: 0.5rem;">
                                         ${mygesBadge}
@@ -4949,7 +4510,7 @@ window.appWs = null;
 
 
         async function deleteUser(fullName) {
-            if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?\n(Cela supprimera ├®galement ses identifiants MyGES et ses photos de visage)`)) return;
+            if (!confirm(`Voulez-vous vraiment supprimer le compte de ${fullName} ?\n(Cela supprimera également ses identifiants MyGES et ses photos de visage)`)) return;
             try {
                 const res = await fetch(`/accounts/${encodeURIComponent(fullName)}`, {
                     method: 'DELETE',
@@ -5066,7 +4627,7 @@ window.appWs = null;
                 try {
                     preferences = JSON.parse(prefVal);
                 } catch (err) {
-                    alert("Format JSON invalide pour les pr├®f├®rences.");
+                    alert("Format JSON invalide pour les préférences.");
                     return;
                 }
             }
@@ -5107,7 +4668,7 @@ window.appWs = null;
                     alert(`Erreur lors de la sauvegarde : ${err}`);
                 }
             } catch (e) {
-                alert('Erreur de r├®seau.');
+                alert('Erreur de réseau.');
             }
         }
 
@@ -5183,7 +4744,7 @@ window.appWs = null;
             } catch (e) {
                 resultDiv.style.background = 'rgba(239,68,68,0.1)';
                 resultDiv.style.color = '#ef4444';
-                resultDiv.innerHTML = 'ÔØî Erreur r├®seau.';
+                resultDiv.innerHTML = 'ÔØî Erreur réseau.';
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '­ƒöì Tester la connexion';
@@ -5239,7 +4800,7 @@ window.appWs = null;
             } catch (e) {
                 resultDiv.style.background = 'rgba(239,68,68,0.1)';
                 resultDiv.style.color = '#ef4444';
-                resultDiv.textContent = 'Erreur r├®seau.';
+                resultDiv.textContent = 'Erreur réseau.';
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = '&#128269; Tester la connexion';
@@ -5306,7 +4867,7 @@ window.appWs = null;
                 if (saveRes.ok) {
                     resultDiv.style.background = 'rgba(34,197,94,0.1)';
                     resultDiv.style.color = '#22c55e';
-                    resultDiv.textContent = 'Ô£à Identifiants valides et sauvegard├®s !';
+                    resultDiv.textContent = 'Ô£à Identifiants valides et sauvegardés !';
                     setTimeout(() => { closeMygesModal(); loadAccounts(); }, 800);
                 } else {
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
@@ -5316,7 +4877,7 @@ window.appWs = null;
             } catch (e) {
                 resultDiv.style.background = 'rgba(239,68,68,0.1)';
                 resultDiv.style.color = '#ef4444';
-                resultDiv.textContent = 'ÔØî Erreur r├®seau.';
+                resultDiv.textContent = 'ÔØî Erreur réseau.';
             }
         }
 
@@ -5361,7 +4922,7 @@ window.appWs = null;
                     if (keys.length === 0) {
                         foldersContainer.innerHTML = `
                             <div style="grid-column: 1/-1; text-align: center; padding: 4rem; color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 12px; background: var(--bg-card);">
-                                Aucun dossier utilisateur disponible. Cr├®ez un compte d'abord.
+                                Aucun dossier utilisateur disponible. Créez un compte d'abord.
                             </div>`;
                         return;
                     }
@@ -5476,7 +5037,7 @@ window.appWs = null;
                     alert('Erreur suppression.');
                 }
             } catch (e) {
-                alert('Erreur r├®seau.');
+                alert('Erreur réseau.');
             }
         }
 
@@ -5597,8 +5158,8 @@ window.appWs = null;
                     const gw = await gatewayRes.json();
                     const gwUpToDate = gw.current_version && gw.latest_version && gw.current_version === gw.latest_version;
                     const gwStatusLower = (gw.status || '').toLowerCase();
-                    let gwDisplayStatus = gw.status || 'Pr├¬t';
-                    if (gwStatusLower.includes('failed') && gwUpToDate) gwDisplayStatus = '├Ç jour';
+                    let gwDisplayStatus = gw.status || 'Prêt';
+                    if (gwStatusLower.includes('failed') && gwUpToDate) gwDisplayStatus = 'À jour';
 
 
                     document.getElementById('gateway-update-status').textContent = gwDisplayStatus;
@@ -5610,7 +5171,7 @@ window.appWs = null;
 
                     const gwInProgress = gw.status &&
                         !gwStatusLower.includes('idle') &&
-                        !gwStatusLower.includes('pr├¬t') &&
+                        !gwStatusLower.includes('prêt') &&
                         !gwStatusLower.includes('done') &&
                         !gwStatusLower.includes('failed') &&
                         gw.percent < 100;
@@ -5623,7 +5184,7 @@ window.appWs = null;
                         gwBtn.style.opacity = gwInProgress ? '0.5' : '1';
                     }
                     if (gwBtnText) {
-                        gwBtnText.textContent = gwUpToDate ? 'R├®installer la Gateway' : 'Lancer la mise ├á jour Gateway';
+                        gwBtnText.textContent = gwUpToDate ? 'Réinstaller la Gateway' : 'Lancer la mise à jour Gateway';
                     }
                 }
 
@@ -5632,8 +5193,8 @@ window.appWs = null;
                     const rb = await robotRes.json();
                     const rbUpToDate = rb.current_version && rb.latest_version && rb.current_version === rb.latest_version;
                     const rbStatusLower = (rb.status || '').toLowerCase();
-                    let rbDisplayStatus = rb.status || 'Pr├¬t';
-                    if (rbStatusLower.includes('failed') && rbUpToDate) rbDisplayStatus = '├Ç jour';
+                    let rbDisplayStatus = rb.status || 'Prêt';
+                    if (rbStatusLower.includes('failed') && rbUpToDate) rbDisplayStatus = 'À jour';
 
 
                     document.getElementById('robot-update-status').textContent = rbDisplayStatus;
@@ -5645,7 +5206,7 @@ window.appWs = null;
 
                     rbInProgress = rb.status &&
                         !rbStatusLower.includes('idle') &&
-                        !rbStatusLower.includes('pr├¬t') &&
+                        !rbStatusLower.includes('prêt') &&
                         !rbStatusLower.includes('done') &&
                         !rbStatusLower.includes('failed') &&
                         rb.percent < 100;
@@ -5658,7 +5219,7 @@ window.appWs = null;
                         rbBtn.style.opacity = rbInProgress ? '0.5' : '1';
                     }
                     if (rbBtnText) {
-                        rbBtnText.textContent = rbUpToDate ? 'R├®installer le Robot' : 'Lancer la mise ├á jour Robot';
+                        rbBtnText.textContent = rbUpToDate ? 'Réinstaller le Robot' : 'Lancer la mise à jour Robot';
                     }
                 }
 
@@ -5670,23 +5231,23 @@ window.appWs = null;
                     const ardStatusLabels = {
 
 
-        failed_launch: "ÔØî ├ëchec lancement (voir logs agent)",
-        failed_launch_msg: "Le robot n'a pas pu d├®marrer la m├áj Arduino.",
-        stale_starting: "ÔÜá´©Å Blocage d├¿s le lancement (60 s sans progr├¿s)",
-                        'stopping_services': 'ÔÅ╣ Arr├¬t services...',
-                        'checking_tools': '­ƒöì V├®rification arduino-cli...',
+        failed_launch: "ÔØî Échec lancement (voir logs agent)",
+        failed_launch_msg: "Le robot n'a pas pu démarrer la màj Arduino.",
+        stale_starting: "ÔÜá´©Å Blocage dès le lancement (60 s sans progrès)",
+                        'stopping_services': 'ÔÅ╣ Arrêt services...',
+                        'checking_tools': '­ƒöì Vérification arduino-cli...',
                         'installing_core': '­ƒôª Installation core AVR...',
                         'installing_libs': '­ƒôÜ Installation librairies...',
-                        'detecting_device': '­ƒöî D├®tection Arduino...',
-                        'preparing_sketch': '­ƒôü Pr├®paration sketch...',
+                        'detecting_device': '­ƒöî Détection Arduino...',
+                        'preparing_sketch': '­ƒôü Préparation sketch...',
                         'compiling': 'ÔÜÖ´©Å Compilation...',
                         'flashing': 'ÔÜí Flashage en cours...',
-                        'idle': 'Ô£ô Pr├¬t',
-                        'starting': 'ÔûÂ D├®marrage...',
+                        'idle': 'Ô£ô Prêt',
+                        'starting': 'ÔûÂ Démarrage...',
                     };
-                    let ardDisplayStatus = ardStatusLabels[ardStatusLower] || ard.status || 'Pr├¬t';
+                    let ardDisplayStatus = ardStatusLabels[ardStatusLower] || ard.status || 'Prêt';
                     if (ardStatusLower.startsWith('failed')) ardDisplayStatus = 'Ô£ù ' + (ardStatusLower.replace('failed_','').replace(/_/g,' ') || 'Erreur');
-                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = 'Ô£ô ├Ç jour';
+                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = 'Ô£ô À jour';
 
 
                     document.getElementById('arduino-update-status').textContent = ardDisplayStatus;
@@ -5698,7 +5259,7 @@ window.appWs = null;
 
                     ardInProgress = ard.status &&
                         !ardStatusLower.includes('idle') &&
-                        !ardStatusLower.includes('pr├¬t') &&
+                        !ardStatusLower.includes('prêt') &&
                         !ardStatusLower.includes('done') &&
                         !ardStatusLower.includes('failed') &&
                         ard.percent < 100;
@@ -5720,12 +5281,12 @@ window.appWs = null;
                         } else if (!arduinoConnected) {
                             ardBtn.disabled = true;
                             ardBtn.style.opacity = '0.5';
-                            if (ardBtnText) ardBtnText.textContent = "Arduino non connect├®";
+                            if (ardBtnText) ardBtnText.textContent = "Arduino non connecté";
                         } else {
                             ardBtn.disabled = ardInProgress;
                             ardBtn.style.opacity = ardInProgress ? '0.5' : '1';
                             if (ardBtnText) {
-                                ardBtnText.textContent = ardUpToDate ? "R├®installer le Code Arduino" : "Reflasher l'Arduino";
+                                ardBtnText.textContent = ardUpToDate ? "Réinstaller le Code Arduino" : "Reflasher l'Arduino";
                             }
                         }
                     }
@@ -5796,7 +5357,7 @@ window.appWs = null;
             const releases = await fetchAllReleases(repo);
             const select = document.getElementById(targetSelectId);
             if (!select) return;
-            select.innerHTML = '<option value="">-- S├®lectionner une version --</option>';
+            select.innerHTML = '<option value="">-- Sélectionner une version --</option>';
             releases.forEach((r, idx) => {
                 const isSelected = (idx === 0) ? ' selected' : '';
                 select.innerHTML += `<option value="${r.tag}"${isSelected}>${r.tag} - ${r.name || ''}</option>`;
@@ -5808,7 +5369,7 @@ window.appWs = null;
             const selectId = repo === 'CORE-Gateway' ? 'gateway-release-select' : 'robot-release-select';
             const select = document.getElementById(selectId);
             if (!select || !select.value) {
-                alert('Veuillez s├®lectionner une version.');
+                alert('Veuillez sélectionner une version.');
                 return;
             }
             const version = select.value;
@@ -5819,7 +5380,7 @@ window.appWs = null;
                     headers: { 'Content-Type': 'application/json', 'X-API-Token': apiToken },
                     body: JSON.stringify({ version: version })
                 }).then(r => r.json()).then(data => {
-                    if (typeof showToast === 'function') showToast('Gateway', `D├®ploiement ${version} lanc├®`, 'info');
+                    if (typeof showToast === 'function') showToast('Gateway', `Déploiement ${version} lancé`, 'info');
                 });
             } else {
                 // Robot update (Pi + Arduino linked)
@@ -5828,7 +5389,7 @@ window.appWs = null;
                     headers: { 'Content-Type': 'application/json', 'X-API-Token': apiToken },
                     body: JSON.stringify({ version: version })
                 }).then(r => r.json()).then(data => {
-                    if (typeof showToast === 'function') showToast('Robot', `D├®ploiement ${version} lanc├® (Pi + Arduino)`, 'info');
+                    if (typeof showToast === 'function') showToast('Robot', `Déploiement ${version} lancé (Pi + Arduino)`, 'info');
                 });
             }
         }
@@ -5846,9 +5407,9 @@ window.appWs = null;
         window.switchTab = switchTab;
 async function triggerUpdate(target) {
             const btnText = document.getElementById(`btn-update-${target}-text`);
-            const isReinstall = btnText && btnText.textContent.toLowerCase().includes('r├®installer');
+            const isReinstall = btnText && btnText.textContent.toLowerCase().includes('réinstaller');
             const label = target === 'gateway' ? 'Gateway' : target === 'arduino' ? 'Arduino Mega' : 'Robot Pi';
-            const action = isReinstall ? 'r├®installer' : 'mettre ├á jour';
+            const action = isReinstall ? 'réinstaller' : 'mettre à jour';
             if (!confirm(`Voulez-vous vraiment ${action} la ${label} ?`)) return;
             try {
                 const res = await fetch(`/system/update/${target}`, {
@@ -5858,10 +5419,10 @@ async function triggerUpdate(target) {
                 if (res.ok) {
                     fetchUpdatesProgress(true);
                 } else {
-                    alert('Impossible de d├®marrer la mise ├á jour.');
+                    alert('Impossible de démarrer la mise à jour.');
                 }
             } catch (e) {
-                alert('Erreur r├®seau.');
+                alert('Erreur réseau.');
             }
         }
 
@@ -5885,28 +5446,28 @@ async function triggerUpdate(target) {
 
             if (!window.vslamTesting) {
                 // Pre-flight (note: V-SLAM tourne sur le robot en LOCAL ÔÇö il
-                // n├®cessite uniquement la pr├®sence physique d'une cam├®ra USB,
+                // nécessite uniquement la présence physique d'une caméra USB,
                 // pas que l'utilisateur active le streaming depuis Vue d'ensemble).
                 const slamInfo = getCurrentSlamMode();
                 if (!slamInfo.hasTelemetry) {
-                    if (typeof showToast === 'function') showToast('V-SLAM', 'Aucune t├®l├®m├®trie re├ºue du robot. V├®rifiez que le robot est en ligne.', 'error');
-                    else alert('V-SLAM: aucune t├®l├®m├®trie du robot.');
+                    if (typeof showToast === 'function') showToast('V-SLAM', 'Aucune télémétrie reçue du robot. Vérifiez que le robot est en ligne.', 'error');
+                    else alert('V-SLAM: aucune télémétrie du robot.');
                     return;
                 }
                 if (!slamInfo.cam1 && !slamInfo.cam2) {
-                    if (typeof showToast === 'function') showToast('V-SLAM', 'Le robot ne d├®tecte aucune cam├®ra USB. V├®rifiez le branchement physique et le mapping (onglet Arduino & Calib).', 'error');
-                    else alert('V-SLAM: aucune cam├®ra d├®tect├®e.');
+                    if (typeof showToast === 'function') showToast('V-SLAM', 'Le robot ne détecte aucune caméra USB. Vérifiez le branchement physique et le mapping (onglet Arduino & Calib).', 'error');
+                    else alert('V-SLAM: aucune caméra détectée.');
                     return;
                 }
                 if (typeof showToast === 'function') {
-                    const label = (slamInfo.cam1 && slamInfo.cam2) ? 'St├®r├®o (Cam1+Cam2)'
+                    const label = (slamInfo.cam1 && slamInfo.cam2) ? 'Stéréo (Cam1+Cam2)'
                                  : (slamInfo.cam1 ? 'Mono (Cam2 absente)' : 'Mono (Cam1 absente)');
-                    showToast('V-SLAM', 'Lancement LOCAL du test sur le robot ÔÇö mode ' + label + ' (ind├®pendant du streaming utilisateur).', 'info');
+                    showToast('V-SLAM', 'Lancement LOCAL du test sur le robot ÔÇö mode ' + label + ' (indépendant du streaming utilisateur).', 'info');
                 }
                 
 
                 window.vslamTesting = true;
-                btn.textContent = 'ÔÅ╣´©Å Arr├¬ter le Test V-SLAM (' + slamInfo.mode + ')';
+                btn.textContent = 'ÔÅ╣´©Å Arrêter le Test V-SLAM (' + slamInfo.mode + ')';
                 btn.className = 'btn btn-secondary';
                 container.style.display = 'block';
                 badgeEl.textContent = 'Actif';
@@ -5943,7 +5504,7 @@ async function triggerUpdate(target) {
                         
 
                         if (delta > 12) {
-                            qualVal.textContent = 'D├®grad├®e';
+                            qualVal.textContent = 'Dégradée';
                             qualVal.style.color = 'var(--danger)';
                             warningBox.style.display = 'block';
                         } else {
@@ -5955,7 +5516,7 @@ async function triggerUpdate(target) {
                     
 
                     if (hz > 0.1) {
-                        statusVal.textContent = 'Localis├® / Tracking';
+                        statusVal.textContent = 'Localisé / Tracking';
                         statusVal.style.color = 'var(--success)';
                     } else {
                         let odomTopicActive = false;
@@ -5963,10 +5524,10 @@ async function triggerUpdate(target) {
                             odomTopicActive = window.lastTelemetryState.topics.some(t => t.name === '/odom' && t.hz > 0);
                         }
                         if (odomTopicActive) {
-                            statusVal.textContent = 'Recherche de rep├¿res...';
+                            statusVal.textContent = 'Recherche de repères...';
                             statusVal.style.color = 'var(--accent)';
                         } else {
-                            statusVal.textContent = 'Attente du n┼ôud ROS 2...';
+                            statusVal.textContent = 'Attente du nœud ROS 2...';
                             statusVal.style.color = 'var(--text-secondary)';
                         }
                     }
@@ -5980,7 +5541,7 @@ async function triggerUpdate(target) {
                 container.style.display = 'none';
                 badgeEl.textContent = 'Inactif';
                 badgeEl.className = 'status-badge';
-                statusVal.textContent = 'Non d├®marr├®';
+                statusVal.textContent = 'Non démarré';
                 statusVal.style.color = 'var(--text-secondary)';
                 rateVal.textContent = '0.0 Hz';
                 document.getElementById('vslam-quality-val').textContent = 'Optimale';
@@ -6052,7 +5613,7 @@ async function triggerUpdate(target) {
 
 
                 let trackTimeout = setTimeout(() => {
-                    showVslamWebRTCError('Timeout ÔÇö aucun flux re├ºu apr├¿s 8s');
+                    showVslamWebRTCError('Timeout ÔÇö aucun flux reçu après 8s');
                 }, 8000);
 
 
@@ -6198,11 +5759,11 @@ async function triggerUpdate(target) {
             appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: cmd }));
             if (typeof showToast === 'function') {
                 const labels = { stand: 'Se lever', sit: "S'asseoir", stop: 'Stop' };
-                showToast("T├®l├®commande", labels[cmd] || cmd + " envoy├®", "info");
+                showToast("Télécommande", labels[cmd] || cmd + " envoyé", "info");
             }
         } else {
             if (typeof showToast === 'function') {
-                showToast("Erreur", "WebSocket non connect├®. Le robot est peut-├¬tre hors ligne.", "error");
+                showToast("Erreur", "WebSocket non connecté. Le robot est peut-être hors ligne.", "error");
             }
         }
             }
@@ -6366,7 +5927,7 @@ async function triggerUpdate(target) {
                 const btn = document.querySelector('#nav-target-panel .btn-primary');
                 if (btn) {
                     const originalText = btn.innerHTML;
-                    btn.innerHTML = 'ÔÜí Objectif Envoy├® !';
+                    btn.innerHTML = 'ÔÜí Objectif Envoyé !';
                     btn.style.backgroundColor = 'var(--success)';
                     setTimeout(() => {
                         btn.innerHTML = originalText;
