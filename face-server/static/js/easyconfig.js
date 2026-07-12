@@ -776,6 +776,18 @@ var ecLRStreamA = null;
             ecTempOffsets = new Array(12).fill(0);
             ecJointServoAttached = false;
             
+            // Sauvegarder le mode démo/réel précédent
+            const demoCheck = document.getElementById('demo-mode-checkbox');
+            window.ecPreviousDemoMode = demoCheck ? demoCheck.checked : true;
+            
+            // Forcer le mode simulation pour la sécurité des moteurs
+            if (typeof window.toggleDemoMode === 'function') {
+                window.toggleDemoMode(true);
+            }
+            if (demoCheck) {
+                demoCheck.checked = true;
+            }
+
             for (let id of [1, 2]) {
                 if (ecPeerConnections[id]) {
                     try { ecPeerConnections[id].close(); } catch(e) {}
@@ -834,6 +846,15 @@ var ecLRStreamA = null;
             o.classList.remove('active');
             o.setAttribute('inert', '');
             
+            // Restaurer le mode démo/réel précédent
+            if (window.ecPreviousDemoMode !== undefined && typeof window.toggleDemoMode === 'function') {
+                window.toggleDemoMode(window.ecPreviousDemoMode);
+                const demoCheck = document.getElementById('demo-mode-checkbox');
+                if (demoCheck) {
+                    demoCheck.checked = window.ecPreviousDemoMode;
+                }
+            }
+
             for (let id of [1, 2]) {
                 const videoEl = document.getElementById(`ec-cam-video-${id}`);
                 if (window.hlsInstances && window.hlsInstances[`ec-${id}`]) {
@@ -1489,9 +1510,19 @@ var ecLRStreamA = null;
         }
 
         function ecStartRobotAndClose() {
+            // Forcer le retour en mode réel
+            window.ecPreviousDemoMode = false;
+            
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "start_robot" }));
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+                
+                // Délai de 300ms avant d'envoyer 'stand' pour laisser le temps au basculement en mode réel
+                // (qui envoie 'sit' automatiquement) de se stabiliser, puis écraser par 'stand'.
+                setTimeout(function() {
+                    if (appWs && appWs.readyState === WebSocket.OPEN) {
+                        appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+                    }
+                }, 300);
             }
             closeEasyConfig();
         }
