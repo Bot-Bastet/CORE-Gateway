@@ -400,7 +400,7 @@ window.appWs = null;
                         // Rotate 3D IMU CSS Cube
                         const cube = document.getElementById('imu-visual-cube');
                         if (cube) {
-                            cube.style.transform = `rotateX(${-pitch}deg) rotateY(${roll}deg) rotateZ(${-yaw}deg)`;
+                            cube.style.transform = `rotateX(${-pitch}deg) rotateY(${yaw}deg) rotateZ(${-roll}deg)`;
                         }
                     }
 
