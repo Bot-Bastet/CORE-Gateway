@@ -265,6 +265,8 @@ async def handle_robot_posture_update(key: str, value, manager):
         value = bool(value)
     elif key == "powered":
         value = bool(value)
+    elif key == "imu_stab":
+        value = bool(value)
 
     robot_posture[key] = value
 

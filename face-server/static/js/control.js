@@ -8,7 +8,7 @@ controlActiveDir = null;
 controlWalkInterval = null;
 navPointA = null;
 navPointB = null;
-robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit" };
+robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit", imu_stab: false };
 
 // LLM auto-execute: disabled by default
 window.llmAutoControl = false;
@@ -347,6 +347,8 @@ function applyRobotPostureSync(postureData) {
   });
   var demoCheck = document.getElementById('demo-mode-checkbox');
   if (demoCheck) demoCheck.checked = robotPosture.demo_mode;
+  var imuCheck = document.getElementById('nav-imu-stab-checkbox');
+  if (imuCheck) imuCheck.checked = robotPosture.imu_stab;
   var powerBtn = document.getElementById('power-toggle-btn');
   if (powerBtn) {
     powerBtn.textContent = robotPosture.powered ? '⏻ Allumé' : '⏻ Éteint';
