@@ -23,6 +23,30 @@ async def websocket_robot(websocket: WebSocket, token: Optional[str] = Query(Non
         return
 
     await manager.connect(websocket, "robot")
+    
+    # Synchronisation initiale de la posture et de la sécurité (moteurs éteints par défaut)
+    try:
+        is_demo = state.robot_posture.get("demo_mode", False)
+        is_powered = state.robot_posture.get("powered", False)
+        
+        # 1. Envoyer le mode démo actuel
+        await websocket.send_json({"type": "demo_mode", "enabled": is_demo})
+        
+        # 2. Si le robot est éteint dans la Gateway, forcer la commande de sécurité 'stop'
+        if not is_powered or is_demo:
+            await websocket.send_json({"type": "arduino_cmd", "cmd": "stop"})
+            await websocket.send_json({"type": "cmd_vel", "linear": 0.0, "angular": 0.0})
+        else:
+            current_pos = state.robot_posture.get("posture", "sit")
+            await websocket.send_json({"type": "arduino_cmd", "cmd": current_pos})
+            
+        # 3. Synchroniser les autres paramètres de posture (hauteur, inclinaisons)
+        for k, v in state.robot_posture.items():
+            if k not in ("demo_mode", "powered", "posture"):
+                await websocket.send_json({"type": "robot_posture", "key": k, "value": v})
+    except Exception as e:
+        print(f"[WS Robot] Erreur envoi état initial au robot : {e}")
+
     for cam_id in [1, 2]:
         if stream_active[cam_id]:
             try:
