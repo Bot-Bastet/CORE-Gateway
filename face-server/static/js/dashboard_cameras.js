@@ -325,9 +325,9 @@
         function closeServoTester() {
             document.getElementById('servo-tester-overlay').classList.remove('active');
             testerStopAll();
-            // FIX: Redemarrer le motion_node en mode stand apres le test individuel
+            // SAFETY: Send stop (not stand) to detach all servos.
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
             }
         }
 
@@ -372,7 +372,8 @@
 
         function testerAttach(idx) {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "attach", index: idx }));
+                // manual:true bypasses Arduino safety gate for uncalibrated servos
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "attach", index: idx, manual: true }));
                 
 
                 document.getElementById(`tester-btn-attach-${idx}`).style.display = 'none';

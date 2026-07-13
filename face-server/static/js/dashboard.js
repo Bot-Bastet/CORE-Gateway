@@ -109,7 +109,7 @@ window.appWs = null;
         window.robotPose = {x: 0, y: 0, theta: 0};
 
 
-        // ÔöÇÔöÇÔöÇ THEME ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── THEME ──────────────────────────────────────────────────────────────
         function getCookie(name) {
             const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
             return v ? v.pop() : null;
@@ -137,7 +137,7 @@ window.appWs = null;
         })();
 
 
-        // ÔöÇÔöÇÔöÇ INIT ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── INIT ─────────────────────────────────────────────────────────────
         
 
         async function checkAuth() {
@@ -226,12 +226,12 @@ window.appWs = null;
             setTimeout(() => {
                 const badgeCalib = document.getElementById('calib-status-badge');
                 if (badgeCalib && badgeCalib.textContent.includes('Chargement')) {
-                    badgeCalib.textContent = 'ÔÅ│ En attente des donnees moteurs...';
+                    badgeCalib.textContent = '⏳ En attente des donnees moteurs...';
                     badgeCalib.style.color = 'var(--text-secondary)';
                     badgeCalib.style.fontWeight = 'normal';
                 }
             }, 10000);
-            // Force refresh SLAM badge every 3s ÔÇö picks up new cam1_connected/cam2_connected
+            // Force refresh SLAM badge every 3s — picks up new cam1_connected/cam2_connected
             // even when telemetry 'sensors' field hasn't been re-broadcast for a while.
             setInterval(() => { try { updateSLAMMode(); } catch (e) { console.warn('updateSLAMMode tick failed', e); } }, 3000);
         }
@@ -253,7 +253,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ WEBSOCKET CLIENT ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── WEBSOCKET CLIENT ─────────────────────────────────────────────────
         
 
         function connectGlobalWebSocket() {
@@ -591,11 +591,11 @@ window.appWs = null;
                     const previewBtn = document.getElementById('calib-cam-preview-' + camId);
                     if (previewBtn) {
                         if (isActive) {
-                            previewBtn.textContent = 'Ôûá Arrêter';
+                            previewBtn.textContent = '■ Arrêter';
                             previewBtn.style.background = 'rgba(239,68,68,0.1)';
                             previewBtn.style.borderColor = 'rgba(239,68,68,0.3)';
                         } else {
-                            previewBtn.textContent = 'ÔûÂ Aperçu';
+                            previewBtn.textContent = '▶ Aperçu';
                             previewBtn.style.background = 'rgba(99,102,241,0.1)';
                             previewBtn.style.borderColor = 'rgba(99,102,241,0.3)';
                         }
@@ -612,10 +612,10 @@ window.appWs = null;
                     if (keepBtn) {
                         if (isKeep) {
                             keepBtn.classList.add("active");
-                            keepBtn.innerHTML = "­ƒôî Keep Stream : ON";
+                            keepBtn.innerHTML = "­📌 Keep Stream : ON";
                         } else {
                             keepBtn.classList.remove("active");
-                            keepBtn.innerHTML = "­ƒôî Keep Stream : OFF";
+                            keepBtn.innerHTML = "­📌 Keep Stream : OFF";
                         }
                     }
                 }
@@ -701,7 +701,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ CHAT TAB IA FUNCTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── CHAT TAB IA FUNCTIONS ────────────────────────────────────────────
         
 
         function sendChatMessage(e) {
@@ -766,7 +766,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ TÉLÉCOMMANDE CHAT VOCAL & PILOTAGE IA ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── TÉLÉCOMMANDE CHAT VOCAL & PILOTAGE IA ────────────────────────────
         function sendControlChatMessage(e) {
             if (e) e.preventDefault();
             const input = document.getElementById('control-chat-input');
@@ -1053,8 +1053,14 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ CALIBRATION WINDOW FUNCTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
-        
+        function updateCalibSliderVal(index) {
+            const slider = document.getElementById(`calib-slider-${index}`);
+            const label = document.getElementById(`calib-val-${index}`);
+            if (slider && label) {
+                label.textContent = slider.value >= 0 ? `+${slider.value}` : slider.value;
+            }
+        }
+        window.updateCalibSliderVal = updateCalibSliderVal;
 
         async function loadSavedOffsets() {
             try {
@@ -1064,6 +1070,8 @@ window.appWs = null;
                 if (res.ok) {
                     const data = await res.json();
                     const offsets = data.offsets || [];
+                    const limits = data.limits || [];
+                    const inverts = data.inverts || [];
                     
 
                     let allZero = true;
@@ -1077,12 +1085,20 @@ window.appWs = null;
                             slider.value = val;
                             updateCalibSliderVal(i);
                         }
+                        
+                        const minInput = document.getElementById(`calib-min-${i}`);
+                        const maxInput = document.getElementById(`calib-max-${i}`);
+                        const invertCheck = document.getElementById(`calib-invert-${i}`);
+                        
+                        if (minInput) minInput.value = (limits[i] && limits[i][0] !== undefined) ? limits[i][0] : 0;
+                        if (maxInput) maxInput.value = (limits[i] && limits[i][1] !== undefined) ? limits[i][1] : 180;
+                        if (invertCheck) invertCheck.checked = inverts[i] === true;
                     }
                     
 
                     const statusText = allZero 
-                        ? '­ƒÜ½ Offsets non configurés (Moteurs désactivés)' 
-                        : 'Ô£à Offsets configurés (Moteurs actifs)';
+                        ? '­🚫 Offsets non configurés (Moteurs désactivés)' 
+                        : '✅ Offsets configurés (Moteurs actifs)';
                     const statusColor = allZero ? 'var(--danger)' : 'var(--success)';
                     
 
@@ -1097,7 +1113,7 @@ window.appWs = null;
                 console.error("Erreur lors du chargement des offsets:", err);
                 const badgeCalib = document.getElementById('calib-status-badge');
                 if (badgeCalib) {
-                    badgeCalib.textContent = 'ÔÜá´©Å Offsets non disponibles (Gateway inaccessible?)';
+                    badgeCalib.textContent = '⚠️ Offsets non disponibles (Gateway inaccessible?)';
                     badgeCalib.style.color = 'var(--warning)';
                     badgeCalib.style.fontWeight = 'bold';
                 }
@@ -1752,7 +1768,7 @@ window.appWs = null;
 
 
 
-        // ÔöÇÔöÇÔöÇ Camera L/R Assignment Modal with Live Stream Previews (WebRTC) ÔöÇÔöÇÔöÇÔöÇ
+        // ─── Camera L/R Assignment Modal with Live Stream Previews (WebRTC) ────
         let assignAssigned = { left: null, right: null };
 
 
@@ -1776,8 +1792,8 @@ window.appWs = null;
             startAssignPreview(2);
             // Pre-fill current mapping from telemetry camera_mapping
             // camera_mapping.left = device path for cam1, camera_mapping.right = device path for cam2
-            // If cam1's device is currently on left ÔåÆ cam1=left, cam2=right (default)
-            // If they've been swapped ÔåÆ cam2=left, cam1=right
+            // If cam1's device is currently on left → cam1=left, cam2=right (default)
+            // If they've been swapped → cam2=left, cam1=right
             const leftSelect = document.getElementById('cam-port-left');
             const rightSelect = document.getElementById('cam-port-right');
             const telMapping = window.lastTelemetryState && window.lastTelemetryState.camera_mapping;
@@ -1990,11 +2006,11 @@ window.appWs = null;
 
 
                 if (assigned === 'left') {
-                    label.textContent = 'ÔåÉ Gauche';
+                    label.textContent = '← Gauche';
                     label.style.color = '#3b82f6';
                     label.style.background = 'rgba(59,130,246,0.15)';
                 } else if (assigned === 'right') {
-                    label.textContent = 'Droite ÔåÆ';
+                    label.textContent = 'Droite →';
                     label.style.color = '#ef4444';
                     label.style.background = 'rgba(239,68,68,0.15)';
                 } else {
@@ -2042,7 +2058,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ SERVO TESTER FUNCTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── SERVO TESTER FUNCTIONS ───────────────────────────────────────────
         const TESTER_JOINT_NAMES = [
             'Avant Droite Hanche', 'Avant Droite Tibia', 'Avant Droite Genou',
             'Avant Gauche Hanche', 'Avant Gauche Tibia', 'Avant Gauche Genou',
@@ -2064,9 +2080,9 @@ window.appWs = null;
         function closeServoTester() {
             document.getElementById('servo-tester-overlay').classList.remove('active');
             testerStopAll();
-            // FIX: Redemarrer le motion_node en mode stand apres le test individuel
+            // SAFETY: Send stop (not stand) to detach all servos.
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
             }
         }
 
@@ -2111,7 +2127,7 @@ window.appWs = null;
 
         function testerAttach(idx) {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "attach", index: idx }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "attach", index: idx, manual: true }));
                 
 
                 document.getElementById(`tester-btn-attach-${idx}`).style.display = 'none';
@@ -2160,7 +2176,7 @@ window.appWs = null;
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 const parsedAngle = parseFloat(angle);
                 const chk = (idx + Math.floor(parsedAngle)) % 100;
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parsedAngle, chk: chk }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parsedAngle, chk: chk, manual: true }));
             }
         }
 
@@ -2176,7 +2192,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ WIFI POPUP FUNCTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── WIFI POPUP FUNCTIONS ─────────────────────────────────────────────
         
 
         function openWifiModal() {
@@ -2244,7 +2260,7 @@ window.appWs = null;
             const btn = document.getElementById('btn-wifi-scan');
             if (btn) btn.disabled = false;
             if (listContainer) {
-                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem; line-height: 1.5;">ÔÜá´©Å Scan WiFi échoué<br><small style="color: var(--text-secondary);">${errMsg}<br>Interface : ${iface} ┬À Gestionnaire : ${mgr}</small></div>`;
+                listContainer.innerHTML = `<div style="text-align: center; color: var(--danger); padding: 2rem 0; font-size: 0.85rem; line-height: 1.5;">⚠️ Scan WiFi échoué<br><small style="color: var(--text-secondary);">${errMsg}<br>Interface : ${iface} ┬À Gestionnaire : ${mgr}</small></div>`;
             }
             if (knownContainer) {
                 knownContainer.innerHTML = `<div style="text-align: center; color: var(--text-secondary); padding: 1rem 0; font-size: 0.85rem;">Surveillance WiFi indisponible.</div>`;
@@ -2497,7 +2513,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ CANVASES RENDER CODES ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── CANVASES RENDER CODES ───────────────────────────────────────────
         
 
         function drawSLAMMap() {
@@ -2669,7 +2685,7 @@ window.appWs = null;
 
         
 
-// ÔöÇÔöÇÔöÇ V-SLAM mode helper (used by updateSLAMMode + toggleVSlamTest pre-flight)
+// ─── V-SLAM mode helper (used by updateSLAMMode + toggleVSlamTest pre-flight)
         function getCurrentSlamMode() {
             const sensors = window.lastTelemetryState && window.lastTelemetryState.sensors;
             const cam1 = !!(sensors && sensors.cam1_connected === true);
@@ -2756,7 +2772,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ MOBILE SIDEBAR ACTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── MOBILE SIDEBAR ACTIONS ───────────────────────────────────────────
 
 
         function toggleSidebar() {
@@ -2779,7 +2795,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ TABS SWITCHING ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── TABS SWITCHING ───────────────────────────────────────────────────
 
 
         function switchTab(tabId) {
@@ -2831,7 +2847,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ TELEMETRY ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── TELEMETRY ────────────────────────────────────────────────────────
 
 
         async function fetchTelemetry() {
@@ -3090,7 +3106,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ CAMERA STREAM ON-DEMAND ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── CAMERA STREAM ON-DEMAND ─────────────────────────────────────────
 
 
         window.forceStereoUI = false;
@@ -3314,7 +3330,7 @@ window.appWs = null;
                     if (peerConnections[camId] === pc) peerConnections[camId] = null;
                 }
                 window.localViewing[camId] = false;
-                // FIX: NE PAS set userClosedStream ici ÔÇö le stream tourne côté robot,
+                // FIX: NE PAS set userClosedStream ici — le stream tourne côté robot,
                 // c'est juste le WebRTC local qui a échoué. On garde le loader
                 // visible pour que l'utilisateur voie qu'on attend.
                 streamingState[camId] = 'idle';
@@ -3342,7 +3358,7 @@ window.appWs = null;
 
 
                 let trackTimeout = setTimeout(() => {
-                    if (!trackReceived) showWebRTCError('Timeout ÔÇö aucun flux reçu après 25s');
+                    if (!trackReceived) showWebRTCError('Timeout — aucun flux reçu après 25s');
                 }, 25000);
 
 
@@ -3424,7 +3440,7 @@ window.appWs = null;
             const statusEl = document.getElementById('stream-quality-status');
             const originalText = btn ? btn.textContent : '­ƒöì';
             if (btn) {
-                btn.textContent = 'ÔÅ│...';
+                btn.textContent = '⏳...';
                 btn.disabled = true;
             }
             statusEl.textContent = 'Détection des résolutions caméra ' + camId + '...';
@@ -3446,7 +3462,7 @@ window.appWs = null;
                     btn.disabled = false;
                 }
                 if (statusEl.textContent.startsWith('Détection')) {
-                    statusEl.textContent = 'Délai dépassé ÔÇö essayez de connecter la caméra';
+                    statusEl.textContent = 'Délai dépassé — essayez de connecter la caméra';
                     statusEl.style.color = 'var(--danger)';
                     setTimeout(() => { statusEl.textContent = ''; }, 4000);
                 }
@@ -3562,7 +3578,7 @@ window.appWs = null;
 
 
 
-        // ÔöÇÔöÇÔöÇ Smart Camera Port Dropdowns ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── Smart Camera Port Dropdowns ──────────────────────────────────
         // - Filter to only /dev/videoX that have live USB data (from telemetry)
         // - Disallow selecting same port on left AND right (rollback to last-good on conflict)
         // - When only 1 active device: disable right + show "caméra central" helper
@@ -3604,7 +3620,7 @@ window.appWs = null;
                     sel.value = only;
                 });
                 rightSelects.forEach(sel => {
-                    sel.innerHTML = '<option value="">ÔÇö</option>';
+                    sel.innerHTML = '<option value="">—</option>';
                     sel.value = '';
                     sel.disabled = true;
                 });
@@ -4358,13 +4374,13 @@ window.appWs = null;
                 const camData = calStatus[String(camId)] || calStatus[camId] || {};
                 const calibrated = camData.calibrated === true;
                 if (calibrated) {
-                    badge.textContent = 'Ô£à Calibrée';
+                    badge.textContent = '✅ Calibrée';
                     badge.style.background = 'rgba(34,197,94,0.15)';
                     badge.style.color = 'var(--success)';
                     badge.style.borderColor = 'rgba(34,197,94,0.3)';
                     badge.setAttribute('data-calibrated', 'true');
                 } else {
-                    badge.textContent = 'ÔÜá Non calibrée';
+                    badge.textContent = '⚠️ Non calibrée';
                     badge.style.background = 'rgba(239,68,68,0.15)';
                     badge.style.color = 'var(--danger)';
                     badge.style.borderColor = 'rgba(239,68,68,0.3)';
@@ -4421,7 +4437,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ ACCOUNTS MANAGEMENT ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── ACCOUNTS MANAGEMENT ─────────────────────────────────────────────
 
 
         async function loadAccounts() {
@@ -4464,7 +4480,7 @@ window.appWs = null;
 
                         const mygesCreds = mygesList[fullName];
                         const mygesBadge = mygesCreds 
-                            ? `<span class="status-badge active" style="font-size: 0.75rem;">Ô£à MyGES : ${mygesCreds.username}</span>`
+                            ? `<span class="status-badge active" style="font-size: 0.75rem;">✅ MyGES : ${mygesCreds.username}</span>`
                             : `<span class="status-badge" style="font-size: 0.75rem; background-color: rgba(225, 29, 72, 0.05); color: var(--danger); border: 1px solid rgba(225, 29, 72, 0.15)">ÔØî MyGES non configuré</span>`;
 
 
@@ -4715,7 +4731,7 @@ window.appWs = null;
 
             // Show loading state
             btn.disabled = true;
-            btn.innerHTML = 'ÔÅ│ Test en cours...';
+            btn.innerHTML = '⏳ Test en cours...';
             resultDiv.style.display = 'block';
             resultDiv.style.background = 'rgba(99,102,241,0.1)';
             resultDiv.style.color = '#6366f1';
@@ -4737,7 +4753,7 @@ window.appWs = null;
                 if (data.status === 'success') {
                     resultDiv.style.background = 'rgba(34,197,94,0.1)';
                     resultDiv.style.color = '#22c55e';
-                    resultDiv.innerHTML = 'Ô£à ' + data.message;
+                    resultDiv.innerHTML = '✅ ' + data.message;
                 } else {
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
                     resultDiv.style.color = '#ef4444';
@@ -4869,7 +4885,7 @@ window.appWs = null;
                 if (saveRes.ok) {
                     resultDiv.style.background = 'rgba(34,197,94,0.1)';
                     resultDiv.style.color = '#22c55e';
-                    resultDiv.textContent = 'Ô£à Identifiants valides et sauvegardés !';
+                    resultDiv.textContent = '✅ Identifiants valides et sauvegardés !';
                     setTimeout(() => { closeMygesModal(); loadAccounts(); }, 800);
                 } else {
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
@@ -4884,7 +4900,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ FACES GALLERY ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── FACES GALLERY ───────────────────────────────────────────────────
 
 
         async function loadFacesGallery() {
@@ -5006,7 +5022,7 @@ window.appWs = null;
                 card.className = 'face-img-card';
                 card.innerHTML = `
                     <img src="#" id="face-img-${f.id}" class="face-img-element" onclick="showLightbox(this.src)" title="Agrandir"/>
-                    <button class="face-delete-btn" onclick="deleteFace('${f.id}')" title="Supprimer">Ô£ò</button>
+                    <button class="face-delete-btn" onclick="deleteFace('${f.id}')" title="Supprimer">✔</button>
                     <div class="face-img-overlay">
                         <div class="face-img-info">${f.original_name}</div>
                         <div style="font-size: 0.6rem; color: #71717a;">${new Date(f.uploaded_at).toLocaleDateString()}</div>
@@ -5143,7 +5159,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ UPDATER & SERVICES ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── UPDATER & SERVICES ───────────────────────────────────────────────
 
 
         async function fetchUpdatesProgress(force = false) {
@@ -5235,7 +5251,7 @@ window.appWs = null;
 
         failed_launch: "ÔØî Échec lancement (voir logs agent)",
         failed_launch_msg: "Le robot n'a pas pu démarrer la màj Arduino.",
-        stale_starting: "ÔÜá´©Å Blocage dès le lancement (60 s sans progrès)",
+        stale_starting: "⚠️ Blocage dès le lancement (60 s sans progrès)",
                         'stopping_services': 'ÔÅ╣ Arrêt services...',
                         'checking_tools': '­ƒöì Vérification arduino-cli...',
                         'installing_core': '­ƒôª Installation core AVR...',
@@ -5245,10 +5261,10 @@ window.appWs = null;
                         'compiling': 'ÔÜÖ´©Å Compilation...',
                         'flashing': 'ÔÜí Flashage en cours...',
                         'idle': 'Ô£ô Prêt',
-                        'starting': 'ÔûÂ Démarrage...',
+                        'starting': '▶ Démarrage...',
                     };
                     let ardDisplayStatus = ardStatusLabels[ardStatusLower] || ard.status || 'Prêt';
-                    if (ardStatusLower.startsWith('failed')) ardDisplayStatus = 'Ô£ù ' + (ardStatusLower.replace('failed_','').replace(/_/g,' ') || 'Erreur');
+                    if (ardStatusLower.startsWith('failed')) ardDisplayStatus = '❌ ' + (ardStatusLower.replace('failed_','').replace(/_/g,' ') || 'Erreur');
                     if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = 'Ô£ô À jour';
 
 
@@ -5330,7 +5346,7 @@ window.appWs = null;
         }
 
 
-        // ÔöÇÔöÇÔöÇ Release Rollback ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── Release Rollback ────────────────────────────────────────────
         let cachedReleases = { gateway: [], robot: [] };
         
 
@@ -5430,7 +5446,7 @@ async function triggerUpdate(target) {
 
 
         // EasyConfig functions moved to static/js/easyconfig.js
-        // ÔöÇÔöÇÔöÇ VSLAM TEST FUNCTIONS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── VSLAM TEST FUNCTIONS ──────────────────────────────────────────────
         window.vslamTesting = false;
         let vslamPeerConnection = null;
         let lastPoseTime = 0;
@@ -5447,7 +5463,7 @@ async function triggerUpdate(target) {
             
 
             if (!window.vslamTesting) {
-                // Pre-flight (note: V-SLAM tourne sur le robot en LOCAL ÔÇö il
+                // Pre-flight (note: V-SLAM tourne sur le robot en LOCAL — il
                 // nécessite uniquement la présence physique d'une caméra USB,
                 // pas que l'utilisateur active le streaming depuis Vue d'ensemble).
                 const slamInfo = getCurrentSlamMode();
@@ -5464,7 +5480,7 @@ async function triggerUpdate(target) {
                 if (typeof showToast === 'function') {
                     const label = (slamInfo.cam1 && slamInfo.cam2) ? 'Stéréo (Cam1+Cam2)'
                                  : (slamInfo.cam1 ? 'Mono (Cam2 absente)' : 'Mono (Cam1 absente)');
-                    showToast('V-SLAM', 'Lancement LOCAL du test sur le robot ÔÇö mode ' + label + ' (indépendant du streaming utilisateur).', 'info');
+                    showToast('V-SLAM', 'Lancement LOCAL du test sur le robot — mode ' + label + ' (indépendant du streaming utilisateur).', 'info');
                 }
                 
 
@@ -5615,7 +5631,7 @@ async function triggerUpdate(target) {
 
 
                 let trackTimeout = setTimeout(() => {
-                    showVslamWebRTCError('Timeout ÔÇö aucun flux reçu après 8s');
+                    showVslamWebRTCError('Timeout — aucun flux reçu après 8s');
                 }, 8000);
 
 
@@ -5679,7 +5695,7 @@ async function triggerUpdate(target) {
         }
 
 
-        // ÔöÇÔöÇÔöÇ TELECOMMANDE & NAVIGATION CONTROLS ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+        // ─── TELECOMMANDE & NAVIGATION CONTROLS ──────────────────────────────────
         let controlWalkInterval = null;
         let controlActiveDir = null;
         let controlSpeed = 0.15; // default speed in m/s

@@ -32,13 +32,13 @@ async def websocket_robot(websocket: WebSocket, token: Optional[str] = Query(Non
         # 1. Envoyer le mode démo actuel
         await websocket.send_json({"type": "demo_mode", "enabled": is_demo})
         
-        # 2. Si le robot est éteint dans la Gateway, forcer la commande de sécurité 'stop'
-        if not is_powered or is_demo:
-            await websocket.send_json({"type": "arduino_cmd", "cmd": "stop"})
-            await websocket.send_json({"type": "cmd_vel", "linear": 0.0, "angular": 0.0})
-        else:
-            current_pos = state.robot_posture.get("posture", "sit")
-            await websocket.send_json({"type": "arduino_cmd", "cmd": current_pos})
+        # 2. 🔴 CRITICAL SAFETY: ALWAYS send 'stop' on robot connect to ensure
+        # all servos are detached. Never send a posture command (stand/sit)
+        # on connect because the motors may not be calibrated yet, and sending
+        # stand/sit would move them to a potentially destructive position.
+        # The user must explicitly start the robot via the dashboard.
+        await websocket.send_json({"type": "arduino_cmd", "cmd": "stop"})
+        await websocket.send_json({"type": "cmd_vel", "linear": 0.0, "angular": 0.0})
             
         # 3. Synchroniser les autres paramètres de posture (hauteur, inclinaisons)
         for k, v in state.robot_posture.items():

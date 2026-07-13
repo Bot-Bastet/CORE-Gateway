@@ -58,38 +58,95 @@
         }
         async function resetAndSendZeroOffsets() {
             resetMotorCalibration();
+            // 🔴 CRITICAL: send stop FIRST to detach all servos immediately,
+            // then clear_servo_calib to erase EEPROM magic numbers.
+            // This prevents any motor movement during the reset process.
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "clear_servo_calib" }));
+            }
             const zeroes = new Array(12).fill(0);
+            const defaultLimits = [];
+            for (let i = 0; i < 12; i++) defaultLimits.push([0, 180]);
+            const defaultInverts = new Array(12).fill(false);
             try {
                 await fetch('/core/calibration', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-API-Token': apiToken },
-                    body: JSON.stringify({ offsets: zeroes })
+                    body: JSON.stringify({ offsets: zeroes, limits: defaultLimits, inverts: defaultInverts })
                 });
             } catch(e) {}
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: zeroes }));
+                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: zeroes, limits: defaultLimits, inverts: defaultInverts }));
             }
             loadSavedOffsets();
+            // Reset 3D viewer to off position (offsets now zero)
+            window.offsetsCalibrated = false;
+            if (typeof window.resetSpotMicro3D === 'function') {
+                window.resetSpotMicro3D();
+            }
         }
 
 
         function sendStopServos() {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+                appWs.send(JSON.stringify({ type: "robot_posture_update", key: "powered", value: false }));
             }
         }
         async function sendCalibrationOffsets() {
             const offsets = [];
+            const limits = [];
+            const inverts = [];
             for (let i = 0; i < 12; i++) {
                 const slider = document.getElementById(`calib-slider-${i}`);
                 offsets.push(slider ? parseInt(slider.value) : 0);
+                
+                const minInput = document.getElementById(`calib-min-${i}`);
+                const maxInput = document.getElementById(`calib-max-${i}`);
+                const invertCheck = document.getElementById(`calib-invert-${i}`);
+                
+                limits.push([
+                    minInput ? parseInt(minInput.value) : 0,
+                    maxInput ? parseInt(maxInput.value) : 180
+                ]);
+                inverts.push(invertCheck ? invertCheck.checked : false);
             }
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets, limits: limits, inverts: inverts }));
             } else {
                 alert("WebSocket déconnecté.");
             }
         }
+
+        function toggleCalibMirror(index) {
+            const invertCheck = document.getElementById(`calib-invert-${index}`);
+            const slider = document.getElementById(`calib-slider-${index}`);
+            if (slider) {
+                const oldOffset = parseInt(slider.value) || 0;
+                slider.value = -oldOffset;
+                updateCalibSliderVal(index);
+            }
+            
+            const minInput = document.getElementById(`calib-min-${index}`);
+            const maxInput = document.getElementById(`calib-max-${index}`);
+            if (minInput && maxInput) {
+                const oldMin = parseInt(minInput.value) || 0;
+                const oldMax = parseInt(maxInput.value) || 180;
+                
+                minInput.value = 180 - oldMax;
+                maxInput.value = 180 - oldMin;
+            }
+            
+            sendCalibrationOffsets();
+        }
+
+        function updateCalibLimits(index) {
+            sendCalibrationOffsets();
+        }
+
+        window.toggleCalibMirror = toggleCalibMirror;
+        window.updateCalibLimits = updateCalibLimits;
 
 
         function toggleManualJointControl(checked) {
@@ -101,9 +158,14 @@
                     slider.style.cursor = checked ? 'pointer' : 'not-allowed';
                 }
             }
-            // FIX: Arreter le motion_node quand mode manuel actif (evite ecrasement des angles)
+            // 🔴 SAFETY: Send stop if uncalibrated, stand if calibrated.
+            // Never send stand when uncalibrated — would move motors destructively.
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: checked ? "stop" : "stand" }));
+                if (!checked && window.offsetsCalibrated) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
+                } else {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+                }
             }
             if (checked) {
                 sendManualJointAngles();
@@ -161,9 +223,21 @@
 
         async function saveCalibrationOffsets() {
             const offsets = [];
+            const limits = [];
+            const inverts = [];
             for (let i = 0; i < 12; i++) {
                 const slider = document.getElementById(`calib-slider-${i}`);
                 offsets.push(slider ? parseInt(slider.value) : 0);
+                
+                const minInput = document.getElementById(`calib-min-${i}`);
+                const maxInput = document.getElementById(`calib-max-${i}`);
+                const invertCheck = document.getElementById(`calib-invert-${i}`);
+                
+                limits.push([
+                    minInput ? parseInt(minInput.value) : 0,
+                    maxInput ? parseInt(maxInput.value) : 180
+                ]);
+                inverts.push(invertCheck ? invertCheck.checked : false);
             }
             
 
@@ -174,12 +248,12 @@
                         'Content-Type': 'application/json',
                         'X-API-Token': apiToken
                     },
-                    body: JSON.stringify({ offsets: offsets })
+                    body: JSON.stringify({ offsets: offsets, limits: limits, inverts: inverts })
                 });
                 if (res.ok) {
-                    alert("Offsets sauvegardés avec succès sur la Gateway.");
+                    alert("Configuration de calibration sauvegardée avec succès sur la Gateway.");
                     if (appWs && appWs.readyState === WebSocket.OPEN) {
-                        appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+                        appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets, limits: limits, inverts: inverts }));
                     }
                     loadSavedOffsets();
                 } else {
