@@ -211,6 +211,7 @@
 
         function resetIMU() {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "reset_imu" }));
                 if (typeof showToast === 'function') showToast("IMU", "Recalibrage BNO085 en cours...", "info");
                 else console.log("[IMU] Recalibrage BNO085 envoye");

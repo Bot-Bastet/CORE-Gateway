@@ -367,9 +367,15 @@ window.appWs = null;
                     
 
                     // Update joint angles (0 to 11)
-                    if (payload.joints && payload.joints.length === 12) {
+                    const hasJoints = payload.joints && payload.joints.length === 12;
+                    const hasServoAngles = payload.servo_angles && payload.servo_angles.length === 12;
+                    const liveAngles = hasServoAngles ? payload.servo_angles : (hasJoints ? payload.joints : null);
+                    window.lastTelemetryState = Object.assign(window.lastTelemetryState || {}, payload);
+                    if (liveAngles) {
+                        window.lastTelemetryState.joints = liveAngles;
+                        window.latestServoAngles = liveAngles.slice();
                         for (let i = 0; i < 12; i++) {
-                            const angle = payload.joints[i];
+                            const angle = liveAngles[i];
                             const valEl = document.getElementById(`joint-val-${i}`);
                             const sliderEl = document.getElementById(`joint-slider-${i}`);
                             if (!window.manualJointControlActive) {
@@ -409,7 +415,7 @@ window.appWs = null;
                     const arduinoBadge = document.getElementById('arduino-status-badge');
                     const arduinoOfflineMsg = document.getElementById('arduino-offline-msg');
                     const arduinoContent = document.getElementById('arduino-telemetry-content');
-                    const hasArduino = payload.imu || (payload.joints && payload.joints.length === 12);
+                    const hasArduino = payload.imu || liveAngles;
                     if (hasArduino) {
                         arduinoBadge.className = 'status-badge active';
                         arduinoBadge.textContent = 'En ligne';
@@ -422,7 +428,7 @@ window.appWs = null;
                         document.getElementById('arduino-pitch').textContent = `${cachedImu.pitch.toFixed(1)}°`;
                         document.getElementById('arduino-yaw').textContent = `${cachedImu.yaw.toFixed(1)}°`;
                     }
-                    if (payload.joints && payload.joints.length === 12) {
+                    if (liveAngles && liveAngles.length === 12) {
                         const jointsGrid = document.getElementById('arduino-joints-grid');
                         if (jointsGrid && !jointsGrid.dataset.init) {
                             const names = ['FR-H','FR-C','FR-T','FL-H','FL-C','FL-T','BR-H','BR-C','BR-T','BL-H','BL-C','BL-T'];
@@ -430,14 +436,14 @@ window.appWs = null;
                             for (let i = 0; i < 12; i++) {
                                 const el = document.createElement('div');
                                 el.style.cssText = 'font-size:0.7rem; text-align:center; padding:0.2rem; background:var(--bg-main); border-radius:4px;';
-                                el.innerHTML = `<div style="color:var(--text-secondary);">${names[i]}</div><div style="font-weight:700; color:var(--accent);" id="gw-joint-${i}">${Math.round(payload.joints[i])}°</div>`;
+                                el.innerHTML = `<div style="color:var(--text-secondary);">${names[i]}</div><div style="font-weight:700; color:var(--accent);" id="gw-joint-${i}">${Math.round(liveAngles[i])}°</div>`;
                                 jointsGrid.appendChild(el);
                             }
                             jointsGrid.dataset.init = '1';
                         } else if (jointsGrid) {
                             for (let i = 0; i < 12; i++) {
                                 const el = document.getElementById(`gw-joint-${i}`);
-                                if (el) el.textContent = `${Math.round(payload.joints[i])}°`;
+                                if (el) el.textContent = `${Math.round(liveAngles[i])}°`;
                             }
                         }
                     }
@@ -1108,9 +1114,21 @@ window.appWs = null;
                         badgeCalib.style.color = statusColor;
                         badgeCalib.style.fontWeight = 'bold';
                     }
+                    // Flag global : pilote le viewer 3D et le verrouillage des commandes moteur
+                    window.offsetsCalibrated = !allZero;
+                    if (!window.offsetsCalibrated && typeof window.resetSpotMicro3D === 'function') {
+                        window.resetSpotMicro3D();
+                    }
+                    if (typeof window.updateCalibrationLockUI === 'function') {
+                        window.updateCalibrationLockUI();
+                    }
                 }
             } catch (err) {
                 console.error("Erreur lors du chargement des offsets:", err);
+                window.offsetsCalibrated = false;
+                if (typeof window.updateCalibrationLockUI === 'function') {
+                    window.updateCalibrationLockUI();
+                }
                 const badgeCalib = document.getElementById('calib-status-badge');
                 if (badgeCalib) {
                     badgeCalib.textContent = '⚠️ Offsets non disponibles (Gateway inaccessible?)';

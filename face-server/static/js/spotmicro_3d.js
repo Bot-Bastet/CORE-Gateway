@@ -90,8 +90,15 @@
     var moving = (cmd !== "s") && posture.powered;
     if (moving) gaitT += dt * GAIT_SPEED * (posture.speed / 10);
 
+    // When offsets are not calibrated, force the model to off/lie-down position
+    // regardless of powered state (real servo positions are unreliable)
+    // Use === true (not !== false) so that undefined (page load) also shows off
+    var offsetsOk = window.offsetsCalibrated === true;
+
     var H;
-    if (!posture.powered) {
+    if (!offsetsOk) {
+      H = LIE_H;  // Lie down: offsets not calibrated, ignore all posture commands
+    } else if (!posture.powered) {
       H = LIE_H;
     } else if (posture.posture === "sit") {
       H = 0.08; // Hauteur assis réaliste en mode allumé
@@ -102,6 +109,14 @@
 
     Object.keys(LEGS).forEach(function (id) {
       var d = LEGS[id], isLeft = d.left, ph = TROT_PHASE[id];
+
+      if (!offsetsOk) {
+        // Offsets not calibrated: all legs neutral/off (same as unpowered)
+        tgt[id + "_s"] = 0;
+        tgt[id + "_t"] = 1.25;
+        tgt[id + "_c"] = -2.59;
+        return;
+      }
 
       if (!posture.powered) {
         tgt[id + "_s"] = 0;
@@ -379,7 +394,8 @@
 
     if (!window._calibModeActive) {
       controls.target.set(worldGrp.position.x, currentH * 0.5, worldGrp.position.z);
-    } else if (matHighlight) {
+    }
+    if (matHighlight) {
       // Animate emissive intensity to pulse glowing color
       var intensity = 0.55 + Math.sin(timestamp * 0.007) * 0.45;
       matHighlight.emissiveIntensity = intensity;
@@ -400,10 +416,10 @@
     if (posture.powered) processKeys();
   }
   function processKeys() {
-    if (keys["z"] || keys["arrowup"]) { cmd = "fw"; return; }
-    if (keys["s"] || keys["arrowdown"]) { cmd = "bk"; return; }
-    if (keys["q"] || keys["arrowleft"]) { cmd = "sl"; return; }
-    if (keys["d"] || keys["arrowright"]) { cmd = "sr"; return; }
+    if (keys["z"] || keys["arrowup"]) { cmd = "bk"; return; }
+    if (keys["s"] || keys["arrowdown"]) { cmd = "fw"; return; }
+    if (keys["q"] || keys["arrowleft"]) { cmd = "sr"; return; }
+    if (keys["d"] || keys["arrowright"]) { cmd = "sl"; return; }
     if (keys["a"]) { cmd = "tl"; return; }
     if (keys["e"]) { cmd = "tr"; return; }
     if (keys[" "]) { cmd = "s"; return; }
@@ -630,7 +646,8 @@
     cmd = "s";
   };
 
-  window.highlightSpotMicroJoint = function (legId, jointType) {
+  window.highlightSpotMicroJoint = function (legId, jointType, phase) {
+    var actualPhase = phase !== undefined ? phase : 1;
     // 1. Restore all original materials
     Object.keys(legData).forEach(function (id) {
       var leg = legData[id];
@@ -653,6 +670,18 @@
       tgt[id + "_t"] = 0;
       tgt[id + "_c"] = 0;
     });
+
+    if (actualPhase === 2) {
+      // Apply target orientation for Phase 2 sens/miroir auto-detection
+      if (jointType === "hip") {
+        var dir = legId.includes("r") ? 1 : -1;
+        tgt[legId + "_s"] = dir * 0.5; // rotate hip outward
+      } else if (jointType === "upper") {
+        tgt[legId + "_t"] = 0.6; // tilt thigh forward
+      } else if (jointType === "lower") {
+        tgt[legId + "_c"] = -1.2; // bend knee inward
+      }
+    }
 
     // 3. Highlight the target joint mesh
     var targetLeg = legData[legId];

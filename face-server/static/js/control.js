@@ -72,16 +72,44 @@ function initControlTab() {
     window.addEventListener("keydown", function (e) {
       if (activeTab !== "control") return;
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      var keyMap = { "z": "up", "KeyW": "up", "ArrowUp": "up", "s": "down", "KeyS": "down", "ArrowDown": "down", "q": "strafe-left", "d": "strafe-right", "KeyA": "turn-left", "ArrowLeft": "turn-left", "KeyD": "strafe-right", "ArrowRight": "strafe-right", "a": "turn-left", "A": "turn-left", "e": "turn-right", "E": "turn-right", "KeyE": "turn-right" };
-      var dir = keyMap[e.key] || keyMap[e.code];
-      if (dir && !window.keysPressed[dir]) { e.preventDefault(); window.keysPressed[dir] = true; startWalking(dir); }
-      if (e.key === " " || e.key === "x" || e.key === "Escape") { e.preventDefault(); sendControlStop(); }
+      
+      var key = e.key.toLowerCase();
+      var dir = null;
+      if (key === "z" || key === "arrowup" || key === "w") dir = "up";
+      else if (key === "s" || key === "arrowdown") dir = "down";
+      else if (key === "q" || key === "arrowleft") dir = "strafe-left";
+      else if (key === "d" || key === "arrowright") dir = "strafe-right";
+      else if (key === "a") dir = "turn-left";
+      else if (key === "e") dir = "turn-right";
+      
+      if (dir && !window.keysPressed[dir]) {
+        e.preventDefault();
+        window.keysPressed[dir] = true;
+        startWalking(dir);
+      }
+      if (e.key === " " || e.key === "x" || e.key === "Escape") {
+        e.preventDefault();
+        sendControlStop();
+      }
     });
     window.addEventListener("keyup", function (e) {
       if (activeTab !== "control") return;
-      var keyMap = { "z": "up", "KeyW": "up", "ArrowUp": "up", "s": "down", "KeyS": "down", "ArrowDown": "down", "q": "strafe-left", "d": "strafe-right", "KeyA": "turn-left", "ArrowLeft": "turn-left", "KeyD": "strafe-right", "ArrowRight": "strafe-right", "a": "turn-left", "A": "turn-left", "e": "turn-right", "E": "turn-right", "KeyE": "turn-right" };
-      var dir = keyMap[e.key] || keyMap[e.code];
-      if (dir) { window.keysPressed[dir] = false; if (!Object.values(window.keysPressed).includes(true)) stopWalking(); }
+      
+      var key = e.key.toLowerCase();
+      var dir = null;
+      if (key === "z" || key === "arrowup" || key === "w") dir = "up";
+      else if (key === "s" || key === "arrowdown") dir = "down";
+      else if (key === "q" || key === "arrowleft") dir = "strafe-left";
+      else if (key === "d" || key === "arrowright") dir = "strafe-right";
+      else if (key === "a") dir = "turn-left";
+      else if (key === "e") dir = "turn-right";
+      
+      if (dir) {
+        window.keysPressed[dir] = false;
+        if (!Object.values(window.keysPressed).includes(true)) {
+          stopWalking();
+        }
+      }
     });
   }
 }
@@ -89,7 +117,42 @@ function initControlTab() {
 // ─── D-Pad Walking ────────────────────────────────────────────────────────
 // Speed is now controlled via Posture & Allure slider (posture-slider-speed)
 
+// 🔴 SÉCURITÉ CALIBRATION : les commandes de posture/marche vers le robot réel
+// sont interdites tant que les offsets ne sont pas calibrés (EasyConfig ou
+// Console Système). Seuls le Testeur de servos (manual) et EasyConfig restent
+// accessibles. La simulation (demo_mode) n'est jamais bloquée.
+function motorsLockedUncalibrated() {
+  return !robotPosture.demo_mode && window.offsetsCalibrated !== true;
+}
+
+function notifyCalibrationRequired() {
+  if (typeof showToast === 'function') {
+    showToast('🔒 Calibration requise',
+      'Moteurs verrouillés : calibrez les offsets via EasyConfig ou testez-les un par un via le Testeur de servos.',
+      'error');
+  }
+}
+
+function updateCalibrationLockUI() {
+  var locked = motorsLockedUncalibrated();
+  var powerBtn = document.getElementById('power-toggle-btn');
+  if (powerBtn) {
+    powerBtn.style.opacity = locked ? '0.4' : '1';
+    powerBtn.title = locked ? 'Calibration des offsets requise (EasyConfig)' : '';
+  }
+  document.querySelectorAll('.dpad-btn').forEach(function (btn) {
+    btn.style.opacity = locked ? '0.4' : '1';
+    btn.title = locked ? 'Calibration des offsets requise (EasyConfig)' : '';
+  });
+  updatePostureButtonsUI();
+}
+window.updateCalibrationLockUI = updateCalibrationLockUI;
+
 function sendControlCmd(cmd) {
+  if ((cmd === 'stand' || cmd === 'sit') && motorsLockedUncalibrated()) {
+    notifyCalibrationRequired();
+    return;
+  }
   if (cmd === 'stand' || cmd === 'sit') {
     robotPosture.posture = cmd;
     
@@ -162,6 +225,10 @@ function sendControlStop() {
 }
 
 function startWalking(dir) {
+  if (motorsLockedUncalibrated()) {
+    notifyCalibrationRequired();
+    return;
+  }
   if (controlActiveDir === dir) return;
   controlActiveDir = dir;
 
@@ -180,10 +247,10 @@ function startWalking(dir) {
   // Mettre à jour la direction dans la simulation en mode démo (simulation)
   if (robotPosture.demo_mode && typeof window.setSpotMicroCmd === "function") {
     var simCmd = "s";
-    if (dir === "up") simCmd = "fw";
-    else if (dir === "down") simCmd = "bk";
-    else if (dir === "strafe-left") simCmd = "sl";
-    else if (dir === "strafe-right") simCmd = "sr";
+    if (dir === "up") simCmd = "bk";
+    else if (dir === "down") simCmd = "fw";
+    else if (dir === "strafe-left") simCmd = "sr";
+    else if (dir === "strafe-right") simCmd = "sl";
     else if (dir === "turn-left") simCmd = "tl";
     else if (dir === "turn-right") simCmd = "tr";
     else if (dir === "left") simCmd = "tl";
@@ -194,10 +261,10 @@ function startWalking(dir) {
   function sendVel() {
     if (!appWs || appWs.readyState !== WebSocket.OPEN) return;
     var vx = 0.0, vy = 0.0, wz = 0.0;
-    if (dir === "up") vx = controlSpeed;
-    else if (dir === "down") vx = -controlSpeed;
-    else if (dir === "strafe-left") vy = -controlSpeed;
-    else if (dir === "strafe-right") vy = controlSpeed;
+    if (dir === "up") vx = -controlSpeed;
+    else if (dir === "down") vx = controlSpeed;
+    else if (dir === "strafe-left") vy = controlSpeed;
+    else if (dir === "strafe-right") vy = -controlSpeed;
     else if (dir === "turn-left") wz = 1.0;
     else if (dir === "turn-right") wz = -1.0;
     // Legacy: left/right keyboard still rotate
@@ -283,6 +350,12 @@ function toggleDemoMode(checked) {
 }
 
 function toggleRobotPower() {
+  // Blocage allumage si non calibré (le power-on envoie 'sit' à 12 servos :
+  // avec des offsets à zéro les positions seraient imprévisibles et dangereuses)
+  if (!robotPosture.powered && motorsLockedUncalibrated()) {
+    notifyCalibrationRequired();
+    return;
+  }
   robotPosture.powered = !robotPosture.powered;
   var btn = document.getElementById('power-toggle-btn');
   if (btn) {

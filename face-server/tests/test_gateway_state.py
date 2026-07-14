@@ -36,13 +36,14 @@ class TestGatewayState:
 
     @pytest.mark.asyncio
     async def test_set_diagnostics_overwrites(self):
-        """Second set_diagnostics replaces previous data entirely."""
+        """Second set_diagnostics merges previous data."""
         gs = GatewayState()
-        await gs.set_diagnostics({"a": 1})
-        await gs.set_diagnostics({"b": 2})
+        await gs.set_diagnostics({"a": 1, "nested": {"x": 10}})
+        await gs.set_diagnostics({"b": 2, "nested": {"y": 20}})
         snap = gs.snapshot_diagnostics()
-        assert snap == {"b": 2}
-        assert "a" not in snap
+        assert snap["a"] == 1
+        assert snap["b"] == 2
+        assert snap["nested"] == {"x": 10, "y": 20}
 
     @pytest.mark.asyncio
     async def test_concurrent_set_diagnostics(self):
@@ -55,11 +56,10 @@ class TestGatewayState:
 
         await asyncio.gather(writer("x"), writer("y"), writer("z"))
         snap = gs.snapshot_diagnostics()
-        # Only one key survives (last writer wins), but no corruption
-        assert len(snap) == 1
-        key, val = next(iter(snap.items()))
-        assert key in ("x", "y", "z")
-        assert isinstance(val, int)
+        # All keys survive under the new merge behavior
+        assert len(snap) == 3
+        for k in ("x", "y", "z"):
+            assert isinstance(snap[k], int)
 
     def test_lazy_lock_creation(self):
         """The _lock property creates an asyncio.Lock on first access."""

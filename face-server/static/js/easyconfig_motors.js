@@ -42,6 +42,7 @@
             ecJointServoAttached = false;
             ecJointModified = false;
             ecAllJointsValidated = false;
+            window._ecSessionDirty = false;
             document.getElementById('ec-joint-calibration-view').style.display = 'flex';
             document.getElementById('ec-joint-final-view').style.display = 'none';
             
@@ -469,8 +470,20 @@
             } else {
                 var inverted = false;
                 if (ecJointServoAttached) {
-                    // Étape B avec servo allumé : détection dynamique
+                    // Étape B avec servo allumé : détection dynamique du sens.
+                    // Comparaison avec la valeur validée en étape A : si l'utilisateur
+                    // a dû descendre le curseur pour reproduire la flexion montrée
+                    // par le modèle 3D, le moteur tourne à l'envers → miroir.
                     var delta = sliderVal - ecPhase1Offset;
+                    if (Math.abs(delta) < 5) {
+                        // Mouvement insuffisant pour une détection fiable du sens
+                        if (typeof showToast === 'function') {
+                            showToast('⚠ Mouvement insuffisant',
+                                'Déplacez le curseur d\'au moins 5° pour reproduire la flexion du modèle 3D, puis validez.',
+                                'warning');
+                        }
+                        return;
+                    }
                     if (delta < 0) {
                         inverted = true;
                     }
@@ -484,6 +497,9 @@
                 ecTempInverts[joint.idx] = inverted;
                 
                 if (ecJointModified && appWs && appWs.readyState === WebSocket.OPEN) {
+                    // Écriture EEPROM réelle : en cas d'abandon en cours de parcours,
+                    // closeEasyConfig() devra effacer la calibration partielle.
+                    window._ecSessionDirty = true;
                     // 1. Enregistrer les limites min/max en PREMIER (avant offset/invert)
                     //    pour éviter un conflit avec le save distribué EEPROM de set_offset.
                     var minLim = ecTempMinLimits[joint.idx] !== undefined ? ecTempMinLimits[joint.idx] : 0;

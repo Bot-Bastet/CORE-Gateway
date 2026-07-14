@@ -247,6 +247,7 @@
 
         function resetIMU() {
             if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "reset_imu" }));
                 if (typeof showToast === 'function') showToast("IMU", "Recalibrage BNO085 en cours...", "info");
                 else console.log("[IMU] Recalibrage BNO085 envoye");
@@ -319,9 +320,10 @@
         function closeServoTester() {
             document.getElementById('servo-tester-overlay').classList.remove('active');
             testerStopAll();
-            // 🔴 SAFETY: detach all servos and clear calibration when leaving tester
+            // Détacher les servos proprement sans effacer la calibration EEPROM.
+            // clear_servo_calib était ici à tort et provoquait des mouvements anarchiques
+            // à la sortie du tester car les moteurs reprenaient sans calibration valide.
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "clear_servo_calib" }));
                 appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
             }
         }

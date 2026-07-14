@@ -23,6 +23,8 @@ var ecCurrentStep = 1;
 var ecJointIndex = 0;
 var ecTempOffsets  = new Array(12).fill(0);    // offset = slider_value - 90
 var ecTempInverts  = new Array(12).fill(false); // flag miroir par servo
+var ecTempMinLimits = new Array(12).fill(0);    // safety min limit par servo
+var ecTempMaxLimits = new Array(12).fill(180);  // safety max limit par servo
 var ecJointServoAttached = false;
 var ecCalibratedMotors = false;
 var ecCalibratedCam1 = false;
@@ -468,6 +470,20 @@ var ecLRStreamA = null;
             if (limitWarnInit) limitWarnInit.style.display = 'none';
             ecUpdateJointSlider(slider.value);
 
+            // --- Sliders de limites de sécurité ---
+            var minSlider = document.getElementById('ec-joint-min-limit-slider');
+            var maxSlider = document.getElementById('ec-joint-max-limit-slider');
+            var savedMin = ecTempMinLimits[joint.idx] !== undefined ? ecTempMinLimits[joint.idx] : 0;
+            var savedMax = ecTempMaxLimits[joint.idx] !== undefined ? ecTempMaxLimits[joint.idx] : 180;
+            if (minSlider) {
+                minSlider.value = savedMin;
+                document.getElementById('ec-joint-min-limit-val').textContent = savedMin + '°';
+            }
+            if (maxSlider) {
+                maxSlider.value = savedMax;
+                document.getElementById('ec-joint-max-limit-val').textContent = savedMax + '°';
+            }
+
             // --- Bouton miroir ---
             var invertBtn = document.getElementById('ec-btn-invert-servo');
             if (invertBtn) {
@@ -641,10 +657,14 @@ var ecLRStreamA = null;
         function ecAttachCurrentJoint() {
             var joint = EC_JOINT_ORDER[ecJointIndex];
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'attach', index: joint.idx }));
-                // Envoyer la position actuelle du slider
-                var curVal = parseInt(document.getElementById('ec-joint-slider').value) || 90;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: curVal }));
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'attach', index: joint.idx, manual: true }));
+                // Envoyer la position actuelle du slider en angle absolu
+                var offset = parseInt(document.getElementById('ec-joint-slider').value) || 0;
+                var absoluteAngle = 90 + offset;
+                var isInverted = ecTempInverts[joint.idx];
+                var angle = isInverted ? (180 - absoluteAngle) : absoluteAngle;
+                var chk = (joint.idx + Math.floor(angle)) % 100;
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, chk: chk, manual: true }));
                 ecJointServoAttached = true;
                 document.getElementById('ec-btn-attach-servo').disabled = false;
                 document.getElementById('ec-btn-attach-servo').textContent = '🔌 Éteindre le servo';
@@ -685,7 +705,7 @@ var ecLRStreamA = null;
             if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
                 var raw = parseInt(document.getElementById('ec-joint-slider').value) || 90;
                 var angle = isInverted ? (180 - raw) : raw;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle }));
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
             }
             if (typeof showToast === 'function') {
                 showToast('Miroir', isInverted ? 'Sens inversé activé' : 'Sens normal', 'info');
@@ -722,7 +742,7 @@ var ecLRStreamA = null;
                     var isInverted = ecTempInverts[joint.idx];
                     var angle = isInverted ? (180 - absoluteAngle) : absoluteAngle;
                     var chk = (joint.idx + Math.floor(angle)) % 100;
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, chk: chk }));
+                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, chk: chk, manual: true }));
                 }
             }, 50);
         }
@@ -739,9 +759,13 @@ var ecLRStreamA = null;
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 // 1. Enregistrer l'offset dans l'EEPROM Arduino
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: offset }));
-                // 2. Enregistrer le flag miroir dans l'EEPROM Arduino
+                // 2. Enregistrer les limites dans l'EEPROM Arduino
+                var minVal = ecTempMinLimits[joint.idx] !== undefined ? ecTempMinLimits[joint.idx] : 0;
+                var maxVal = ecTempMaxLimits[joint.idx] !== undefined ? ecTempMaxLimits[joint.idx] : 180;
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: minVal, max: maxVal }));
+                // 3. Enregistrer le flag miroir dans l'EEPROM Arduino
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: ecTempInverts[joint.idx] }));
-                // 3. Détacher le servo avant de passer au suivant
+                // 4. Détacher le servo avant de passer au suivant
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx }));
             }
             ecJointServoAttached = false;
@@ -768,13 +792,84 @@ var ecLRStreamA = null;
             }
         }
 
+        function ecUpdateJointMinLimit(value) {
+            var joint = EC_JOINT_ORDER[ecJointIndex];
+            var val = parseInt(value) || 0;
+            ecTempMinLimits[joint.idx] = val;
+            var valEl = document.getElementById('ec-joint-min-limit-val');
+            if (valEl) valEl.textContent = val + '°';
+            
+            // Constrain min slider to not exceed max slider
+            var maxSlider = document.getElementById('ec-joint-max-limit-slider');
+            if (maxSlider && val > parseInt(maxSlider.value)) {
+                maxSlider.value = val;
+                ecUpdateJointMaxLimit(val);
+            }
+            
+            // Send set_limit to Arduino immediately for real-time validation if attached
+            if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
+                var maxVal = ecTempMaxLimits[joint.idx] !== undefined ? ecTempMaxLimits[joint.idx] : 180;
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: val, max: maxVal }));
+            }
+        }
+
+        function ecUpdateJointMaxLimit(value) {
+            var joint = EC_JOINT_ORDER[ecJointIndex];
+            var val = parseInt(value) || 180;
+            ecTempMaxLimits[joint.idx] = val;
+            var valEl = document.getElementById('ec-joint-max-limit-val');
+            if (valEl) valEl.textContent = val + '°';
+            
+            // Constrain max slider to not be less than min slider
+            var minSlider = document.getElementById('ec-joint-min-limit-slider');
+            if (minSlider && val < parseInt(minSlider.value)) {
+                minSlider.value = val;
+                ecUpdateJointMinLimit(val);
+            }
+            
+            // Send set_limit to Arduino immediately for real-time validation if attached
+            if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
+                var minVal = ecTempMinLimits[joint.idx] !== undefined ? ecTempMinLimits[joint.idx] : 0;
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: minVal, max: val }));
+            }
+        }
+
+        function ecTestLimit(type) {
+            var joint = EC_JOINT_ORDER[ecJointIndex];
+            if (!ecJointServoAttached) {
+                if (typeof showToast === 'function') showToast('Attention', 'Veuillez d\'abord allumer le servo.', 'warning');
+                return;
+            }
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                var targetAngle = 90;
+                var offset = parseInt(document.getElementById('ec-joint-slider').value) || 0;
+                
+                if (type === 'min') {
+                    targetAngle = parseInt(document.getElementById('ec-joint-min-limit-slider').value) || 0;
+                } else if (type === 'max') {
+                    targetAngle = parseInt(document.getElementById('ec-joint-max-limit-slider').value) || 180;
+                } else {
+                    targetAngle = 90 + offset;
+                }
+                
+                var isInverted = ecTempInverts[joint.idx];
+                var angle = isInverted ? (180 - targetAngle) : targetAngle;
+                var chk = (joint.idx + Math.floor(angle)) % 100;
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, chk: chk, manual: true }));
+                if (typeof showToast === 'function') {
+                    var label = type === 'min' ? 'limite Min' : (type === 'max' ? 'limite Max' : 'position Offset');
+                    showToast('Test', 'Positionnement sur ' + label + ' (' + targetAngle + '°)', 'info');
+                }
+            }
+        }
+
         function openEasyConfig() {
             ecCurrentStep = 1;
             ecCalibratedMotors = false;
             ecCalibratedCam1 = false;
             ecCalibratedCam2 = false;
             ecJointIndex = 0;
-            ecTempOffsets = new Array(12).fill(0);
+            // Ne pas réinitialiser ecTempOffsets ici — ecInitJointCalibration() les charge depuis la Gateway
             ecJointServoAttached = false;
             
             // Sauvegarder le mode démo/réel précédent
@@ -830,6 +925,24 @@ var ecLRStreamA = null;
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(null, null);
             }
+            // 🔴 SECURITE: desactiver les moteurs quand on quitte EasyConfig
+            // Ne PAS clear la calibration si elle a ete terminee avec succes
+            // ou si on passe par ecStartRobotAndClose (demarrage normal du robot)
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                if (ecJointServoAttached) {
+                    const currentJoint = EC_JOINT_ORDER[ecJointIndex] || EC_JOINT_ORDER[0];
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: currentJoint.idx }));
+                }
+                // Only clear calibration if NOT completed (user abandoned mid-way)
+                // AND not called from ecStartRobotAndClose (normal robot start)
+                if (!ecAllJointsValidated && !window._ecNormalClose) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "clear_servo_calib" }));
+                }
+                if (!window._ecNormalClose) {
+                    appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stop" }));
+                }
+                window._ecNormalClose = false;
+            }
             // Restaurer l'onglet précédent
             if (window.ecPreviousTab && typeof window.switchTab === 'function') {
                 window.switchTab(window.ecPreviousTab);
@@ -878,8 +991,11 @@ var ecLRStreamA = null;
         }
 
         function ecUpdateMotorFeedback() {
-            if (window.lastTelemetryState && window.lastTelemetryState.joints) {
-                const j = window.lastTelemetryState.joints;
+            const telemetry = window.lastTelemetryState || {};
+            const j = (telemetry.servo_angles && telemetry.servo_angles.length === 12)
+                ? telemetry.servo_angles
+                : (telemetry.joints && telemetry.joints.length === 12 ? telemetry.joints : null);
+            if (j) {
                 for (let i = 0; i < 12; i++) {
                     const el2 = document.getElementById(`ec-j${i}`);
                     if (el2) {
@@ -1262,42 +1378,49 @@ var ecLRStreamA = null;
         }
 
         function ecCalculateOffsets(activateMotors = true) {
-            const offsets = [];
+            const offsets = ecTempOffsets;
+            const limits = [];
+            const inverts = ecTempInverts;
             for (let i = 0; i < 12; i++) {
-                const slider = document.getElementById(`calib-slider-${i}`);
-                let currentOffset = slider ? parseInt(slider.value) : 0;
-                offsets.push(currentOffset);
+                limits.push([
+                    ecTempMinLimits[i] !== undefined ? ecTempMinLimits[i] : 0,
+                    ecTempMaxLimits[i] !== undefined ? ecTempMaxLimits[i] : 180
+                ]);
             }
             
             fetch('/core/calibration', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-API-Token': apiToken
+                    'X-API-Token': window.apiToken || localStorage.getItem('bastet_api_token') || ''
                 },
-                body: JSON.stringify({ offsets: offsets })
+                body: JSON.stringify({ offsets: offsets, limits: limits, inverts: inverts })
             }).then(res => {
                 if (res.ok) {
-                    alert("Offsets sauvegardes avec succes.");
-                    loadSavedOffsets();
+                    alert("Offsets et limites sauvegardes avec succes.");
+                    if (typeof loadSavedOffsets === 'function') loadSavedOffsets();
+                    ecCalibratedMotors = true;
+                    document.getElementById('ec-motor-success-anim').style.display = 'block';
+                    document.getElementById('ec-btn-next').disabled = false;
+                    
+                    // Auto advance to next step after a short delay
+                    setTimeout(function() {
+                        ecNextStep();
+                    }, 500);
                 } else {
-                    alert("Erreur sauvegarde offsets (code " + res.status + "). Verifiez le token API.");
+                    alert("Erreur sauvegarde configuration (code " + res.status + "). Verifiez le token API.");
                 }
             }).catch(err => {
                 console.error(err);
-                alert("Erreur reseau lors de la sauvegarde des offsets.");
+                alert("Erreur reseau lors de la sauvegarde de la calibration.");
             });
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets }));
+                appWs.send(JSON.stringify({ type: "motor_calibration", offsets: offsets, limits: limits, inverts: inverts }));
                 if (activateMotors) {
                     appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "stand" }));
                 }
             }
-            
-            ecCalibratedMotors = true;
-            document.getElementById('ec-motor-success-anim').style.display = 'block';
-            document.getElementById('ec-btn-next').disabled = false;
         }
 
         async function ecRunCameraCalib(camId) {
@@ -1332,7 +1455,7 @@ var ecLRStreamA = null;
                 hudEl.style.display = 'none';
                 overlayEl.style.display = 'flex';
                 statusText.innerHTML = `
-                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">Ô£ù</span>
+                    <span style="font-size: 2rem; color: var(--danger); display:block; margin-bottom:0.5rem;">❌</span>
                     <span style="color:var(--danger); font-weight:bold;">Erreur WebRTC : Flux indisponible.</span><br/>
                     <span style="font-size:0.75rem; color:var(--text-secondary);">Vérifiez que MediaMTX est actif et que la caméra est démarrée.</span>
                 `;
@@ -1487,7 +1610,7 @@ var ecLRStreamA = null;
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-API-Token': apiToken
+                                'X-API-Token': window.apiToken || localStorage.getItem('bastet_api_token') || ''
                             },
                             body: JSON.stringify(calibratedData)
                         }).catch(err => console.error(err));
@@ -1497,7 +1620,7 @@ var ecLRStreamA = null;
                         overlayEl.style.display = 'flex';
                         overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
                         statusText.innerHTML = `
-                            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); border: 2px solid var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--danger); margin: 0 auto 0.5rem;">Ô£ù</div>
+                            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); border: 2px solid var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--danger); margin: 0 auto 0.5rem;">❌</div>
                             <span style="color:var(--danger); font-weight:bold; font-size: 0.95rem;">Échec de la calibration</span><br/>
                             <span style="font-size:0.75rem; color:var(--text-secondary);">Aucune mire de calibration détectée ou flux caméra instable.</span>
                         `;
@@ -1513,6 +1636,8 @@ var ecLRStreamA = null;
         function ecStartRobotAndClose() {
             // Forcer le retour en mode réel
             window.ecPreviousDemoMode = false;
+            // Marquer qu'on termine normalement → closeEasyConfig ne fera PAS clear_servo_calib ni stop
+            window._ecNormalClose = true;
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "start_robot" }));
@@ -1539,3 +1664,6 @@ window.ecSkipStep       = ecSkipStep;
 window.ecValidateJoint  = ecValidateJoint;
 window.ecRunCameraCalib = ecRunCameraCalib;
 window.ecRunStereoCalib = ecRunStereoCalib;
+window.ecUpdateJointMinLimit = ecUpdateJointMinLimit;
+window.ecUpdateJointMaxLimit = ecUpdateJointMaxLimit;
+window.ecTestLimit      = ecTestLimit;
