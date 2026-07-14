@@ -116,9 +116,33 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                         }), "app")
                     continue
                 elif msg_type == "arduino_cmd":
+                    cmd = msg_json.get("cmd")
+                    if cmd == "reset_imu":
+                        print(f"[WS App] Reset IMU command reçu depuis l'application : {msg_json}")
+                    if cmd in ("attach", "write"):
+                        if "manual" not in msg_json:
+                            msg_json["manual"] = True
+                        if cmd == "write" and "chk" not in msg_json:
+                            idx = msg_json.get("index")
+                            ang = msg_json.get("angle")
+                            if idx is not None and ang is not None:
+                                try:
+                                    msg_json["chk"] = (int(idx) + int(float(ang))) % 100
+                                except Exception:
+                                    pass
+                    data = json.dumps(msg_json)
                     await manager.broadcast(data, "robot")
+                    continue
                 elif msg_type == "query_camera_resolutions":
                     await manager.broadcast(data, "robot")
+                    continue
+                elif msg_type == "cmd_vel":
+                    # D-pad walking commands → robot only (not node)
+                    await manager.broadcast(data, "robot")
+                    continue
+                elif msg_type == "manual_joint_control":
+                    await manager.broadcast(data, "robot")
+                    continue
                 elif msg_type == "robot_posture_update":
                     key = msg_json.get("key")
                     value = msg_json.get("value")
@@ -140,7 +164,11 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                 # Client sent a JSON value that is not a dict (e.g. an array)
                 pass
 
+            # Fallthrough: forward any unhandled message type to robot.
+            # This covers chat, scan_wifi, connect_wifi, forget_wifi,
+            # save_camera_mapping, reset_calibration, motor_calibration,
+            # stream_quality_config, run_stereo_calib, run_mono_calib,
+            # feature_request, trigger_update, trigger_arduino_flash.
             await manager.broadcast(data, "robot")
-            await manager.broadcast(data, "node")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "app")

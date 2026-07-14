@@ -75,8 +75,11 @@ class GatewayState:
 
     async def set_diagnostics(self, data: dict) -> None:
         async with self._lock:
-            self.latest_diagnostics.clear()
-            self.latest_diagnostics.update(data)
+            for k, v in data.items():
+                if isinstance(v, dict) and isinstance(self.latest_diagnostics.get(k), dict):
+                    self.latest_diagnostics[k].update(v)
+                else:
+                    self.latest_diagnostics[k] = v
 
     def snapshot_diagnostics(self) -> dict:
         return dict(self.latest_diagnostics)
@@ -231,6 +234,10 @@ if isinstance(_saved, dict):
                 state.robot_posture[k] = str(_saved[k])
             else:
                 state.robot_posture[k] = float(_saved[k])
+
+# Force absolute safe powered-off/detached state on startup
+state.robot_posture["powered"] = False
+state.robot_posture["posture"] = "stop"
 
 # ─── Connection Manager ──────────────────────────────────────────────────
 # Extracted to connection_manager.py to avoid circular imports.

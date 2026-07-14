@@ -2343,7 +2343,7 @@ window.appWs = null;
 
                     let badge = '';
                     if (isConnected) {
-                        badge = `<span style="font-size:0.65rem; background:rgba(76,175,80,0.2); color: #4CAF50; padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">Ô£ô Connecté</span>`;
+                        badge = `<span style="font-size:0.65rem; background:rgba(76,175,80,0.2); color: #4CAF50; padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">✓ Connecté</span>`;
                     } else {
                         badge = `<span style="font-size:0.65rem; background:rgba(255,111,97,0.15); color: var(--accent); padding:0.1rem 0.35rem; border-radius:4px; margin-left:0.35rem; font-weight:600;">Enregistré</span>`;
                     }
@@ -2352,11 +2352,11 @@ window.appWs = null;
                     item.innerHTML = `
                         <div style="flex: 1;">
                             <span style="font-weight: 600; font-size: 0.9rem; display: block; color: ${isConnected ? '#4CAF50' : 'var(--accent)'};">${ssid} ${badge}</span>
-                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' ÔÇó ' + scannedNet.security) : 'Profil de connexion sauvegardé'}</span>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${inRange ? (scannedNet.bssid + ' • ' + scannedNet.security) : 'Profil de connexion sauvegardé'}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:0.5rem;">
                             <span style="font-size: 0.85rem; font-weight: bold; color: ${signalColor};">${signalText}</span>
-                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--danger); color: var(--danger); background: transparent;" onclick="event.stopPropagation(); forgetWifiNetwork('${ssid}')">­ƒùæ´©Å Oublier</button>
+                            <button class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; border-color: var(--danger); color: var(--danger); background: transparent;" onclick="event.stopPropagation(); forgetWifiNetwork('${ssid}')">🗑️ Oublier</button>
                         </div>
                     `;
                     
@@ -2381,13 +2381,13 @@ window.appWs = null;
                     
 
                     const isSecure = net.security && net.security.trim() !== "" && net.security !== "--" && net.security.toLowerCase() !== "open";
-                    const lockIcon = isSecure ? '­ƒöÆ' : '­ƒöô';
+                    const lockIcon = isSecure ? '🔒' : '🔓';
                     
 
                     item.innerHTML = `
                         <div>
                             <span style="font-weight: 600; font-size: 0.9rem; display: block;">${net.ssid}</span>
-                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${net.bssid} ÔÇó ${net.security}</span>
+                            <span style="font-size: 0.7rem; color: var(--text-secondary);">${net.bssid} • ${net.security}</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:0.5rem;">
                             <span style="font-size: 0.8rem;">${lockIcon}</span>
@@ -2865,13 +2865,13 @@ window.appWs = null;
 
                     robotBadge.className = `status-badge ${robotStatus}`;
                     if (robotStatus === 'online') {
-                        robotBadge.textContent = '­ƒƒó En ligne';
+                        robotBadge.textContent = '🟢 En ligne';
                     } else if (robotStatus === 'hibernating') {
-                        robotBadge.textContent = '­ƒƒá Hibernation';
+                        robotBadge.textContent = '🟠 Hibernation';
                     } else if (robotStatus === 'idle') {
-                        robotBadge.textContent = '­ƒƒí Inactif';
+                        robotBadge.textContent = '🟡 Inactif';
                     } else {
-                        robotBadge.textContent = '­ƒö┤ Hors-ligne';
+                        robotBadge.textContent = '🔴 Hors-ligne';
                     }
 
 
@@ -3307,7 +3307,7 @@ window.appWs = null;
             }
 
 
-            statusEl.textContent = 'Connexion WebRTCÔÇª';
+            statusEl.textContent = 'Connexion WebRTC…';
             statusEl.className = 'status-badge';
             streamingState[camId] = 'connecting';
             placeholder.style.display = 'none';
@@ -3438,7 +3438,7 @@ window.appWs = null;
         function queryCameraResolutions(camId) {
             const btn = document.getElementById('detect-res-btn-' + camId);
             const statusEl = document.getElementById('stream-quality-status');
-            const originalText = btn ? btn.textContent : '­ƒöì';
+            const originalText = btn ? btn.textContent : '🔍';
             if (btn) {
                 btn.textContent = '⏳...';
                 btn.disabled = true;
@@ -4276,7 +4276,7 @@ window.appWs = null;
                     streamingState[camId] = 'requesting';
 
 
-                    statusEl.textContent = 'Connexion WebRTCÔÇª';
+                    statusEl.textContent = 'Connexion WebRTC…';
                     statusEl.className = 'status-badge';
                     btnText.textContent = 'Couper Caméra';
 
@@ -4425,7 +4425,7 @@ window.appWs = null;
                     if (videoEl) videoEl.style.display = 'none';
                     if (fsBtn) fsBtn.style.display = 'none';
                     if (statusEl) {
-                        statusEl.textContent = 'ReconfigurationÔÇª';
+                        statusEl.textContent = 'Reconfiguration…';
                         statusEl.className = 'status-badge';
                     }
                     
@@ -4481,7 +4481,7 @@ window.appWs = null;
                         const mygesCreds = mygesList[fullName];
                         const mygesBadge = mygesCreds 
                             ? `<span class="status-badge active" style="font-size: 0.75rem;">✅ MyGES : ${mygesCreds.username}</span>`
-                            : `<span class="status-badge" style="font-size: 0.75rem; background-color: rgba(225, 29, 72, 0.05); color: var(--danger); border: 1px solid rgba(225, 29, 72, 0.15)">ÔØî MyGES non configuré</span>`;
+                            : `<span class="status-badge" style="font-size: 0.75rem; background-color: rgba(225, 29, 72, 0.05); color: var(--danger); border: 1px solid rgba(225, 29, 72, 0.15)">❌ MyGES non configuré</span>`;
 
 
                         const card = document.createElement('div');
@@ -4757,15 +4757,15 @@ window.appWs = null;
                 } else {
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
                     resultDiv.style.color = '#ef4444';
-                    resultDiv.innerHTML = 'ÔØî ' + data.message;
+                    resultDiv.innerHTML = '❌ ' + data.message;
                 }
             } catch (e) {
                 resultDiv.style.background = 'rgba(239,68,68,0.1)';
                 resultDiv.style.color = '#ef4444';
-                resultDiv.innerHTML = 'ÔØî Erreur réseau.';
+                resultDiv.innerHTML = '❌ Erreur réseau.';
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '­ƒöì Tester la connexion';
+                btn.innerHTML = '🔍 Tester la connexion';
             }
         }
 
@@ -4866,7 +4866,7 @@ window.appWs = null;
                 if (testData.status !== 'success') {
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
                     resultDiv.style.color = '#ef4444';
-                    resultDiv.textContent = 'ÔØî ' + testData.message;
+                    resultDiv.textContent = '❌ ' + testData.message;
                     return;
                 }
 
@@ -4890,12 +4890,12 @@ window.appWs = null;
                 } else {
                     resultDiv.style.background = 'rgba(239,68,68,0.1)';
                     resultDiv.style.color = '#ef4444';
-                    resultDiv.textContent = 'ÔØî Erreur lors de la sauvegarde.';
+                    resultDiv.textContent = '❌ Erreur lors de la sauvegarde.';
                 }
             } catch (e) {
                 resultDiv.style.background = 'rgba(239,68,68,0.1)';
                 resultDiv.style.color = '#ef4444';
-                resultDiv.textContent = 'ÔØî Erreur réseau.';
+                resultDiv.textContent = '❌ Erreur réseau.';
             }
         }
 
@@ -5249,23 +5249,23 @@ window.appWs = null;
                     const ardStatusLabels = {
 
 
-        failed_launch: "ÔØî Échec lancement (voir logs agent)",
+        failed_launch: "❌ Échec lancement (voir logs agent)",
         failed_launch_msg: "Le robot n'a pas pu démarrer la màj Arduino.",
         stale_starting: "⚠️ Blocage dès le lancement (60 s sans progrès)",
-                        'stopping_services': 'ÔÅ╣ Arrêt services...',
-                        'checking_tools': '­ƒöì Vérification arduino-cli...',
-                        'installing_core': '­ƒôª Installation core AVR...',
-                        'installing_libs': '­ƒôÜ Installation librairies...',
-                        'detecting_device': '­ƒöî Détection Arduino...',
-                        'preparing_sketch': '­ƒôü Préparation sketch...',
-                        'compiling': 'ÔÜÖ´©Å Compilation...',
-                        'flashing': 'ÔÜí Flashage en cours...',
-                        'idle': 'Ô£ô Prêt',
+                        'stopping_services': '⏹ Arrêt services...',
+                        'checking_tools': '🔍 Vérification arduino-cli...',
+                        'installing_core': '📦 Installation core AVR...',
+                        'installing_libs': '📚 Installation librairies...',
+                        'detecting_device': '🔌 Détection Arduino...',
+                        'preparing_sketch': '📁 Préparation sketch...',
+                        'compiling': '⚙️ Compilation...',
+                        'flashing': '⚡ Flashage en cours...',
+                        'idle': '✓ Prêt',
                         'starting': '▶ Démarrage...',
                     };
                     let ardDisplayStatus = ardStatusLabels[ardStatusLower] || ard.status || 'Prêt';
                     if (ardStatusLower.startsWith('failed')) ardDisplayStatus = '❌ ' + (ardStatusLower.replace('failed_','').replace(/_/g,' ') || 'Erreur');
-                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = 'Ô£ô À jour';
+                    if (ardStatusLower.includes('failed') && ardUpToDate) ardDisplayStatus = '✓ À jour';
 
 
                     document.getElementById('arduino-update-status').textContent = ardDisplayStatus;
@@ -5485,7 +5485,7 @@ async function triggerUpdate(target) {
                 
 
                 window.vslamTesting = true;
-                btn.textContent = 'ÔÅ╣´©Å Arrêter le Test V-SLAM (' + slamInfo.mode + ')';
+                btn.textContent = '⏹️ Arrêter le Test V-SLAM (' + slamInfo.mode + ')';
                 btn.className = 'btn btn-secondary';
                 container.style.display = 'block';
                 badgeEl.textContent = 'Actif';
@@ -5554,7 +5554,7 @@ async function triggerUpdate(target) {
 
             } else {
                 window.vslamTesting = false;
-                btn.textContent = '­ƒÜÇ Lancer le Test V-SLAM';
+                btn.textContent = '🚀 Lancer le Test V-SLAM';
                 btn.className = 'btn btn-primary';
                 container.style.display = 'none';
                 badgeEl.textContent = 'Inactif';
@@ -5945,7 +5945,7 @@ async function triggerUpdate(target) {
                 const btn = document.querySelector('#nav-target-panel .btn-primary');
                 if (btn) {
                     const originalText = btn.innerHTML;
-                    btn.innerHTML = 'ÔÜí Objectif Envoyé !';
+                    btn.innerHTML = '⚡ Objectif Envoyé !';
                     btn.style.backgroundColor = 'var(--success)';
                     setTimeout(() => {
                         btn.innerHTML = originalText;

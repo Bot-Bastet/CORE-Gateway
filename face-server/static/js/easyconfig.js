@@ -6,18 +6,18 @@
 // L'Arduino calcule : offset = slider_value - 90
 // (90° = valeur logique neutre envoyée par le Pi quand l'URDF dit 0)
 var EC_JOINT_ORDER = [
-    { leg: "Avant Droite",   joint: "Hanche",   idx: 0,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "right", leg_id: "fr" },
-    { leg: "Avant Droite",   joint: "Tibia",    idx: 1,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "right", leg_id: "fr" },
-    { leg: "Avant Droite",   joint: "Genou",    idx: 2,  icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "right", leg_id: "fr" },
-    { leg: "Avant Gauche",   joint: "Hanche",   idx: 3,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "fl" },
-    { leg: "Avant Gauche",   joint: "Tibia",    idx: 4,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "left",  leg_id: "fl" },
-    { leg: "Avant Gauche",   joint: "Genou",    idx: 5,  icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "left",  leg_id: "fl" },
-    { leg: "Arrière Droite", joint: "Hanche",   idx: 6,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "right", leg_id: "rr" },
-    { leg: "Arrière Droite", joint: "Tibia",    idx: 7,  icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "right", leg_id: "rr" },
-    { leg: "Arrière Droite", joint: "Genou",    idx: 8,  icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "right", leg_id: "rr" },
-    { leg: "Arrière Gauche", joint: "Hanche",   idx: 9,  icon: "­ƒªÁ", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "rl" },
-    { leg: "Arrière Gauche", joint: "Tibia",    idx: 10, icon: "­ƒªÁ", type: "upper", urdf_angle: 90, side: "left",  leg_id: "rl" },
-    { leg: "Arrière Gauche", joint: "Genou",    idx: 11, icon: "­ƒªÁ", type: "lower", urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Avant Droite",   joint: "Hanche",   idx: 0,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "right", leg_id: "fr" },
+    { leg: "Avant Droite",   joint: "Tibia",    idx: 1,  icon: "🦵", type: "upper", urdf_angle: 90, side: "right", leg_id: "fr" },
+    { leg: "Avant Droite",   joint: "Genou",    idx: 2,  icon: "🦵", type: "lower", urdf_angle: 90, side: "right", leg_id: "fr" },
+    { leg: "Avant Gauche",   joint: "Hanche",   idx: 3,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "fl" },
+    { leg: "Avant Gauche",   joint: "Tibia",    idx: 4,  icon: "🦵", type: "upper", urdf_angle: 90, side: "left",  leg_id: "fl" },
+    { leg: "Avant Gauche",   joint: "Genou",    idx: 5,  icon: "🦵", type: "lower", urdf_angle: 90, side: "left",  leg_id: "fl" },
+    { leg: "Arrière Droite", joint: "Hanche",   idx: 6,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Droite", joint: "Tibia",    idx: 7,  icon: "🦵", type: "upper", urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Droite", joint: "Genou",    idx: 8,  icon: "🦵", type: "lower", urdf_angle: 90, side: "right", leg_id: "rr" },
+    { leg: "Arrière Gauche", joint: "Hanche",   idx: 9,  icon: "🦵", type: "hip",   urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Gauche", joint: "Tibia",    idx: 10, icon: "🦵", type: "upper", urdf_angle: 90, side: "left",  leg_id: "rl" },
+    { leg: "Arrière Gauche", joint: "Genou",    idx: 11, icon: "🦵", type: "lower", urdf_angle: 90, side: "left",  leg_id: "rl" },
 ];
 var ecCurrentStep = 1;
 var ecJointIndex = 0;
@@ -456,7 +456,7 @@ var ecLRStreamA = null;
 
             // --- Côté du servo ---
             var sideEl = document.getElementById('ec-joint-side-label');
-            if (sideEl) sideEl.textContent = joint.side === 'left' ? '­ƒøà Gauche ÔÇö peut nécessiter inversion' : '­ƒøà Droit';
+            if (sideEl) sideEl.textContent = joint.side === 'left' ? '🛅 Gauche — peut nécessiter inversion' : '🛅 Droit';
 
             // --- Slider positionné à l'offset temporaire ou à 0 (neutre) ---
             var slider = document.getElementById('ec-joint-slider');
@@ -472,14 +472,14 @@ var ecLRStreamA = null;
             var invertBtn = document.getElementById('ec-btn-invert-servo');
             if (invertBtn) {
                 var isInverted = ecTempInverts[joint.idx] || false;
-                invertBtn.textContent = isInverted ? '­ƒöä Miroir : ON' : '­ƒöä Miroir : OFF';
+                invertBtn.textContent = isInverted ? '🔄 Miroir : ON' : '🔄 Miroir : OFF';
                 invertBtn.style.background = isInverted ? 'rgba(239,68,68,0.2)' : 'rgba(100,100,100,0.15)';
                 invertBtn.style.color = isInverted ? 'var(--danger)' : 'var(--text-secondary)';
             }
             
             var btn = document.getElementById('ec-btn-attach-servo');
             btn.disabled = false;
-            btn.textContent = '­ƒöî Allumer le servo';
+            btn.textContent = '🔌 Allumer le servo';
             btn.onclick = ecAttachCurrentJoint;
             document.getElementById('ec-btn-validate-joint').disabled = true;
             document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
@@ -635,7 +635,7 @@ var ecLRStreamA = null;
             ctx.fillStyle = COL_NEUTRAL;
             ctx.font = 'bold 11px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText('Ô£ö Position cible URDF', cx, 18);
+            ctx.fillText('✔ Position cible URDF', cx, 18);
         }
         
         function ecAttachCurrentJoint() {
@@ -647,11 +647,11 @@ var ecLRStreamA = null;
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: curVal }));
                 ecJointServoAttached = true;
                 document.getElementById('ec-btn-attach-servo').disabled = false;
-                document.getElementById('ec-btn-attach-servo').textContent = '­ƒöî Éteindre le servo';
+                document.getElementById('ec-btn-attach-servo').textContent = '🔌 Éteindre le servo';
                 document.getElementById('ec-btn-attach-servo').onclick = ecDetachCurrentJoint;
                 document.getElementById('ec-btn-validate-joint').disabled = false;
                 document.getElementById('ec-btn-validate-joint').style.opacity = '1';
-                if (typeof showToast === 'function') showToast('Servo', joint.joint + ' allumé ÔÇö utilisez le curseur', 'info');
+                if (typeof showToast === 'function') showToast('Servo', joint.joint + ' allumé — utilisez le curseur', 'info');
             } else {
                 if (typeof showToast === 'function') showToast('Erreur', 'WebSocket non connecté', 'error');
             }
@@ -663,7 +663,7 @@ var ecLRStreamA = null;
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx }));
             }
             ecJointServoAttached = false;
-            document.getElementById('ec-btn-attach-servo').textContent = '­ƒöî Allumer le servo';
+            document.getElementById('ec-btn-attach-servo').textContent = '🔌 Allumer le servo';
             document.getElementById('ec-btn-attach-servo').onclick = ecAttachCurrentJoint;
             document.getElementById('ec-btn-validate-joint').disabled = true;
             document.getElementById('ec-btn-validate-joint').style.opacity = '0.5';
@@ -677,7 +677,7 @@ var ecLRStreamA = null;
             var isInverted = ecTempInverts[joint.idx];
             var invertBtn = document.getElementById('ec-btn-invert-servo');
             if (invertBtn) {
-                invertBtn.textContent = isInverted ? '­ƒöä Miroir : ON' : '­ƒöä Miroir : OFF';
+                invertBtn.textContent = isInverted ? '🔄 Miroir : ON' : '🔄 Miroir : OFF';
                 invertBtn.style.background = isInverted ? 'rgba(239,68,68,0.2)' : 'rgba(100,100,100,0.15)';
                 invertBtn.style.color = isInverted ? 'var(--danger)' : 'var(--text-secondary)';
             }
@@ -735,7 +735,7 @@ var ecLRStreamA = null;
             var offset = sliderVal;
             ecTempOffsets[joint.idx] = offset;
 
-            // ÔÜá´©Å IMPORTANT : avant de sauvegarder, on doit effacer l'offset temporaire de l'Arduino
+            // ⚠️ IMPORTANT : avant de sauvegarder, on doit effacer l'offset temporaire de l'Arduino
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 // 1. Enregistrer l'offset dans l'EEPROM Arduino
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: offset }));
@@ -747,7 +747,7 @@ var ecLRStreamA = null;
             ecJointServoAttached = false;
 
             if (typeof showToast === 'function') {
-                showToast('Ô£ö Calibré', joint.leg + ' ' + joint.joint + ' ÔÇö offset=' + offset + '°' + (ecTempInverts[joint.idx] ? ', miroir=ON' : ''), 'success');
+                showToast('✔ Calibré', joint.leg + ' ' + joint.joint + ' — offset=' + offset + '°' + (ecTempInverts[joint.idx] ? ', miroir=ON' : ''), 'success');
             }
             
             if (ecJointIndex < 11) {
@@ -894,7 +894,7 @@ var ecLRStreamA = null;
         const maxGoto = ecCameraCount >= 2 ? 6 : 4;
         if (targetStep < 1 || targetStep > maxGoto) return;
         // Allow skipping joint calibration (toast handled by ecSkipStep)
-        // No block here ÔÇö ecSkipStep shows the info toast when explicitly skipping
+        // No block here — ecSkipStep shows the info toast when explicitly skipping
         // Close any open camera streams when leaving step 2/3
         if (ecCurrentStep === 2 || ecCurrentStep === 3) {
             for (let id of [1, 2]) {
@@ -1060,7 +1060,7 @@ var ecLRStreamA = null;
                     if (numSpan) {
                         numSpan.style.background = i === step ? 'var(--accent)' : 'var(--success)';
                         numSpan.style.color = 'white';
-                        if (i < step) numSpan.textContent = 'Ô£ô';
+                        if (i < step) numSpan.textContent = '✓';
                         else numSpan.textContent = i;
                     }
                 }
@@ -1111,13 +1111,13 @@ var ecLRStreamA = null;
                     if (statusText) statusText.innerHTML = `Connexion automatique au flux actif...`;
                     if (btnRun) {
                         btnRun.disabled = true;
-                        btnRun.innerHTML = `<span>­ƒôÀ Connexion...</span>`;
+                        btnRun.innerHTML = `<span>📷 Connexion...</span>`;
                     }
                     ecRunCameraCalib(camId);
                 } else {
                     if (btnRun) {
                         btnRun.disabled = false;
-                        btnRun.innerHTML = `­ƒôÀ Lancer la Calibration Cam${camId}`;
+                        btnRun.innerHTML = `📷 Lancer la Calibration Cam${camId}`;
                         btnRun.onclick = () => ecRunCameraCalib(camId);
                     }
                     if (statusText) statusText.innerHTML = `Le flux vidéo de la caméra s'affiche dès le lancement.`;
@@ -1310,7 +1310,7 @@ var ecLRStreamA = null;
             
             btnRun.disabled = true;
             btnSkip.disabled = true;
-            btnRun.innerHTML = `<span>­ƒôÀ Connexion...</span>`;
+            btnRun.innerHTML = `<span>📷 Connexion...</span>`;
             
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: "request_camera", camera: camId, v_slam: false, ...((window.getStreamQualityParams && window.getStreamQualityParams(camId)) || {}) }));
@@ -1338,7 +1338,7 @@ var ecLRStreamA = null;
                 `;
                 btnRun.disabled = false;
                 btnSkip.disabled = false;
-                btnRun.innerHTML = `<span>­ƒôÀ Lancer la Calibration Cam${camId}</span>`;
+                btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
                 btnRun.onclick = () => ecRunCameraCalib(camId);
                 console.error('EasyConfig WebRTC error:', msg);
             };
@@ -1349,7 +1349,7 @@ var ecLRStreamA = null;
                 pc.addTransceiver('video', { direction: 'recvonly' });
 
                 let trackTimeout = setTimeout(() => {
-                    showEcWebRTCError('Timeout ÔÇö aucun flux reçu après 8s');
+                    showEcWebRTCError('Timeout — aucun flux reçu après 8s');
                 }, 8000);
 
                 pc.oniceconnectionstatechange = () => {
@@ -1374,7 +1374,7 @@ var ecLRStreamA = null;
                     hudEl.style.display = 'block';
                     btnRun.disabled = false;
                     btnSkip.disabled = false;
-                    btnRun.innerHTML = `<span>­ƒôÀ Capturer & Calibrer</span>`;
+                    btnRun.innerHTML = `<span>📷 Capturer & Calibrer</span>`;
                     btnRun.onclick = () => ecConfirmCalibration(camId);
                 };
 
@@ -1416,7 +1416,7 @@ var ecLRStreamA = null;
             
             btnRun.disabled = true;
             btnSkip.disabled = true;
-            btnRun.innerHTML = `<span>­ƒôÀ Analyse...</span>`;
+            btnRun.innerHTML = `<span>📷 Analyse...</span>`;
             
             ecStartScanningSim(camId);
         }
@@ -1444,7 +1444,7 @@ var ecLRStreamA = null;
                         overlayEl.style.display = 'flex';
                         overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
                         statusText.innerHTML = `
-                            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(72, 209, 204, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--success); margin: 0 auto 0.5rem;">Ô£ô</div>
+                            <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(72, 209, 204, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--success); margin: 0 auto 0.5rem;">✓</div>
                             <span style="color:var(--success); font-weight:bold; font-size: 0.95rem;">Calibration réussie !</span><br/>
                             <span style="font-size:0.75rem; color:var(--text-secondary);">Mire détectée et paramètres intrinsèques enregistrés.</span>
                         `;
@@ -1503,7 +1503,7 @@ var ecLRStreamA = null;
                         `;
                         btnRun.disabled = false;
                         btnSkip.disabled = false;
-                        btnRun.innerHTML = `<span>­ƒôÀ Lancer la Calibration Cam${camId}</span>`;
+                        btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
                         btnRun.onclick = () => ecRunCameraCalib(camId);
                     }
                 }
