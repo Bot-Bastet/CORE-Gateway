@@ -14,6 +14,12 @@ rtmpAddress: :1935          # RTMP  (optionnel)
 hlsAddress: :8888           # HLS   → lecture navigateur / app mobile
 webrtcAddress: :8889        # WebRTC → lecture web temps réel
 
+# RTSP-over-UDP (publication robot → gateway) : ports fixes pour pouvoir les
+# forwarder explicitement (le robot pousse en UDP pour la latence minimale,
+# au lieu de TCP qui bloque toute la ligne au moindre paquet perdu).
+rtpAddress: :8000
+rtcpAddress: :8001
+
 # ─── HLS ─────────────────────────────────────────────────────────────────────
 hls: yes
 hlsVariant: lowLatency      # mode LL-HLS pour latence réduite

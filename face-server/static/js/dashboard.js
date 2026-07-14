@@ -3376,8 +3376,8 @@ window.appWs = null;
 
 
                 let trackTimeout = setTimeout(() => {
-                    if (!trackReceived) showWebRTCError('Timeout — aucun flux reçu après 25s');
-                }, 25000);
+                    if (!trackReceived) showWebRTCError('Timeout — aucun flux reçu après 40s');
+                }, 40000);
 
 
                 pc.oniceconnectionstatechange = () => {
@@ -3416,8 +3416,14 @@ window.appWs = null;
 
                 const webrtcUrl = `${window.location.protocol}//${window.location.hostname}:48889/robot/cam${camId}/whep`;
                 let response = null;
-                // 48 retries × 250ms = 12s pour laisser le temps à la caméra de démarrer
-                let retries = 48;
+                // 70 retries × 500ms = 35s : le pipeline caméra (subscribe → 1ère
+                // frame → ffmpeg → publication RTSP sur le tunnel) peut dépasser
+                // 12s au démarrage à froid (mesuré en prod : ~13-20s), ce qui
+                // faisait échouer le tout premier clic et laissait l'UI bloquée
+                // sur "Connexion WebRTC…" jusqu'à un refresh (le flux devenait
+                // alors chaud et le join suivant réussissait instantanément).
+                let retries = 70;
+                let attempt = 0;
                 while (retries > 0 && !aborted) {
                     try {
                         response = await fetch(webrtcUrl, {
@@ -3430,7 +3436,12 @@ window.appWs = null;
                         console.warn(`WHEP signaling cam${camId}: ${e.message}`);
                     }
                     retries--;
-                    if (retries > 0 && !aborted) await new Promise(r => setTimeout(r, 250));
+                    attempt++;
+                    // Rassure l'utilisateur : la caméra démarre encore côté robot.
+                    if (attempt === 10 && statusEl && !aborted) {
+                        statusEl.textContent = 'Démarrage de la caméra…';
+                    }
+                    if (retries > 0 && !aborted) await new Promise(r => setTimeout(r, 500));
                 }
 
 
@@ -3439,7 +3450,7 @@ window.appWs = null;
 
                 if (!response || !response.ok) {
                     clearTimeout(trackTimeout);
-                    throw new Error(`WHEP cam${camId} non disponible après 12s.`);
+                    throw new Error(`WHEP cam${camId} non disponible après 35s.`);
                 }
 
 

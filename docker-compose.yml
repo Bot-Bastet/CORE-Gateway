@@ -23,14 +23,18 @@ services:
       - MTX_HLSVARIANT=lowLatency
       - MTX_HLSSEGMENTCOUNT=7
       - MTX_HLSSEGMENTDURATION=1s
+      - MTX_RTPADDRESS=:8000
+      - MTX_RTCPADDRESS=:8001
     volumes:
       - ./rtsp-proxy/mediamtx.yml:/mediamtx.yml:ro
     ports:
-      - "48554:8554"                     # RTSP
+      - "48554:8554"                     # RTSP (contrôle, TCP)
       - "127.0.0.1:48886:8888"           # HLS (local, proxifié par Caddy pour HTTPS)
       - "127.0.0.1:48890:8889/tcp"       # WebRTC Signaling (HTTP)
       - "48189:48189/udp"                # WebRTC ICE UDP
       - "48189:48189/tcp"                # WebRTC ICE TCP
+      - "48000:8000/udp"                 # RTSP média RTP (publication robot en UDP)
+      - "48001:8001/udp"                 # RTSP média RTCP
       - "49997:9997"                     # API
     networks:
       - bastet-net
