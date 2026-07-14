@@ -41,6 +41,7 @@ from config import (
     latest_diagnostics, manager, stop_camera_delayed,
     total_consumers, should_schedule_idle_kill,
 )
+from connection_manager import touch_rest_viewer, drop_rest_viewer, REST_VIEWER_TTL_SECONDS
 from routes.ws_helpers import emit_stream_state_sync  # WS sync broadcast helper
 import json
 
@@ -189,6 +190,11 @@ async def join_stream(
     """Idempotent: add this REST caller as a viewer. If the first viewer, send start_camera to robot.
 
     Anti-griefing: cancel any in-flight idle-kill timer. Sets running=True if first viewer.
+
+    HEARTBEAT: les clients REST (app mobile) doivent re-POST ce join au moins
+    toutes les REST_VIEWER_TTL_SECONDS (75) secondes tant qu'ils regardent le
+    flux. Sans heartbeat, le viewer est purgé et le flux peut se couper 60 s
+    plus tard s'il était le dernier.
     """
     if cam not in (1, 2):
         raise HTTPException(status_code=404, detail="Caméra inconnue. IDs valides : 1, 2.")
@@ -201,6 +207,7 @@ async def join_stream(
     client_id = body.client_id or f"rest-{int(time.time()*1000)}"
     was_present = client_id in rest_camera_listeners[cam]
     rest_camera_listeners[cam].add(client_id)
+    touch_rest_viewer(cam, client_id)  # heartbeat anti-viewer-fantôme
 
     # Cancel any in-flight idle-kill timer (someone's rejoining)
     if camera_stop_timers[cam] is not None:
@@ -235,6 +242,7 @@ async def leave_stream(
     if body.client_id is None:
         raise HTTPException(status_code=400, detail="client_id requis pour le leave REST.")
     rest_camera_listeners[cam].discard(body.client_id)
+    drop_rest_viewer(cam, body.client_id)
 
     cooldown_started = False
     if should_schedule_idle_kill(cam):

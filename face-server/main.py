@@ -110,7 +110,14 @@ async def lifespan(app: FastAPI):
 
     threading.Thread(target=_hourly_check, daemon=True).start()
     threading.Thread(target=_gateway_telemetry_collector, daemon=True).start()
+
+    # Réconciliation des streams : purge les viewers REST sans heartbeat et
+    # coupe les flux orphelins (robot qui streame sans plus aucun spectateur).
+    import asyncio as _asyncio
+    from connection_manager import stream_reconciler, manager as _ws_manager
+    _reconciler_task = _asyncio.create_task(stream_reconciler(_ws_manager))
     yield
+    _reconciler_task.cancel()
 
 
 # ─── App Creation ──────────────────────────────────────────────────────────
