@@ -203,12 +203,11 @@
                 slider.value = ecTempOffsets[joint.idx] || 0;
                 if (unitLabel) unitLabel.textContent = '° offset';
             } else {
-                // Étape C : curseur relatif au zéro calibré, borné par les limites de l'étape B
-                var o = ecTempOffsets[joint.idx] || 0;
-                var relMin = ecTempMinLimits[joint.idx] - 90 - o;
-                var relMax = ecTempMaxLimits[joint.idx] - 90 - o;
-                slider.min = Math.max(-90, relMin);
-                slider.max = Math.min(90, relMax);
+                // Étape C : course fixe ±45° autour du zéro calibré. Les butées EEPROM
+                // sont ouvertes pendant la mesure (voir ecAttachCurrentJoint) puis
+                // re-flashées aux valeurs de l'étape B à la validation.
+                slider.min = -45;
+                slider.max = 45;
                 slider.value = 0;
                 if (unitLabel) unitLabel.textContent = '° depuis le zéro';
             }
@@ -313,9 +312,12 @@
                 ecWriteServo(90);
             } else {
                 // Détection du sens : inversion OBLIGATOIREMENT désactivée pour mesurer
-                // le comportement brut du montage. Le miroir sera réécrit à la validation.
+                // le comportement brut du montage, et butées ouvertes pour que la
+                // course de mesure (±45°) ne soit jamais bloquée par d'anciennes
+                // limites serrées. Miroir et limites sont réécrits à la validation.
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: false });
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: ecTempOffsets[joint.idx] || 0 });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: 0, max: 180 });
                 ecWriteServo(90);
             }
 
@@ -461,6 +463,9 @@
                 inverted = (sliderVal > 0) !== (shown > 0);
                 window._ecSessionDirty = true;
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: inverted });
+                // Restaurer les butées de l'étape B (ouvertes pendant la mesure du sens)
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx,
+                            min: ecTempMinLimits[joint.idx], max: ecTempMaxLimits[joint.idx] });
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx });
             } else {
                 inverted = ecTempInverts[joint.idx] || false;
