@@ -21,12 +21,20 @@
 
 
         function resetMotorCalibration() {
+            // Remet TOUTE l'UI de calibration au neutre : offsets, limites min/max
+            // ET miroirs (pas seulement les sliders d'offset).
             for (let i = 0; i < 12; i++) {
                 const slider = document.getElementById(`calib-slider-${i}`);
                 if (slider) {
                     slider.value = 0;
                     updateCalibSliderVal(i);
                 }
+                const minInput = document.getElementById(`calib-min-${i}`);
+                const maxInput = document.getElementById(`calib-max-${i}`);
+                const invertCheck = document.getElementById(`calib-invert-${i}`);
+                if (minInput) minInput.value = 0;
+                if (maxInput) maxInput.value = 180;
+                if (invertCheck) invertCheck.checked = false;
             }
         }
 
@@ -57,6 +65,10 @@
             }
         }
         async function resetAndSendZeroOffsets() {
+            if (!confirm('Réinitialiser TOUTE la calibration moteurs ?\n\n' +
+                         'Offsets, limites min/max ET miroirs seront remis au neutre ' +
+                         'dans l\'interface, sur la Gateway ET dans l\'EEPROM de l\'Arduino. ' +
+                         'Les servos seront détachés (sécurité).')) return;
             resetMotorCalibration();
             // 🔴 CRITICAL: send stop FIRST to detach all servos immediately,
             // then clear_servo_calib to erase EEPROM magic numbers.

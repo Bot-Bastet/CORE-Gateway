@@ -2203,7 +2203,11 @@ window.appWs = null;
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 const parsedAngle = parseFloat(angle);
                 const chk = (idx + Math.floor(parsedAngle)) % 100;
-                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parsedAngle, chk: chk, manual: true }));
+                // raw:true → angle PHYSIQUE direct : le firmware saute inversion,
+                // offset ET limites min/max. Ce menu sert à tester la course réelle
+                // du moteur (vissage, butées mécaniques), il doit passer outre
+                // toutes les limitations de calibration.
+                appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "write", index: idx, angle: parsedAngle, chk: chk, manual: true, raw: true }));
             }
         }
 

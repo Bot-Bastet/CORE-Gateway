@@ -1321,6 +1321,12 @@
             </div>
             
             <div style="padding: 1.5rem; overflow-y: auto; max-height: 70vh; display: flex; flex-direction: column; gap: 1rem;">
+                <!-- Raw mode warning -->
+                <div style="background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.8rem; color: #f59e0b;">
+                    ⚠️ <b>Mode brut</b> : les angles sont envoyés <b>directement au servo (0-180° physiques)</b>,
+                    sans offset, sans miroir et <b>sans limites de sécurité</b>. Sert à vérifier la course réelle
+                    du moteur et le vissage du palonnier. Attention aux butées mécaniques du châssis.
+                </div>
                 <!-- General control -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color);">
                     <span style="font-size: 0.85rem; color: var(--text-secondary);">Tous les moteurs :</span>
@@ -1353,7 +1359,7 @@
                 <div style="padding: 1.5rem; overflow-y: auto; border-right: 1px solid var(--border-color);">
                     <h3 class="font-outfit" style="font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
                         <span>Offsets des Angles Moteurs (-90° à +90°)</span>
-                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetMotorCalibration()">Réinitialiser</button>
+                        <button class="btn btn-secondary" style="font-size:0.75rem; padding: 0.25rem 0.5rem;" onclick="resetAndSendZeroOffsets()">Réinitialiser</button>
                     </h3>
                     
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
