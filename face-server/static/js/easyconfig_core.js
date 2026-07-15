@@ -448,25 +448,21 @@ var ecLRStreamA = null;
         function ecPrevStep() {
             // Joint-level navigation during step 1 (joint calibration wizard)
             if (ecCurrentStep === 1) {
-                if (typeof ecJointPhase !== 'undefined' && ecJointPhase === 2) {
-                    ecJointPhase = 1;
+                if (typeof ecJointPhase !== 'undefined' && ecJointPhase > 1) {
+                    // Reculer d'une sous-étape (C→B ou B→A) pour la même articulation
+                    ecJointPhase--;
                     ecShowJoint(ecJointIndex);
                     return;
                 } else if (ecJointIndex > 0) {
+                    // Revenir à l'étape C de l'articulation précédente
                     const currentJoint = EC_JOINT_ORDER[ecJointIndex];
                     if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
                         appWs.send(JSON.stringify({ type: "arduino_cmd", cmd: "detach", index: currentJoint.idx }));
                     }
                     ecJointServoAttached = false;
                     ecJointIndex--;
-                    ecJointPhase = 2; // Return to Phase 2 of previous joint
+                    ecJointPhase = 3;
                     ecShowJoint(ecJointIndex);
-                    
-                    const prevJoint = EC_JOINT_ORDER[ecJointIndex];
-                    const savedOffset = ecTempOffsets[prevJoint.idx] || 0;
-                    document.getElementById('ec-joint-slider').value = savedOffset;
-                    document.getElementById('ec-joint-slider-value').textContent = savedOffset;
-                    document.getElementById('ec-joint-limit-warning').style.display = 'none';
                     return;
                 }
             }

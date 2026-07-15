@@ -1363,7 +1363,7 @@
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Hanche</span><span id="calib-val-0">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-0" oninput="updateCalibSliderVal(0)" onchange="applyCalibOffsetLive(0)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-0" min="0" max="180" value="0" onchange="updateCalibLimits(0)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1374,7 +1374,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Tibia</span><span id="calib-val-1">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-1" oninput="updateCalibSliderVal(1)" onchange="applyCalibOffsetLive(1)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-1" min="0" max="180" value="0" onchange="updateCalibLimits(1)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1385,7 +1385,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FR Genou</span><span id="calib-val-2">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-2" oninput="updateCalibSliderVal(2)" onchange="applyCalibOffsetLive(2)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-2" min="0" max="180" value="0" onchange="updateCalibLimits(2)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1403,7 +1403,7 @@
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Hanche</span><span id="calib-val-3">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-3" oninput="updateCalibSliderVal(3)" onchange="applyCalibOffsetLive(3)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-3" min="0" max="180" value="0" onchange="updateCalibLimits(3)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1414,7 +1414,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Tibia</span><span id="calib-val-4">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-4" oninput="updateCalibSliderVal(4)" onchange="applyCalibOffsetLive(4)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-4" min="0" max="180" value="0" onchange="updateCalibLimits(4)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1425,7 +1425,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>FL Genou</span><span id="calib-val-5">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-5" oninput="updateCalibSliderVal(5)" onchange="applyCalibOffsetLive(5)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-5" min="0" max="180" value="0" onchange="updateCalibLimits(5)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1443,7 +1443,7 @@
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Hanche</span><span id="calib-val-6">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-6" oninput="updateCalibSliderVal(6)" onchange="applyCalibOffsetLive(6)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-6" min="0" max="180" value="0" onchange="updateCalibLimits(6)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1454,7 +1454,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Tibia</span><span id="calib-val-7">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-7" oninput="updateCalibSliderVal(7)" onchange="applyCalibOffsetLive(7)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-7" min="0" max="180" value="0" onchange="updateCalibLimits(7)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1465,7 +1465,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BR Genou</span><span id="calib-val-8">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-8" oninput="updateCalibSliderVal(8)" onchange="applyCalibOffsetLive(8)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-8" min="0" max="180" value="0" onchange="updateCalibLimits(8)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1483,7 +1483,7 @@
                             <div style="display:flex; flex-direction:column; gap:0.75rem;">
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Hanche</span><span id="calib-val-9">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-9" oninput="updateCalibSliderVal(9)" onchange="applyCalibOffsetLive(9)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-9" min="0" max="180" value="0" onchange="updateCalibLimits(9)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1494,7 +1494,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Tibia</span><span id="calib-val-10">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-10" oninput="updateCalibSliderVal(10)" onchange="applyCalibOffsetLive(10)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-10" min="0" max="180" value="0" onchange="updateCalibLimits(10)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -1505,7 +1505,7 @@
                                 </div>
                                 <div>
                                     <div style="display:flex; justify-content:space-between; font-size:0.75rem;"><span>BL Genou</span><span id="calib-val-11">0</span></div>
-                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)"/>
+                                    <input type="range" min="-90" max="90" value="0" class="form-input" style="padding:0; height:4px; margin-top:0.25rem;" id="calib-slider-11" oninput="updateCalibSliderVal(11)" onchange="applyCalibOffsetLive(11)"/>
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem; font-size:0.7rem; color:var(--text-secondary);">
                                         <div style="display:flex; align-items:center; gap:0.25rem;">
                                             <span>Min:</span><input type="number" id="calib-min-11" min="0" max="180" value="0" onchange="updateCalibLimits(11)" style="width:36px; background:rgba(0,0,0,0.2); border:1px solid var(--border-color); color:var(--text-primary); font-size:0.65rem; padding:1px; border-radius:3px; text-align:center;">
@@ -2077,43 +2077,43 @@
                 <!-- Servo icon (Hidden since full 3D is visible) -->
                 <div style="text-align: center; font-size: 3rem; opacity: 0.6; display: none;" id="ec-joint-icon"></div>
                 
-                <!-- Slider -->
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-90</span>
-                    <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" aria-label="Angle du joint" autocomplete="off" 
-                           oninput="ecUpdateJointSlider(this.value)" 
-                           style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
-                    <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+90</span>
+                <!-- Bloc curseur principal (masqué pendant l'étape B limites) -->
+                <div id="ec-joint-main-block" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">-90</span>
+                        <input type="range" id="ec-joint-slider" min="-90" max="90" value="0" aria-label="Angle du joint" autocomplete="off"
+                               oninput="ecUpdateJointSlider(this.value)"
+                               style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); min-width: 28px; text-align: center;">+90</span>
+                    </div>
+                    <div style="text-align: center;">
+                        <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
+                        <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
+                        <span id="ec-joint-unit-label" style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
+                    </div>
                 </div>
-                
-                <!-- Value display -->
-                <div style="text-align: center;">
-                    <span id="ec-joint-slider-value" style="font-size: 2.5rem; font-weight: 700; color: var(--accent); transition: color 0.2s;">0</span>
-                    <span id="ec-joint-limit-warning" style="display: none; font-size: 0.75rem; font-weight: 600; color: #f59e0b; background: rgba(245,158,11,0.12); padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; vertical-align: middle;">⚠ Limite servo</span>
-                    <span id="ec-joint-unit-label" style="color: var(--text-secondary); font-size: 0.9rem;">° offset</span>
-                </div>
-                <!-- Min/Max safety limit sliders -->
+                <!-- Min/Max safety limit sliders (relatifs au zéro calibré de l'étape A) -->
                 <div id="ec-joint-limits-container" style="border-top: 1px solid var(--border-color); padding-top: 1rem; display: flex; flex-direction: column; gap: 1rem;">
                     <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">
-                        🛡️ Limites de Sécurité (Angle Réel/Absolu)
+                        🛡️ Limites de Sécurité (± depuis le zéro calibré)
                     </div>
-                    
+
                     <!-- Min Limit Slider -->
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-                        <span style="font-size: 0.8rem; color: var(--text-secondary); width: 80px;">Angle Min :</span>
-                        <input type="range" id="ec-joint-min-limit-slider" min="0" max="180" value="0" aria-label="Angle Minimum" autocomplete="off"
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); width: 80px;">Butée Min :</span>
+                        <input type="range" id="ec-joint-min-limit-slider" min="-90" max="0" value="-45" aria-label="Butée Minimum" autocomplete="off"
                                oninput="ecUpdateJointMinLimit(this.value)"
                                style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
-                        <span id="ec-joint-min-limit-val" style="font-size: 0.85rem; font-weight: 600; color: var(--accent); min-width: 35px; text-align: right;">0°</span>
+                        <span id="ec-joint-min-limit-val" style="font-size: 0.85rem; font-weight: 600; color: var(--accent); min-width: 78px; text-align: right;">-45° (45°)</span>
                     </div>
 
                     <!-- Max Limit Slider -->
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
-                        <span style="font-size: 0.8rem; color: var(--text-secondary); width: 80px;">Angle Max :</span>
-                        <input type="range" id="ec-joint-max-limit-slider" min="0" max="180" value="180" aria-label="Angle Maximum" autocomplete="off"
+                        <span style="font-size: 0.8rem; color: var(--text-secondary); width: 80px;">Butée Max :</span>
+                        <input type="range" id="ec-joint-max-limit-slider" min="0" max="90" value="45" aria-label="Butée Maximum" autocomplete="off"
                                oninput="ecUpdateJointMaxLimit(this.value)"
                                style="flex: 1; height: 6px; -webkit-appearance: none; appearance: none; background: var(--border-color); border-radius: 3px; outline: none; cursor: pointer;">
-                        <span id="ec-joint-max-limit-val" style="font-size: 0.85rem; font-weight: 600; color: var(--accent); min-width: 35px; text-align: right;">180°</span>
+                        <span id="ec-joint-max-limit-val" style="font-size: 0.85rem; font-weight: 600; color: var(--accent); min-width: 78px; text-align: right;">+45° (135°)</span>
                     </div>
 
                     <!-- Test Limit Angles -->

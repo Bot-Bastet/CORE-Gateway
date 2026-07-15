@@ -1,18 +1,34 @@
 // === easyconfig_motors.js - Calibration articulations moteurs ===
+// Parcours en 3 étapes par moteur :
+//   Étape A (phase 1) : Offset — aligner le moteur physique sur le zéro du modèle 3D.
+//   Étape B (phase 2) : Limites min/max, exprimées EN RELATIF par rapport au zéro calibré.
+//   Étape C (phase 3) : Sens — reproduire la flexion montrée par le modèle 3D ;
+//                       le signe du mouvement détecte le miroir.
+// Convention : le client envoie TOUJOURS des angles logiques bruts (0-180, 90 = centre).
+// L'Arduino applique seul inversion + offset + limites depuis son EEPROM
+// (physical = constrain((inverted ? 180-L : L) + offset, min, max)).
         var ecJointPhase = 1;
-        var ecPhase1Offset = 0;
+        var ecPhaseAOffset = 0;
         var ecJointModified = false;
+
+        // Delta logique (°) montré par le modèle 3D en étape C, par type d'articulation.
+        // Le genou fléchit en logique négative (convention IK : coude toujours négatif).
+        var EC_SHOWN_DELTA = { hip: 30, upper: 40, lower: -45 };
+        // Limites par défaut (± depuis le zéro calibré) proposées quand aucune
+        // calibration n'existe. Hanches : ±25° (course mécanique du châssis).
+        var EC_DEFAULT_LIMITS = { hip: 25, upper: 60, lower: 60 };
 
         async function ecInitJointCalibration() {
             ecJointIndex = 0;
             ecJointPhase = 1;
-            ecPhase1Offset = 0;
+            ecPhaseAOffset = 0;
             ecTempOffsets  = new Array(12).fill(0);
             ecTempInverts  = new Array(12).fill(false);
             ecTempMinLimits = new Array(12).fill(0);
             ecTempMaxLimits = new Array(12).fill(180);
-            
-            // Pré-charger les calibrations existantes depuis la Gateway pour ne pas les écraser
+
+            // Pré-charger les calibrations existantes depuis la Gateway : permet de
+            // « Suivant (garder les valeurs) » sans tout refaire.
             try {
                 const res = await fetch('/core/calibration', {
                     headers: { 'X-API-Token': window.apiToken || localStorage.getItem('bastet_api_token') || '' }
@@ -20,32 +36,30 @@
                 if (res.ok) {
                     const data = await res.json();
                     if (data.offsets && data.offsets.length === 12) {
-                        ecTempOffsets = [...data.offsets];
-                        console.log("[EasyConfig] Offsets pré-chargés :", ecTempOffsets);
+                        ecTempOffsets = data.offsets.map(function(v) { return parseInt(v) || 0; });
                     }
                     if (data.inverts && data.inverts.length === 12) {
-                        ecTempInverts = [...data.inverts];
-                        console.log("[EasyConfig] Inversions pré-chargées :", ecTempInverts);
+                        ecTempInverts = data.inverts.map(function(v) { return v === true; });
                     }
                     if (data.limits && data.limits.length === 12) {
                         for (let i = 0; i < 12; i++) {
-                            ecTempMinLimits[i] = data.limits[i][0] !== undefined ? data.limits[i][0] : 0;
-                            ecTempMaxLimits[i] = data.limits[i][1] !== undefined ? data.limits[i][1] : 180;
+                            ecTempMinLimits[i] = (data.limits[i] && data.limits[i][0] !== undefined) ? data.limits[i][0] : 0;
+                            ecTempMaxLimits[i] = (data.limits[i] && data.limits[i][1] !== undefined) ? data.limits[i][1] : 180;
                         }
-                        console.log("[EasyConfig] Limites pré-chargées.");
                     }
+                    console.log("[EasyConfig] Calibration pré-chargée :", ecTempOffsets, ecTempInverts);
                 }
             } catch (err) {
                 console.error("[EasyConfig] Erreur pré-chargement calibration :", err);
             }
-            
+
             ecJointServoAttached = false;
             ecJointModified = false;
             ecAllJointsValidated = false;
             window._ecSessionDirty = false;
             document.getElementById('ec-joint-calibration-view').style.display = 'flex';
             document.getElementById('ec-joint-final-view').style.display = 'none';
-            
+
             if (window.lastTelemetryState && window.lastTelemetryState.sensors) {
                 const s = window.lastTelemetryState.sensors;
                 ecCameraCount = (s.cam1_connected ? 1 : 0) + (s.cam2_connected ? 1 : 0);
@@ -56,96 +70,199 @@
             ecShowJoint(0);
         }
 
+        // Envoi d'un angle logique brut au servo courant (aucune inversion côté client).
+        function ecWriteServo(logicalAngle) {
+            var joint = EC_JOINT_ORDER[ecJointIndex];
+            var angle = Math.max(0, Math.min(180, Math.round(logicalAngle)));
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
+            }
+        }
+
+        function ecSendCmd(payload) {
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify(payload));
+            }
+        }
+
+        // Bornes de la plage relative autour du zéro calibré (l'absolu doit rester 0-180) :
+        // absolu = 90 + offset + rel  →  rel ∈ [-(90+offset), 90-offset]
+        function ecRelBounds(offset) {
+            return { lo: -(90 + offset), hi: 90 - offset };
+        }
+
+        function ecPhaseLabel() {
+            if (ecJointPhase === 1) return 'Étape A : Régler le Zéro (Offset)';
+            if (ecJointPhase === 2) return 'Étape B : Limites de Sécurité';
+            return 'Étape C : Détecter le Sens (Miroir)';
+        }
+
         function ecShowJoint(index) {
             if (index >= EC_JOINT_ORDER.length) return;
             var joint = EC_JOINT_ORDER[index];
-            
+
             if (ecJointPhase === 1) {
                 ecJointModified = false;
             }
-            
-            document.getElementById('ec-joint-leg-name').textContent  = joint.leg;
-            document.getElementById('ec-joint-name').textContent       = joint.joint;
-            
-            var progressText = 'Articulation ' + (index + 1) + '/12';
-            if (ecJointPhase === 1) {
-                progressText += ' - Étape A : Régler le Zéro';
-            } else {
-                progressText += ' - Étape B : Détecter le Sens';
-            }
-            document.getElementById('ec-joint-progress').textContent   = progressText;
-            document.getElementById('ec-joint-icon').textContent       = joint.icon;
 
-            // Masquer le bouton miroir manuel
+            document.getElementById('ec-joint-leg-name').textContent = joint.leg;
+            document.getElementById('ec-joint-name').textContent = joint.joint;
+            document.getElementById('ec-joint-progress').textContent =
+                'Articulation ' + (index + 1) + '/12 — ' + ecPhaseLabel();
+            document.getElementById('ec-joint-icon').textContent = joint.icon;
+
+            var sideEl = document.getElementById('ec-joint-side-label');
+            if (sideEl) sideEl.textContent = joint.side === 'left' ? '🛅 Côté Gauche' : '🛅 Côté Droit';
+
+            // Bouton miroir manuel masqué : le sens est détecté automatiquement en étape C
             var invertBtn = document.getElementById('ec-btn-invert-servo');
             if (invertBtn) invertBtn.style.display = 'none';
 
-            // --- Pose cible affichée par la vue 3D interactive (surbrillance + orientation) ---
+            // Pose cible dans la vue 3D interactive : neutre (A/B), fléchie (C)
             if (typeof window.highlightSpotMicroJoint === 'function') {
                 window.highlightSpotMicroJoint(joint.leg_id, joint.type, ecJointPhase);
             }
 
-            // --- Description pédagogique selon la phase ---
+            ecRenderPhaseDescription(joint);
+            ecRenderPhaseControls(joint);
+            ecUpdateActionButtons(joint);
+
+            document.getElementById('ec-btn-prev').disabled = (index === 0 && ecJointPhase === 1);
+            var btnNext = document.getElementById('ec-btn-next');
+            btnNext.disabled = false;
+            btnNext.textContent = ecKeepLabel(joint);
+            btnNext.onclick = ecNextStep;
+        }
+
+        // Libellé du bouton Suivant : reprend les valeurs existantes sans re-calibrer.
+        function ecKeepLabel(joint) {
+            if (ecJointServoAttached) return 'Suivant →';
+            if (ecJointPhase === 1) {
+                var o = ecTempOffsets[joint.idx] || 0;
+                return 'Suivant (garder offset ' + (o > 0 ? '+' : '') + o + '°)';
+            }
+            if (ecJointPhase === 2) {
+                var o2 = ecTempOffsets[joint.idx] || 0;
+                var rMin = ecTempMinLimits[joint.idx] - 90 - o2;
+                var rMax = ecTempMaxLimits[joint.idx] - 90 - o2;
+                return 'Suivant (garder ' + rMin + '°/' + '+' + rMax + '°)';
+            }
+            return 'Suivant (garder ' + (ecTempInverts[joint.idx] ? 'Miroir' : 'Normal') + ')';
+        }
+
+        function ecRenderPhaseDescription(joint) {
             var descEl = document.getElementById('ec-joint-description');
-            if (descEl) {
-                var html = '';
-                if (ecJointPhase === 1) {
-                    html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9"><b>1. Étape A : Réglage du Zéro (Offset)</b></p>';
-                    if (joint.type === 'hip') {
-                        html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">Ajustez le curseur jusqu\'à ce que la hanche soit <b>parfaitement verticale</b> par rapport au sol (comme le montre la ligne verte).</p>';
-                    } else if (joint.type === 'upper') {
-                        html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">Ajustez le curseur jusqu\'à ce que la cuisse soit <b>horizontale / perpendiculaire au corps</b> (comme le montre la ligne verte).</p>';
-                    } else {
-                        html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">Ajustez le curseur pour que le genou et la patte soient alignés de façon <b>la plus droite possible</b> (comme le montre la ligne verte).</p>';
-                    }
-                    html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9; color:var(--success)"><b>Une fois droit, cliquez sur "Valider le Zéro".</b></p>';
-                } else {
-                    html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9"><b>2. Étape B : Détection du Sens (Miroir)</b></p>';
-                    if (joint.type === 'hip') {
-                        html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">Déplacez le curseur pour <b>écarter la patte vers l\'extérieur</b> du robot (comme l\'indique la position orange).</p>';
-                    } else if (joint.type === 'upper') {
-                        html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">Déplacez le curseur pour <b>incliner la cuisse vers l\'avant</b> (comme l\'indique la position orange).</p>';
-                    } else {
-                        html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9">Déplacez le curseur pour <b>plier le genou vers l\'intérieur</b> (comme l\'indique la position orange).</p>';
-                    }
-                    html += '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9; color:var(--accent)"><b>Une fois plié/incliné physiquement, cliquez sur "Valider le Sens".</b></p>';
-                }
-                descEl.innerHTML = html;
+            if (!descEl) return;
+            var P = function(t, c) {
+                return '<p style="margin:0.25rem 0; font-size:0.85rem; line-height:1.4; opacity:0.9' +
+                       (c ? '; color:' + c : '') + '">' + t + '</p>';
+            };
+            var html = '';
+            if (ecJointPhase === 1) {
+                html += P('<b>Étape A : Réglage du Zéro (Offset)</b>');
+                html += P('Le modèle 3D montre la position neutre de cette articulation. ' +
+                          'Allumez le servo puis déplacez le curseur jusqu\'à ce que le moteur physique ' +
+                          '<b>corresponde exactement à la pose du modèle 3D</b>.');
+                html += P('<b>Une fois aligné, cliquez sur « Valider le Zéro ».</b>', 'var(--success)');
+            } else if (ecJointPhase === 2) {
+                html += P('<b>Étape B : Limites de Sécurité (min/max)</b>');
+                html += P('Définissez jusqu\'où le moteur a le droit d\'aller <b>de chaque côté du zéro calibré</b>, ' +
+                          'pour qu\'il ne force jamais sur le châssis. Utilisez « Test Min/Max » pour vérifier ' +
+                          'physiquement que la butée est bonne.');
+                html += P('<b>Une fois les deux butées sûres, cliquez sur « Valider les Limites ».</b>', 'var(--success)');
+            } else {
+                html += P('<b>Étape C : Détection du Sens (Miroir)</b>');
+                html += P('Le modèle 3D montre maintenant une <b>flexion</b> de cette articulation. ' +
+                          'Déplacez le curseur pour reproduire <b>exactement la même position physique</b> sur le robot ' +
+                          '(peu importe le sens du curseur, c\'est justement ce qu\'on mesure).');
+                html += P('<b>Une fois la flexion reproduite, cliquez sur « Valider le Sens ».</b>', 'var(--accent)');
+            }
+            descEl.innerHTML = html;
+        }
+
+        function ecRenderPhaseControls(joint) {
+            var mainBlock = document.getElementById('ec-joint-main-block');
+            var limitsContainer = document.getElementById('ec-joint-limits-container');
+            var slider = document.getElementById('ec-joint-slider');
+            var unitLabel = document.getElementById('ec-joint-unit-label');
+            var limitWarn = document.getElementById('ec-joint-limit-warning');
+            if (limitWarn) limitWarn.style.display = 'none';
+
+            if (ecJointPhase === 2) {
+                if (mainBlock) mainBlock.style.display = 'none';
+                if (limitsContainer) limitsContainer.style.display = 'flex';
+                ecInitLimitSliders(joint);
+                return;
             }
 
-            // --- Côté du servo ---
-            var sideEl = document.getElementById('ec-joint-side-label');
-            if (sideEl) sideEl.textContent = joint.side === 'left' ? '🛅 Côté Gauche' : '🛅 Côté Droit';
+            if (mainBlock) mainBlock.style.display = '';
+            if (limitsContainer) limitsContainer.style.display = 'none';
 
-            // Hiding limits block in Phase 2
-            var limitsContainer = document.getElementById('ec-joint-limits-container');
-            var unitLabel = document.getElementById('ec-joint-unit-label');
             if (ecJointPhase === 1) {
-                if (limitsContainer) limitsContainer.style.display = 'flex';
+                slider.min = -90; slider.max = 90;
+                slider.value = ecTempOffsets[joint.idx] || 0;
                 if (unitLabel) unitLabel.textContent = '° offset';
             } else {
-                if (limitsContainer) limitsContainer.style.display = 'none';
-                if (unitLabel) unitLabel.textContent = '° flexion';
-            }
-
-            // --- Slider positionné ---
-            var slider = document.getElementById('ec-joint-slider');
-            if (ecJointPhase === 1) {
-                var savedOffset = ecTempOffsets[joint.idx] || 0;
-                slider.value = savedOffset;
+                // Étape C : curseur relatif au zéro calibré, borné par les limites de l'étape B
+                var o = ecTempOffsets[joint.idx] || 0;
+                var relMin = ecTempMinLimits[joint.idx] - 90 - o;
+                var relMax = ecTempMaxLimits[joint.idx] - 90 - o;
+                slider.min = Math.max(-90, relMin);
+                slider.max = Math.min(90, relMax);
+                slider.value = 0;
+                if (unitLabel) unitLabel.textContent = '° depuis le zéro';
             }
             document.getElementById('ec-joint-slider-value').textContent = slider.value;
             document.getElementById('ec-joint-slider-value').style.color = 'var(--accent)';
-            var limitWarnInit = document.getElementById('ec-joint-limit-warning');
-            if (limitWarnInit) limitWarnInit.style.display = 'none';
-            ecUpdateJointSlider(slider.value);
+        }
 
-            // --- Bouton Allumer/Éteindre ---
+        function ecInitLimitSliders(joint) {
+            var o = ecTempOffsets[joint.idx] || 0;
+            var b = ecRelBounds(o);
+            var minSlider = document.getElementById('ec-joint-min-limit-slider');
+            var maxSlider = document.getElementById('ec-joint-max-limit-slider');
+            if (!minSlider || !maxSlider) return;
+
+            var relMin = ecTempMinLimits[joint.idx] - 90 - o;
+            var relMax = ecTempMaxLimits[joint.idx] - 90 - o;
+            // Aucune limite définie (0/180 par défaut) → proposer le préréglage du type
+            if (ecTempMinLimits[joint.idx] <= 0 && ecTempMaxLimits[joint.idx] >= 180) {
+                var d = EC_DEFAULT_LIMITS[joint.type] || 45;
+                relMin = -d; relMax = d;
+            }
+            relMin = Math.max(b.lo, Math.min(0, relMin));
+            relMax = Math.min(b.hi, Math.max(0, relMax));
+
+            minSlider.min = b.lo; minSlider.max = 0;   minSlider.value = relMin;
+            maxSlider.min = 0;    maxSlider.max = b.hi; maxSlider.value = relMax;
+            ecStoreRelLimits(joint, relMin, relMax, false);
+            ecRefreshLimitLabels(joint);
+        }
+
+        function ecStoreRelLimits(joint, relMin, relMax, sendToArduino) {
+            var o = ecTempOffsets[joint.idx] || 0;
+            ecTempMinLimits[joint.idx] = Math.max(0, Math.min(180, 90 + o + relMin));
+            ecTempMaxLimits[joint.idx] = Math.max(0, Math.min(180, 90 + o + relMax));
+            if (sendToArduino && ecJointServoAttached) {
+                window._ecSessionDirty = true;
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx,
+                            min: ecTempMinLimits[joint.idx], max: ecTempMaxLimits[joint.idx] });
+            }
+        }
+
+        function ecRefreshLimitLabels(joint) {
+            var o = ecTempOffsets[joint.idx] || 0;
+            var minEl = document.getElementById('ec-joint-min-limit-val');
+            var maxEl = document.getElementById('ec-joint-max-limit-val');
+            var relMin = ecTempMinLimits[joint.idx] - 90 - o;
+            var relMax = ecTempMaxLimits[joint.idx] - 90 - o;
+            if (minEl) minEl.textContent = relMin + '° (' + ecTempMinLimits[joint.idx] + '°)';
+            if (maxEl) maxEl.textContent = '+' + relMax + '° (' + ecTempMaxLimits[joint.idx] + '°)';
+        }
+
+        function ecUpdateActionButtons(joint) {
             var btnAttach = document.getElementById('ec-btn-attach-servo');
             var btnValidate = document.getElementById('ec-btn-validate-joint');
-            
-            var savedOffset = ecTempOffsets[joint.idx] || 0;
-            var savedInvert = ecTempInverts[joint.idx] || false;
 
             if (ecJointServoAttached) {
                 btnAttach.textContent = '🔌 Éteindre le servo';
@@ -153,250 +270,114 @@
                 btnValidate.disabled = false;
                 btnValidate.style.opacity = '1';
                 btnValidate.style.background = 'var(--primary-color)';
-                
-                if (ecJointPhase === 1) {
-                    btnValidate.textContent = 'Valider le Zéro';
-                } else {
-                    btnValidate.textContent = 'Valider le Sens';
-                }
             } else {
                 btnAttach.textContent = '🔌 Allumer le servo';
                 btnAttach.onclick = ecAttachCurrentJoint;
-                
-                // Permettre de valider l'étape en conservant la valeur existante
-                btnValidate.disabled = false;
-                btnValidate.style.opacity = '0.85';
+                btnValidate.disabled = true;
+                btnValidate.style.opacity = '0.5';
                 btnValidate.style.background = 'rgba(255,255,255,0.05)';
-                btnValidate.style.border = '1px solid var(--border-color)';
-                
-                if (ecJointPhase === 1) {
-                    btnValidate.textContent = `Conserver Zéro (${savedOffset > 0 ? '+' : ''}${savedOffset}°) & Suivant`;
-                } else {
-                    btnValidate.textContent = `Conserver Sens (${savedInvert ? 'Miroir' : 'Normal'}) & Suivant`;
-                }
             }
-            btnAttach.disabled = false;
+            if (ecJointPhase === 1) btnValidate.textContent = '✅ Valider le Zéro';
+            else if (ecJointPhase === 2) btnValidate.textContent = '✅ Valider les Limites';
+            else btnValidate.textContent = '✅ Valider le Sens';
             btnValidate.onclick = ecValidateJoint;
-
-            document.getElementById('ec-btn-prev').disabled = (index === 0 && ecJointPhase === 1);
-            document.getElementById('ec-btn-next').disabled = false;
-            document.getElementById('ec-btn-next').textContent = 'Suivant \u2192';
-            document.getElementById('ec-btn-next').onclick = ecNextStep;
         }
-        
+
+        // Allumage du servo courant : remet l'EEPROM du moteur dans un état de
+        // mesure déterministe selon la phase, puis positionne le moteur.
         function ecAttachCurrentJoint() {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            ecJointModified = true;
-            if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'attach', index: joint.idx, manual: true }));
-                // Envoyer la position actuelle du slider en angle absolu
-                var curVal = parseInt(document.getElementById('ec-joint-slider').value) || 0;
-                var absoluteAngle = curVal + 90;
-                var isInverted = ecTempInverts[joint.idx];
-                var angle = isInverted ? (180 - absoluteAngle) : absoluteAngle;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
-                
-                ecJointServoAttached = true;
-                ecShowJoint(ecJointIndex);
-                if (typeof showToast === 'function') showToast('Servo', joint.joint + ' allumé — utilisez le curseur', 'info');
-            } else {
+            if (!appWs || appWs.readyState !== WebSocket.OPEN) {
                 if (typeof showToast === 'function') showToast('Erreur', 'WebSocket non connecté', 'error');
+                return;
             }
+            ecJointModified = true;
+            window._ecSessionDirty = true;
+            ecSendCmd({ type: 'arduino_cmd', cmd: 'attach', index: joint.idx, manual: true });
+
+            var slider = document.getElementById('ec-joint-slider');
+            var val = parseInt(slider.value) || 0;
+
+            if (ecJointPhase === 1) {
+                // Mesure d'offset : tout remettre à plat pour que écrire L donne physique = L
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: false });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: 0 });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: 0, max: 180 });
+                ecWriteServo(90 + val);
+            } else if (ecJointPhase === 2) {
+                // Limites : offset validé appliqué, inversion neutralisée pendant le réglage
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: false });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: ecTempOffsets[joint.idx] || 0 });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx,
+                            min: ecTempMinLimits[joint.idx], max: ecTempMaxLimits[joint.idx] });
+                ecWriteServo(90);
+            } else {
+                // Détection du sens : inversion OBLIGATOIREMENT désactivée pour mesurer
+                // le comportement brut du montage. Le miroir sera réécrit à la validation.
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: false });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: ecTempOffsets[joint.idx] || 0 });
+                ecWriteServo(90);
+            }
+
+            ecJointServoAttached = true;
+            ecShowJoint(ecJointIndex);
+            if (typeof showToast === 'function') showToast('Servo', joint.joint + ' allumé — utilisez le curseur', 'info');
         }
-        
+
         function ecDetachCurrentJoint() {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            if (appWs && appWs.readyState === WebSocket.OPEN) {
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx }));
-            }
+            ecSendCmd({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx });
             ecJointServoAttached = false;
             ecShowJoint(ecJointIndex);
             if (typeof showToast === 'function') showToast('Servo', joint.joint + ' éteint', 'info');
         }
 
-        // Bascule le flag miroir du servo courant
-        function ecToggleInvert() {
-            var joint = EC_JOINT_ORDER[ecJointIndex];
-            ecTempInverts[joint.idx] = !ecTempInverts[joint.idx];
-            var isInverted = ecTempInverts[joint.idx];
-            var invertBtn = document.getElementById('ec-btn-invert-servo');
-            if (invertBtn) {
-                invertBtn.textContent = isInverted ? '🔄 Miroir : ON' : '🔄 Miroir : OFF';
-                invertBtn.style.background = isInverted ? 'rgba(239,68,68,0.2)' : 'rgba(100,100,100,0.15)';
-                invertBtn.style.color = isInverted ? 'var(--danger)' : 'var(--text-secondary)';
-            }
-            // Si servo allumé, tester le miroir immédiatement
-            if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
-                var raw = parseInt(document.getElementById('ec-joint-slider').value) || 90;
-                var angle = isInverted ? (180 - raw) : raw;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
-            }
-            if (typeof showToast === 'function') {
-                showToast('Miroir', isInverted ? 'Sens inversé activé' : 'Sens normal', 'info');
-            }
-        }
-        
         var ecSliderThrottle = null;
         function ecUpdateJointSlider(value) {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var intVal = parseInt(value) || 0; // valeur de -90 à 90 (offset)
+            var intVal = parseInt(value) || 0;
             var valueEl = document.getElementById('ec-joint-slider-value');
             var limitWarn = document.getElementById('ec-joint-limit-warning');
             if (valueEl) valueEl.textContent = intVal;
-            
-            // L'offset stocké = la valeur du slider directement
-            ecTempOffsets[joint.idx] = intVal;
 
-            // Calculer l'angle absolu théorique à envoyer au moteur physique (90 = neutre)
-            var absoluteAngle = 90 + intVal;
+            var logical;
+            if (ecJointPhase === 1) {
+                ecTempOffsets[joint.idx] = intVal;
+                logical = 90 + intVal;   // offset EEPROM remis à 0 à l'allumage → physique = L
+            } else {
+                logical = 90 + intVal;   // offset appliqué par l'EEPROM → physique = 90+offset+rel
+            }
 
-            // Indicateur couleur si aux limites de l'angle absolu (0° ou 180°)
-            if (absoluteAngle <= 5 || absoluteAngle >= 175) {
+            if (logical <= 5 || logical >= 175) {
                 if (valueEl) valueEl.style.color = '#f59e0b';
                 if (limitWarn) limitWarn.style.display = 'inline-block';
             } else {
                 if (valueEl) valueEl.style.color = 'var(--accent)';
                 if (limitWarn) limitWarn.style.display = 'none';
             }
-            
-            // Throttle 50ms pour ne pas saturer le buffer série Arduino
+
             if (ecSliderThrottle) clearTimeout(ecSliderThrottle);
             ecSliderThrottle = setTimeout(function() {
-                if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
-                    var isInverted = ecTempInverts[joint.idx];
-                    var angle = isInverted ? (180 - absoluteAngle) : absoluteAngle;
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
-                }
+                if (ecJointServoAttached) ecWriteServo(logical);
             }, 50);
-        }
-        
-        function ecValidateJoint() {
-            var joint = EC_JOINT_ORDER[ecJointIndex];
-            var sliderVal = parseInt(document.getElementById('ec-joint-slider').value) || 0;
-            
-            if (ecJointPhase === 1) {
-                if (ecJointServoAttached) {
-                    // Étape A avec servo allumé : on lit la valeur courante du slider
-                    ecPhase1Offset = sliderVal;
-                } else {
-                    // Étape A sans servo allumé : on conserve l'offset préexistant
-                    ecPhase1Offset = ecTempOffsets[joint.idx] || 0;
-                }
-                ecJointPhase = 2;
-                ecShowJoint(ecJointIndex);
-                if (typeof showToast === 'function') {
-                    showToast('✔ Zéro enregistré', 'Déplacez le curseur ou passez au sens suivant', 'info');
-                }
-            } else {
-                var inverted = false;
-                if (ecJointServoAttached) {
-                    // Étape B avec servo allumé : détection dynamique du sens.
-                    // Comparaison avec la valeur validée en étape A : si l'utilisateur
-                    // a dû descendre le curseur pour reproduire la flexion montrée
-                    // par le modèle 3D, le moteur tourne à l'envers → miroir.
-                    var delta = sliderVal - ecPhase1Offset;
-                    if (Math.abs(delta) < 5) {
-                        // Mouvement insuffisant pour une détection fiable du sens
-                        if (typeof showToast === 'function') {
-                            showToast('⚠ Mouvement insuffisant',
-                                'Déplacez le curseur d\'au moins 5° pour reproduire la flexion du modèle 3D, puis validez.',
-                                'warning');
-                        }
-                        return;
-                    }
-                    if (delta < 0) {
-                        inverted = true;
-                    }
-                } else {
-                    // Étape B sans servo allumé : on conserve l'inversion préexistante
-                    inverted = ecTempInverts[joint.idx] || false;
-                }
-                
-                var offset = ecPhase1Offset;
-                ecTempOffsets[joint.idx] = offset;
-                ecTempInverts[joint.idx] = inverted;
-                
-                if (ecJointModified && appWs && appWs.readyState === WebSocket.OPEN) {
-                    // Écriture EEPROM réelle : en cas d'abandon en cours de parcours,
-                    // closeEasyConfig() devra effacer la calibration partielle.
-                    window._ecSessionDirty = true;
-                    // 1. Enregistrer les limites min/max en PREMIER (avant offset/invert)
-                    //    pour éviter un conflit avec le save distribué EEPROM de set_offset.
-                    var minLim = ecTempMinLimits[joint.idx] !== undefined ? ecTempMinLimits[joint.idx] : 0;
-                    var maxLim = ecTempMaxLimits[joint.idx] !== undefined ? ecTempMaxLimits[joint.idx] : 180;
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: minLim, max: maxLim }));
-                    // 2. Enregistrer le flag miroir (inversion) dans l'EEPROM de l'Arduino
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: inverted }));
-                    // 3. Enregistrer l'offset dans l'EEPROM de l'Arduino
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: offset }));
-                    // 4. Détacher le servo avant de passer au suivant
-                    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx }));
-                }
-                ecJointServoAttached = false;
-                
-                if (typeof showToast === 'function') {
-                    showToast('✔ Articulation Validée', joint.leg + ' ' + joint.joint + ' — offset=' + offset + '°' + (inverted ? ', miroir=ON' : ', miroir=OFF'), 'success');
-                }
-                
-                // Réinitialiser la phase pour l'articulation suivante
-                ecJointPhase = 1;
-                
-                if (ecJointIndex < 11) {
-                    ecJointIndex++;
-                    ecShowJoint(ecJointIndex);
-                } else {
-                    // Toutes les articulations calibrées
-                    ecAllJointsValidated = true;
-                    document.getElementById('ec-joint-calibration-view').style.display = 'none';
-                    document.getElementById('ec-joint-final-view').style.display = 'flex';
-                    document.getElementById('ec-btn-prev').disabled = false;
-                    document.getElementById('ec-btn-next').disabled = false;
-                    document.getElementById('ec-progress-text').textContent = 'Toutes les articulations calibrées';
-                    // 🔴 SAFETY: Do NOT send 'stand' here. The EEPROM save is
-                    // asynchronous (distributed save takes ~54 loops for offsets,
-                    // ~102 loops for limits). Sending stand before the save
-                    // completes would move motors with incomplete calibration.
-                    // The user must explicitly press 'Finaliser' to send stand.
-                }
-            }
         }
 
         function ecUpdateJointMinLimit(value) {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var val = parseInt(value) || 0;
-            ecTempMinLimits[joint.idx] = val;
-            var valEl = document.getElementById('ec-joint-min-limit-val');
-            if (valEl) valEl.textContent = val + '°';
-            
+            var rel = parseInt(value) || 0;
             var maxSlider = document.getElementById('ec-joint-max-limit-slider');
-            if (maxSlider && val > parseInt(maxSlider.value)) {
-                maxSlider.value = val;
-                ecUpdateJointMaxLimit(val);
-            }
-            
-            if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
-                var maxVal = ecTempMaxLimits[joint.idx] !== undefined ? ecTempMaxLimits[joint.idx] : 180;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: val, max: maxVal }));
-            }
+            var relMax = maxSlider ? (parseInt(maxSlider.value) || 0) : 90;
+            ecStoreRelLimits(joint, rel, relMax, true);
+            ecRefreshLimitLabels(joint);
         }
 
         function ecUpdateJointMaxLimit(value) {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var val = parseInt(value) || 180;
-            ecTempMaxLimits[joint.idx] = val;
-            var valEl = document.getElementById('ec-joint-max-limit-val');
-            if (valEl) valEl.textContent = val + '°';
-            
+            var rel = parseInt(value) || 0;
             var minSlider = document.getElementById('ec-joint-min-limit-slider');
-            if (minSlider && val < parseInt(minSlider.value)) {
-                minSlider.value = val;
-                ecUpdateJointMinLimit(val);
-            }
-            
-            if (ecJointServoAttached && appWs && appWs.readyState === WebSocket.OPEN) {
-                var minVal = ecTempMinLimits[joint.idx] !== undefined ? ecTempMinLimits[joint.idx] : 0;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx, min: minVal, max: val }));
-            }
+            var relMin = minSlider ? (parseInt(minSlider.value) || 0) : -90;
+            ecStoreRelLimits(joint, relMin, rel, true);
+            ecRefreshLimitLabels(joint);
         }
 
         function ecTestLimit(type) {
@@ -405,25 +386,107 @@
                 if (typeof showToast === 'function') showToast('Attention', 'Veuillez d\'abord allumer le servo.', 'warning');
                 return;
             }
-            if (appWs && appWs.readyState === WebSocket.OPEN) {
-                var targetAngle = 90;
-                var offset = parseInt(document.getElementById('ec-joint-slider').value) || 0;
-                
-                if (type === 'min') {
-                    targetAngle = parseInt(document.getElementById('ec-joint-min-limit-slider').value) || 0;
-                } else if (type === 'max') {
-                    targetAngle = parseInt(document.getElementById('ec-joint-max-limit-slider').value) || 180;
-                } else {
-                    targetAngle = 90 + offset;
+            var o = ecTempOffsets[joint.idx] || 0;
+            var rel = 0;
+            if (type === 'min') rel = ecTempMinLimits[joint.idx] - 90 - o;
+            else if (type === 'max') rel = ecTempMaxLimits[joint.idx] - 90 - o;
+            ecWriteServo(90 + rel);
+            if (typeof showToast === 'function') {
+                var label = type === 'min' ? 'limite Min' : (type === 'max' ? 'limite Max' : 'zéro calibré');
+                showToast('Test', 'Positionnement sur ' + label + ' (' + rel + '° relatif)', 'info');
+            }
+        }
+
+        // Conservé pour compatibilité (bouton masqué) : bascule manuelle du miroir.
+        function ecToggleInvert() {
+            var joint = EC_JOINT_ORDER[ecJointIndex];
+            ecTempInverts[joint.idx] = !ecTempInverts[joint.idx];
+            if (ecJointServoAttached) {
+                window._ecSessionDirty = true;
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: ecTempInverts[joint.idx] });
+            }
+            if (typeof showToast === 'function') {
+                showToast('Miroir', ecTempInverts[joint.idx] ? 'Sens inversé activé' : 'Sens normal', 'info');
+            }
+        }
+
+        function ecValidateJoint() {
+            var joint = EC_JOINT_ORDER[ecJointIndex];
+            var slider = document.getElementById('ec-joint-slider');
+            var sliderVal = parseInt(slider.value) || 0;
+
+            if (ecJointPhase === 1) {
+                if (ecJointServoAttached) {
+                    ecPhaseAOffset = sliderVal;
+                    ecTempOffsets[joint.idx] = sliderVal;
+                    window._ecSessionDirty = true;
+                    ecSendCmd({ type: 'arduino_cmd', cmd: 'set_offset', index: joint.idx, offset: sliderVal });
                 }
-                
-                var isInverted = ecTempInverts[joint.idx];
-                var angle = isInverted ? (180 - targetAngle) : targetAngle;
-                appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
+                ecJointPhase = 2;
+                ecShowJoint(ecJointIndex);
                 if (typeof showToast === 'function') {
-                    var label = type === 'min' ? 'limite Min' : (type === 'max' ? 'limite Max' : 'position Offset');
-                    showToast('Test', 'Positionnement sur ' + label + ' (' + targetAngle + '°)', 'info');
+                    showToast('✔ Zéro enregistré', 'Réglez maintenant les butées min/max', 'info');
                 }
+                return;
+            }
+
+            if (ecJointPhase === 2) {
+                if (ecJointServoAttached) {
+                    window._ecSessionDirty = true;
+                    ecSendCmd({ type: 'arduino_cmd', cmd: 'set_limit', index: joint.idx,
+                                min: ecTempMinLimits[joint.idx], max: ecTempMaxLimits[joint.idx] });
+                }
+                ecJointPhase = 3;
+                ecShowJoint(ecJointIndex);
+                if (typeof showToast === 'function') {
+                    showToast('✔ Limites enregistrées', 'Reproduisez la flexion montrée par le modèle 3D', 'info');
+                }
+                return;
+            }
+
+            // Étape C : détection du sens
+            var inverted;
+            if (ecJointServoAttached) {
+                if (Math.abs(sliderVal) < 5) {
+                    if (typeof showToast === 'function') {
+                        showToast('⚠ Mouvement insuffisant',
+                            'Déplacez le curseur d\'au moins 5° pour reproduire la flexion du modèle 3D, puis validez.',
+                            'warning');
+                    }
+                    return;
+                }
+                // Le modèle 3D montre un delta logique EC_SHOWN_DELTA[type]. Si l'utilisateur
+                // a dû aller dans le sens opposé pour reproduire la pose, le montage est inversé.
+                var shown = EC_SHOWN_DELTA[joint.type] || 30;
+                inverted = (sliderVal > 0) !== (shown > 0);
+                window._ecSessionDirty = true;
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: inverted });
+                ecSendCmd({ type: 'arduino_cmd', cmd: 'detach', index: joint.idx });
+            } else {
+                inverted = ecTempInverts[joint.idx] || false;
+            }
+            ecTempInverts[joint.idx] = inverted;
+            ecJointServoAttached = false;
+
+            if (typeof showToast === 'function') {
+                showToast('✔ Articulation Validée',
+                    joint.leg + ' ' + joint.joint + ' — offset=' + (ecTempOffsets[joint.idx] || 0) + '°' +
+                    (inverted ? ', miroir=ON' : ', miroir=OFF'), 'success');
+            }
+
+            ecJointPhase = 1;
+            if (ecJointIndex < 11) {
+                ecJointIndex++;
+                ecShowJoint(ecJointIndex);
+            } else {
+                ecAllJointsValidated = true;
+                document.getElementById('ec-joint-calibration-view').style.display = 'none';
+                document.getElementById('ec-joint-final-view').style.display = 'flex';
+                document.getElementById('ec-btn-prev').disabled = false;
+                document.getElementById('ec-btn-next').disabled = false;
+                document.getElementById('ec-progress-text').textContent = 'Toutes les articulations calibrées';
+                // 🔴 SAFETY: ne PAS envoyer 'stand' ici — la sauvegarde EEPROM est
+                // asynchrone. L'utilisateur choisit explicitement dans la vue finale.
             }
         }
 
@@ -436,3 +499,4 @@
         window.ecAttachCurrentJoint = ecAttachCurrentJoint;
         window.ecDetachCurrentJoint = ecDetachCurrentJoint;
         window.ecInitJointCalibration = ecInitJointCalibration;
+        window.ecValidateJoint = ecValidateJoint;

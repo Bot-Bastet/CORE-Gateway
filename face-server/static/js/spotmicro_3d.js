@@ -671,15 +671,19 @@
       tgt[id + "_c"] = 0;
     });
 
-    if (actualPhase === 2) {
-      // Apply target orientation for Phase 2 sens/miroir auto-detection
+    if (actualPhase >= 3) {
+      // Étape C (détection du sens) : montrer la pose correspondant à un delta
+      // LOGIQUE fixe (EC_SHOWN_DELTA côté easyconfig : hip +30°, upper +40°,
+      // lower -45°). Même mapping logique→modèle que updateSpotMicroServos :
+      // le côté droit ("fr"/"rr", 2e lettre = r) a un signe modèle inversé.
+      // ⚠ ne PAS utiliser includes("r") : "rl" (arrière-gauche) contient aussi un r.
+      var sideSign = legId.charAt(1) === "r" ? -1 : 1;
       if (jointType === "hip") {
-        var dir = legId.includes("r") ? 1 : -1;
-        tgt[legId + "_s"] = dir * 0.5; // rotate hip outward
+        tgt[legId + "_s"] = sideSign * 30 * DEG;
       } else if (jointType === "upper") {
-        tgt[legId + "_t"] = 0.6; // tilt thigh forward
+        tgt[legId + "_t"] = sideSign * 40 * DEG;
       } else if (jointType === "lower") {
-        tgt[legId + "_c"] = -1.2; // bend knee inward
+        tgt[legId + "_c"] = sideSign * -45 * DEG;
       }
     }
 

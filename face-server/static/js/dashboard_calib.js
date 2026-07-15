@@ -119,34 +119,59 @@
             }
         }
 
+        // ── Application LIVE par moteur ──
+        // Chaque changement est flashé directement dans l'EEPROM de l'Arduino
+        // (set_offset / set_limit / set_invert) : ni la Gateway ni le Pi
+        // n'appliquent de transformation. Le firmware fait :
+        //   physical = constrain((inverted ? 180-L : L) + offset, min, max)
+        // → basculer le miroir ne change NI l'offset NI les limites (le centre
+        // L=90 est invariant), donc aucune transformation client n'est nécessaire.
+
+        function _calibSendLive(payloads) {
+            if (!appWs || appWs.readyState !== WebSocket.OPEN) {
+                if (typeof showToast === 'function') showToast('Erreur', 'WebSocket non connecté', 'error');
+                return false;
+            }
+            for (const p of payloads) appWs.send(JSON.stringify(p));
+            return true;
+        }
+
         function toggleCalibMirror(index) {
             const invertCheck = document.getElementById(`calib-invert-${index}`);
-            const slider = document.getElementById(`calib-slider-${index}`);
-            if (slider) {
-                const oldOffset = parseInt(slider.value) || 0;
-                slider.value = -oldOffset;
-                updateCalibSliderVal(index);
+            const inverted = invertCheck ? invertCheck.checked : false;
+            _calibSendLive([
+                { type: 'arduino_cmd', cmd: 'set_invert', index: index, inverted: inverted },
+                { type: 'arduino_cmd', cmd: 'write', index: index, angle: 90, manual: true }
+            ]);
+            if (typeof showToast === 'function') {
+                showToast('Miroir', `Moteur ${index} : ${inverted ? 'inversé' : 'normal'} (EEPROM)`, 'info');
             }
-            
-            const minInput = document.getElementById(`calib-min-${index}`);
-            const maxInput = document.getElementById(`calib-max-${index}`);
-            if (minInput && maxInput) {
-                const oldMin = parseInt(minInput.value) || 0;
-                const oldMax = parseInt(maxInput.value) || 180;
-                
-                minInput.value = 180 - oldMax;
-                maxInput.value = 180 - oldMin;
-            }
-            
-            sendCalibrationOffsets();
         }
 
         function updateCalibLimits(index) {
-            sendCalibrationOffsets();
+            const minInput = document.getElementById(`calib-min-${index}`);
+            const maxInput = document.getElementById(`calib-max-${index}`);
+            const min = minInput ? parseInt(minInput.value) || 0 : 0;
+            const max = maxInput ? parseInt(maxInput.value) || 180 : 180;
+            _calibSendLive([
+                { type: 'arduino_cmd', cmd: 'set_limit', index: index, min: min, max: max }
+            ]);
+        }
+
+        // Appliqué au relâchement du slider d'offset (onchange) : flash EEPROM
+        // puis positionnement sur le nouveau zéro pour vérification visuelle.
+        function applyCalibOffsetLive(index) {
+            const slider = document.getElementById(`calib-slider-${index}`);
+            const offset = slider ? parseInt(slider.value) || 0 : 0;
+            _calibSendLive([
+                { type: 'arduino_cmd', cmd: 'set_offset', index: index, offset: offset },
+                { type: 'arduino_cmd', cmd: 'write', index: index, angle: 90, manual: true }
+            ]);
         }
 
         window.toggleCalibMirror = toggleCalibMirror;
         window.updateCalibLimits = updateCalibLimits;
+        window.applyCalibOffsetLive = applyCalibOffsetLive;
 
 
         function toggleManualJointControl(checked) {
