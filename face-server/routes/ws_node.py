@@ -85,11 +85,37 @@ async def websocket_node(websocket: WebSocket, token: Optional[str] = Query(None
                     await manager.broadcast(data, "app")
                 elif msg_type == "vslam_blocked":
                     await manager.broadcast(data, "app")
+                elif msg_type == "chat_response":
+                    await manager.broadcast(data, "app")
+                    continue
+                elif msg_type == "feature_request":
+                    feature = msg_json.get("feature")
+                    state_val = msg_json.get("state", False)
+                    target = "node" if state_val else "robot"
+                    from config import preferred_ai_targets
+                    if feature in preferred_ai_targets:
+                        preferred_ai_targets[feature] = target
+                    ai_msg = json.dumps({
+                        "type": "ai_control",
+                        "feature": feature,
+                        "target": target,
+                    })
+                    await manager.broadcast(ai_msg, "robot")
+                    await manager.broadcast(json.dumps({
+                        "type": "ai_state_update",
+                        "ai_state": dict(preferred_ai_targets),
+                    }), "app")
+                    ack_msg = json.dumps({
+                        "type": "feature_ack",
+                        "feature": feature,
+                        "state": state_val,
+                        "status": "ok",
+                    })
+                    await websocket.send_text(ack_msg)
+                    continue
             except json.JSONDecodeError:
-                # Client sent malformed JSON — skip this message silently
                 pass
             except AttributeError:
-                # Client sent a JSON value that is not a dict (e.g. an array)
                 pass
 
             await manager.broadcast(data, "robot")

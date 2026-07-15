@@ -55,6 +55,8 @@ Canal bidirectionnel pour le serveur de traitement IA.
 - Gère les mêmes commandes caméra que l'app : `request_camera`, `release_camera`, `stop_camera`, `toggle_keep_stream`, `join_stream`, `leave_stream`.
 - **Gate V-SLAM** : une demande de flux avec `v_slam:true` sur une caméra non calibrée renvoie au Node `{"type":"vslam_blocked","camera":<id>,"reason":"Calibration requise avant V-SLAM."}`.
 - `{"type":"camera_resolutions", …}` et `{"type":"vslam_blocked", …}` reçus du Node sont relayés vers `app`.
+- `{"type":"chat_response", "text":"…"}` reçu du Node est relayé vers `app` uniquement (pas au robot, c'est la réponse à sa requête).
+- `{"type":"feature_request", "feature":"…", "state":true|false}` reçu du Node est converti en `ai_control` interne et un `feature_ack` de confirmation est renvoyé au Node.
 - Tout autre message est diffusé à `robot` **et** `app`.
 
 ### 1.3 `wss://…/ws/app` (Connexion Application Mobile / Dashboard)
@@ -100,9 +102,9 @@ Puis, une fois :
   ```json
   { "type": "ai_control", "feature": "chat", "target": "node" }
   ```
-- **`cmd_vel`** — téléopération manuelle. Le dashboard envoie 3 axes ; le relais REST (§6.3) n'en envoie que 2. Diffusé au **robot uniquement**.
+- **`cmd_vel`** — téléopération manuelle. Diffusé au **robot uniquement**.
   ```json
-  { "type": "cmd_vel", "linear": -0.2, "lateral": 0.0, "angular": 1.0 }
+  { "type": "cmd_vel", "linear": -0.2, "angular": 1.0 }
   ```
 - **`manual_joint_control`** — contrôle angulaire direct des 12 servos ROS (0-180°, 90 = neutre).
   ```json
@@ -150,6 +152,8 @@ Tout message `type` **non listé ci-dessus** est diffusé tel quel au `robot`. C
 - **`mono_calib_result` / `stereo_calib_result`** — `{"type":"mono_calib_result","camera":1,"success":true,"message":"OK","fx":521.3,"reprojection_error":0.18}`.
 - **`vslam_blocked`** — V-SLAM refusé faute de calibration (voir §1.2).
 - **`robot_update_progress`** — progression d'une mise à jour/rollback du robot.
+- **`ai_state_update`** — état effectif des features IA (`{"type":"ai_state_update","ai_state":{"tts":"robot","stt":"node",…}}`). Envoyé aux dashboards lors de connexions/déconnexions du Node.
+- **`robot_posture_sync`** — posture complète du robot (`{"type":"robot_posture_sync","robot_posture":{…}}`). Sync au démarrage et après chaque modification.
 
 ---
 
