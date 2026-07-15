@@ -71,9 +71,16 @@
         }
 
         // Envoi d'un angle logique brut au servo courant (aucune inversion côté client).
+        // Le firmware applique physical = logical + offset : on borne donc en espace
+        // PHYSIQUE (0-180 servo), pas en logique. Avec un gros offset (ex. genou à
+        // ±80°), le logique doit pouvoir sortir de 0-180 pour couvrir toute la course
+        // physique — l'ancien bornage 0-180 amputait l'articulation de |offset|°.
         function ecWriteServo(logicalAngle) {
             var joint = EC_JOINT_ORDER[ecJointIndex];
-            var angle = Math.max(0, Math.min(180, Math.round(logicalAngle)));
+            // Offset actif dans l'EEPROM : remis à 0 en phase A, appliqué en B/C
+            // (voir ecAttachCurrentJoint).
+            var o = (ecJointPhase === 1) ? 0 : (ecTempOffsets[joint.idx] || 0);
+            var angle = Math.max(0 - o, Math.min(180 - o, Math.round(logicalAngle)));
             if (appWs && appWs.readyState === WebSocket.OPEN) {
                 appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'write', index: joint.idx, angle: angle, manual: true }));
             }
@@ -352,7 +359,10 @@
                 logical = 90 + intVal;   // offset appliqué par l'EEPROM → physique = 90+offset+rel
             }
 
-            if (logical <= 5 || logical >= 175) {
+            // Avertissement de butée : en PHYSIQUE (position réelle du servo),
+            // le logique pouvant légitimement dépasser 0-180 quand l'offset est grand.
+            var physical = logical + ((ecJointPhase === 1) ? 0 : (ecTempOffsets[joint.idx] || 0));
+            if (physical <= 5 || physical >= 175) {
                 if (valueEl) valueEl.style.color = '#f59e0b';
                 if (limitWarn) limitWarn.style.display = 'inline-block';
             } else {
@@ -461,7 +471,11 @@
                 }
                 // Le modèle 3D montre un delta logique EC_SHOWN_DELTA[type]. Si l'utilisateur
                 // a dû aller dans le sens opposé pour reproduire la pose, le montage est inversé.
+                // Convention IK (ik_solver.py) : gauche = 90 + θ, droite = 90 − θ → pour la
+                // même flexion physique (tangage : upper/lower), le delta logique attendu est
+                // opposé côté droit. La hanche (roulis) est déjà miroir dans la pose affichée.
                 var shown = EC_SHOWN_DELTA[joint.type] || 30;
+                if (joint.side === 'right' && joint.type !== 'hip') shown = -shown;
                 inverted = (sliderVal > 0) !== (shown > 0);
                 window._ecSessionDirty = true;
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: inverted });

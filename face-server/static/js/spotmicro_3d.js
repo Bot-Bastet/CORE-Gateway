@@ -675,18 +675,21 @@
     });
 
     if (actualPhase >= 3) {
-      // Étape C (détection du sens) : montrer la pose correspondant à un delta
-      // LOGIQUE fixe (EC_SHOWN_DELTA côté easyconfig : hip +30°, upper +40°,
-      // lower -45°). Même mapping logique→modèle que updateSpotMicroServos :
-      // le côté droit ("fr"/"rr", 2e lettre = r) a un signe modèle inversé.
+      // Étape C (détection du sens) : montrer une flexion ANATOMIQUEMENT possible.
+      // Axes tangage (upper/lower) : même signe modèle des deux côtés — cf.
+      // updateSpotMicroServos où les offsets stand (0.5952 / -1.0845) sont
+      // identiques pour les 4 pattes. Le genou fléchit TOUJOURS vers l'arrière
+      // (calf négatif) : appliquer sideSign ici montrait un tibia vers l'avant
+      // sur les pattes droites, pose hors de portée mécanique.
+      // Seule la hanche (axe roulis) est réellement miroir gauche/droite.
       // ⚠ ne PAS utiliser includes("r") : "rl" (arrière-gauche) contient aussi un r.
       var sideSign = legId.charAt(1) === "r" ? -1 : 1;
       if (jointType === "hip") {
         tgt[legId + "_s"] = sideSign * 30 * DEG;
       } else if (jointType === "upper") {
-        tgt[legId + "_t"] = sideSign * 40 * DEG;
+        tgt[legId + "_t"] = 40 * DEG;
       } else if (jointType === "lower") {
-        tgt[legId + "_c"] = sideSign * -45 * DEG;
+        tgt[legId + "_c"] = -45 * DEG;
       }
     }
 
