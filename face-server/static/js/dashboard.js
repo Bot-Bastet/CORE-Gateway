@@ -99,6 +99,23 @@ window.appWs = null;
         window.userClosedStream = { 1: false, 2: false };
         let peerConnections = { 1: null, 2: null };
         let streamingState = { 1: "idle", 2: "idle" };  // idle|requesting|connecting|active|error
+
+        // Lance la connexion WebRTC en attente dès qu'un signal (stream_status OU
+        // télémétrie 5 Hz) indique que le flux est actif côté robot. Volontairement
+        // SANS détection de front (isActive && !wasActive) : les deux handlers
+        // partagent window.activeStreams, donc celui qui passe en premier mange le
+        // front pour l'autre — c'est ce qui laissait le premier clic bloqué jusqu'à
+        // un refresh quand la télémétrie arrivait avant le stream_status dédié.
+        function maybeStartPendingStream(camId) {
+            if (!window._pendingStreamConnect || !window._pendingStreamConnect[camId]) return;
+            if (streamingState[camId] === 'connecting' || streamingState[camId] === 'active') return;
+            window._pendingStreamConnect[camId] = false;
+            if (window._pendingStreamTimeout && window._pendingStreamTimeout[camId]) {
+                clearTimeout(window._pendingStreamTimeout[camId]);
+                window._pendingStreamTimeout[camId] = null;
+            }
+            startStreamWebRTC(camId);
+        }
         window.manualJointControlActive = false;
         
 
@@ -537,23 +554,10 @@ window.appWs = null;
                     if (isActive && !wasActive) {
                         if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
                         window.userClosedStream[camId] = false;
-                        // FIX: Si on attendait le demarrage du robot pour lancer WebRTC,
-                        // c'est le moment ! Le stream_status {active:true} confirme que
-                        // l'encodeur ffmpeg tourne et que MediaMTX a le flux.
-                        if (window._pendingStreamConnect && window._pendingStreamConnect[camId]) {
-                            // Guard: ne pas lancer WebRTC si deja en cours.
-                            // On ne consomme le flag qu'APRES avoir verifie qu'on va vraiment lancer.
-                            if (streamingState[camId] !== 'connecting' && streamingState[camId] !== 'active') {
-                                window._pendingStreamConnect[camId] = false;
-                                // Le robot a confirmé : on désarme le watchdog d'attente.
-                                if (window._pendingStreamTimeout && window._pendingStreamTimeout[camId]) {
-                                    clearTimeout(window._pendingStreamTimeout[camId]);
-                                    window._pendingStreamTimeout[camId] = null;
-                                }
-                                startStreamWebRTC(camId);
-                            }
-                        }
                     }
+                    // Si on attendait le démarrage du robot pour lancer WebRTC, c'est
+                    // le moment. Pas de condition de front : voir maybeStartPendingStream.
+                    if (isActive) maybeStartPendingStream(camId);
                     
 
                     const statusEl = document.getElementById(`stream-status-${camId}`);
@@ -2984,6 +2988,10 @@ window.appWs = null;
                             if (!window.userClosedStream) window.userClosedStream = { 1: false, 2: false };
                             window.userClosedStream[camId] = false;
                         }
+                        // La télémétrie 5 Hz peut signaler le flux actif AVANT le
+                        // message stream_status dédié : débloquer aussi ici la
+                        // connexion WebRTC en attente (premier clic sans refresh).
+                        if (isActive) maybeStartPendingStream(camId);
 
 
                         const statusEl = document.getElementById(`stream-status-${camId}`);
