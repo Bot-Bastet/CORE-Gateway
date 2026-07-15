@@ -498,6 +498,9 @@ var ecLRStreamA = null;
         }
 
         function ecNextStep(targetStep = null) {
+            // Garde : si appelé comme handler d'événement, l'argument est un
+            // MouseEvent — seul un numéro d'étape explicite est accepté.
+            if (typeof targetStep !== 'number') targetStep = null;
             // Joint-level forward navigation during step 1 (joint calibration wizard)
             if (ecCurrentStep === 1 && !ecAllJointsValidated && targetStep === null) {
                 if (typeof ecValidateJoint === 'function') {

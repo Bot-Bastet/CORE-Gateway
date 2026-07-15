@@ -131,7 +131,9 @@
             var btnNext = document.getElementById('ec-btn-next');
             btnNext.disabled = false;
             btnNext.textContent = ecKeepLabel(joint);
-            btnNext.onclick = ecNextStep;
+            // Ne pas assigner ecNextStep directement : onclick passerait le
+            // MouseEvent comme targetStep et casserait la navigation.
+            btnNext.onclick = function () { ecNextStep(); };
         }
 
         // Libellé du bouton Suivant : reprend les valeurs existantes sans re-calibrer.
