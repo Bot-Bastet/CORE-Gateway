@@ -615,6 +615,9 @@
   //   thigh : 1.25 + (servo - 90) * DEG   (offset IK stand)
   //   calf  : -2.59 + (servo - 90) * DEG  (offset IK stand)
   window.updateSpotMicroServos = function (angles12) {
+    // Pendant EasyConfig, la pose de référence (highlightSpotMicroJoint) doit
+    // rester figée : ignorer la télémétrie temps réel qui l'écraserait à 5 Hz.
+    if (window._calibModeActive) return;
     if (!angles12 || angles12.length < 12) return;
     var mapping = [
       { id: "fr", s: 0, t: 1, c: 2 },
