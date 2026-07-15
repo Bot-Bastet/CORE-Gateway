@@ -545,6 +545,11 @@ window.appWs = null;
                             // On ne consomme le flag qu'APRES avoir verifie qu'on va vraiment lancer.
                             if (streamingState[camId] !== 'connecting' && streamingState[camId] !== 'active') {
                                 window._pendingStreamConnect[camId] = false;
+                                // Le robot a confirmé : on désarme le watchdog d'attente.
+                                if (window._pendingStreamTimeout && window._pendingStreamTimeout[camId]) {
+                                    clearTimeout(window._pendingStreamTimeout[camId]);
+                                    window._pendingStreamTimeout[camId] = null;
+                                }
                                 startStreamWebRTC(camId);
                             }
                         }
@@ -3437,9 +3442,10 @@ window.appWs = null;
                     }
                     retries--;
                     attempt++;
-                    // Rassure l'utilisateur : la caméra démarre encore côté robot.
-                    if (attempt === 10 && statusEl && !aborted) {
-                        statusEl.textContent = 'Démarrage de la caméra…';
+                    // Feedback visible : compteur de secondes pendant que la caméra
+                    // démarre côté robot, pour que l'utilisateur voie que ça avance.
+                    if (attempt % 4 === 0 && statusEl && !aborted) {
+                        statusEl.textContent = 'Démarrage de la caméra… (' + Math.round(attempt * 0.5) + 's)';
                     }
                     if (retries > 0 && !aborted) await new Promise(r => setTimeout(r, 500));
                 }
@@ -3456,6 +3462,10 @@ window.appWs = null;
 
                 const answerSdp = await response.text();
                 await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+                // Signalisation OK — il ne reste que l'établissement du canal vidéo.
+                if (!aborted && !trackReceived && statusEl) {
+                    statusEl.textContent = 'Connexion vidéo…';
+                }
 
 
             } catch (err) {
@@ -4305,9 +4315,28 @@ window.appWs = null;
                     streamingState[camId] = 'requesting';
 
 
-                    statusEl.textContent = 'Connexion WebRTC…';
+                    statusEl.textContent = 'Demande envoyée au robot…';
                     statusEl.className = 'status-badge';
                     btnText.textContent = 'Couper Caméra';
+
+                    // Watchdog anti-attente-infinie : si le robot ne confirme pas le
+                    // démarrage du flux (stream_status active:true) sous 15s, on
+                    // affiche une erreur claire au lieu de laisser le loader tourner
+                    // pour toujours (robot éteint, agent déconnecté, caméra HS...).
+                    if (!window._pendingStreamTimeout) window._pendingStreamTimeout = {};
+                    if (window._pendingStreamTimeout[camId]) clearTimeout(window._pendingStreamTimeout[camId]);
+                    window._pendingStreamTimeout[camId] = setTimeout(function() {
+                        if (window._pendingStreamConnect && window._pendingStreamConnect[camId]) {
+                            window._pendingStreamConnect[camId] = false;
+                            window.localViewing[camId] = false;
+                            streamingState[camId] = 'idle';
+                            stopStreamUI(camId);
+                            var stEl = document.getElementById('stream-status-' + camId);
+                            var btEl = document.getElementById('stream-btn-text-' + camId);
+                            if (stEl) { stEl.textContent = 'Robot injoignable — flux non démarré'; stEl.className = 'status-badge error'; }
+                            if (btEl) btEl.textContent = 'Réessayer';
+                        }
+                    }, 15000);
 
 
                     // FIX: Ne pas lancer WebRTC tout de suite. Le robot n'a pas encore
