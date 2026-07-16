@@ -168,6 +168,20 @@
                         }
                     }
 
+                    // ⚖️ Statut équilibrage (motion_node /balance_status) : assiette
+                    // live + badges dans le popup Navigation Autonome
+                    if (payload.balance) {
+                        const bal = payload.balance;
+                        const elNavRoll = document.getElementById('nav-live-roll');
+                        const elNavPitch = document.getElementById('nav-live-pitch');
+                        if (elNavRoll && bal.roll !== undefined) elNavRoll.textContent = `${bal.roll.toFixed(1)}°`;
+                        if (elNavPitch && bal.pitch !== undefined) elNavPitch.textContent = `${bal.pitch.toFixed(1)}°`;
+                        const faultBadge = document.getElementById('nav-balance-fault-badge');
+                        if (faultBadge) faultBadge.style.display = bal.fault ? '' : 'none';
+                        const activeBadge = document.getElementById('nav-balance-active-badge');
+                        if (activeBadge) activeBadge.style.display = (bal.active && !bal.fault) ? '' : 'none';
+                    }
+
                     // Update Arduino Mega dashboard card
                     const arduinoBadge = document.getElementById('arduino-status-badge');
                     const arduinoOfflineMsg = document.getElementById('arduino-offline-msg');

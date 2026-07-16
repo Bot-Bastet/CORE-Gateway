@@ -8,7 +8,7 @@ controlActiveDir = null;
 controlWalkInterval = null;
 navPointA = null;
 navPointB = null;
-robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit", imu_stab: false };
+robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit", imu_stab: false, fall_protect: false, balance_kp: 0.6, balance_kd: 0.08, stance_x_trim: 0.0 };
 
 // LLM auto-execute: disabled by default
 window.llmAutoControl = false;
@@ -307,6 +307,10 @@ function onPostureSliderChange(key, value) {
       labelEl.textContent = (parseFloat(value) / 10).toFixed(1) + 'x';
     } else if (key === 'height') {
       labelEl.textContent = value + '%';
+    } else if (key === 'balance_kp' || key === 'balance_kd') {
+      labelEl.textContent = parseFloat(value).toFixed(2);
+    } else if (key === 'stance_x_trim') {
+      labelEl.textContent = Math.round(parseFloat(value) * 1000) + ' mm';
     } else {
       labelEl.textContent = value + '°';
     }
@@ -422,6 +426,17 @@ function applyRobotPostureSync(postureData) {
   if (demoCheck) demoCheck.checked = robotPosture.demo_mode;
   var imuCheck = document.getElementById('nav-imu-stab-checkbox');
   if (imuCheck) imuCheck.checked = robotPosture.imu_stab;
+  var fallCheck = document.getElementById('nav-fall-protect-checkbox');
+  if (fallCheck) fallCheck.checked = robotPosture.fall_protect;
+  // Options équilibrage (menu Navigation Autonome)
+  var kpSlider = document.getElementById('posture-slider-balance_kp');
+  var kpLabel  = document.getElementById('posture-val-balance_kp');
+  if (kpSlider) kpSlider.value = robotPosture.balance_kp;
+  if (kpLabel)  kpLabel.textContent = parseFloat(robotPosture.balance_kp).toFixed(2);
+  var trimSlider = document.getElementById('posture-slider-stance_x_trim');
+  var trimLabel  = document.getElementById('posture-val-stance_x_trim');
+  if (trimSlider) trimSlider.value = Math.round(parseFloat(robotPosture.stance_x_trim) * 1000);
+  if (trimLabel)  trimLabel.textContent = Math.round(parseFloat(robotPosture.stance_x_trim) * 1000) + ' mm';
   var powerBtn = document.getElementById('power-toggle-btn');
   if (powerBtn) {
     powerBtn.textContent = robotPosture.powered ? '⏻ Allumé' : '⏻ Éteint';
@@ -458,7 +473,15 @@ function openNavPopup() {
   if (secB) secB.style.display = "none";
   var panel = document.getElementById("nav-target-panel");
   if (panel) { panel.style.opacity = "0"; panel.style.pointerEvents = "none"; }
-  drawNavPopupMap();
+  // Redraw après le layout (le canvas vient d'être affiché : clientWidth/Height
+  // ne sont corrects qu'au frame suivant) + suivre les redimensionnements.
+  requestAnimationFrame(drawNavPopupMap);
+  if (!window._navResizeHooked) {
+    window._navResizeHooked = true;
+    window.addEventListener('resize', function () {
+      if (window._navPopupActive) requestAnimationFrame(drawNavPopupMap);
+    });
+  }
 }
 
 function closeNavPopup() {
@@ -477,7 +500,10 @@ function onNavPopupClick(e) {
   var canvas = document.getElementById("nav-popup-canvas");
   if (!canvas) return;
   var rect = canvas.getBoundingClientRect();
-  var cx = rect.width / 2, cy = rect.height / 2, scale = 40;
+  // Échelle partagée avec drawNavPopupMap (adaptative) — l'ancienne valeur
+  // codée en dur (40) désalignait le clic et l'affichage dès que le zoom
+  // adaptatif s'écartait de 40 px/m.
+  var cx = rect.width / 2, cy = rect.height / 2, scale = window._navMapScale || 40;
   var pt = { x: parseFloat(((e.clientX - rect.left - cx) / scale).toFixed(2)), y: parseFloat((-(e.clientY - rect.top - cy) / scale).toFixed(2)) };
 
   if (!navPointA) { navPointA = pt; navPointB = null; }
@@ -534,6 +560,14 @@ function sendNavGoal() {
 function drawNavPopupMap() {
   var canvas = document.getElementById('nav-popup-canvas');
   if (!canvas || !window._navPopupActive) return;
+  // Synchroniser la résolution interne du canvas avec sa taille CSS réelle.
+  // Sans ça, le buffer reste en 300×150 (défaut HTML) étiré par le CSS →
+  // ratio d'aspect faussé (cercles ovales) et zoom apparent énorme.
+  var dispW = canvas.clientWidth, dispH = canvas.clientHeight;
+  if (dispW > 0 && dispH > 0 && (canvas.width !== dispW || canvas.height !== dispH)) {
+    canvas.width = dispW;
+    canvas.height = dispH;
+  }
   var ctx = canvas.getContext('2d');
   var w = canvas.width, h = canvas.height;
   var cx = w / 2, cy = h / 2;
@@ -557,6 +591,9 @@ function drawNavPopupMap() {
       scale = Math.min(80, Math.max(20, Math.floor((Math.min(cx, cy) * 0.85) / maxCoord)));
     }
   }
+
+  // Mémoriser l'échelle pour onNavPopupClick (conversion px -> mètres cohérente)
+  window._navMapScale = scale;
 
   ctx.fillStyle = '#0f0f13';
   ctx.fillRect(0, 0, w, h);
