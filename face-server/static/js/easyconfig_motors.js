@@ -471,11 +471,14 @@
                 }
                 // Le modèle 3D montre un delta logique EC_SHOWN_DELTA[type]. Si l'utilisateur
                 // a dû aller dans le sens opposé pour reproduire la pose, le montage est inversé.
-                // Convention IK (ik_solver.py) : gauche = 90 + θ, droite = 90 − θ → pour la
-                // même flexion physique (tangage : upper/lower), le delta logique attendu est
-                // opposé côté droit. La hanche (roulis) est déjà miroir dans la pose affichée.
+                // Référence exacte = spotmicro_3d.js::highlightSpotMicroJoint (étape C) :
+                //   hip (roulis)   → tgt = sideSign * 30°   (MIROIR gauche/droite)
+                //   upper/lower (tangage) → tgt = +40° / -45° IDENTIQUE des 2 côtés (pas de miroir)
+                // L'ancienne formule faisait l'inverse (miroir sur upper/lower, jamais sur hip),
+                // d'où une détection de sens fausse sur hanche droite + genou/tibia droits —
+                // c'était la cause des mirois à corriger manuellement après EasyConfig.
                 var shown = EC_SHOWN_DELTA[joint.type] || 30;
-                if (joint.side === 'right' && joint.type !== 'hip') shown = -shown;
+                if (joint.type === 'hip' && joint.side === 'right') shown = -shown;
                 inverted = (sliderVal > 0) !== (shown > 0);
                 window._ecSessionDirty = true;
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: inverted });
