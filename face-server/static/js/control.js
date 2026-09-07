@@ -56,6 +56,16 @@ function _setBadge(powered, demo_mode) {
 function initControlTab() {
   // Neutralize the old drawControlMap that might be running
   if (typeof drawControlMap === "function") { window._oldDrawControlMap = drawControlMap; drawControlMap = function(){}; }
+
+  // 🧭 Assiette IMU 3D : restaurer la préférence locale (option d'affichage
+  // purement client, pas synchronisée serveur contrairement à robotPosture)
+  var imu3dCheck = document.getElementById('imu-3d-checkbox');
+  if (imu3dCheck && !window._imu3dPrefLoaded) {
+    var saved = localStorage.getItem('bastet_imu3d') === '1';
+    imu3dCheck.checked = saved;
+    toggleImu3D(saved);           // pas de toast : _imu3dPrefLoaded pas encore posé
+    window._imu3dPrefLoaded = true;
+  }
   
   if (!window._spot3dInitDone && typeof initSpotMicro3D === "function") {
     initSpotMicro3D("spotmicro-3d-container");
@@ -202,7 +212,50 @@ function sendControlCmd(cmd) {
   }
 }
 
+// ─── 🧭 Assiette IMU dans la vue 3D ───────────────────────────────────────
+// Option d'affichage : incliner le modèle 3D selon le gyroscope réel. La
+// source est payload.imu, DÉJÀ calibrée par le firmware (q_offset EEPROM) —
+// exactement les mêmes valeurs que la carte « Gyroscope & Orientation IMU »
+// de l'onglet Arduino & Calibration. Aucune référence côté client.
+function toggleImu3D(checked) {
+  window.imu3dEnabled = !!checked;
+  localStorage.setItem('bastet_imu3d', checked ? '1' : '0');
+  if (typeof window.setSpotMicroIMUEnabled === 'function') window.setSpotMicroIMUEnabled(checked);
+  var zeroBtn = document.getElementById('imu-3d-zero-btn');
+  if (zeroBtn) zeroBtn.style.display = checked ? '' : 'none';
+  if (typeof showToast === 'function' && window._imu3dPrefLoaded) {
+    showToast('Assiette IMU', checked
+      ? 'Vue 3D asservie au gyroscope (valeurs IMU calibrées)'
+      : 'Vue 3D revenue à la posture commandée', 'info');
+  }
+}
+
+// « ⟳ Zéro » = VRAIE recalibration BNO085 (même commande reset_imu que le
+// bouton « Recalibrer l'IMU » de l'onglet Arduino & Calibration, sans le
+// 'stop' qui détacherait les servos) : le firmware capture la pose actuelle
+// comme référence, la persiste en EEPROM, et TOUTES les vues (cube, valeurs
+// numériques, modèle 3D) repassent à ~0 ensemble — source unifiée.
+function zeroImu3D() {
+  if (appWs && appWs.readyState === WebSocket.OPEN) {
+    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'reset_imu' }));
+    if (typeof showToast === 'function') {
+      showToast('Assiette IMU', 'Recalibrage BNO085 envoyé : position actuelle = à plat (persisté EEPROM)', 'info');
+    }
+  } else if (typeof showToast === 'function') {
+    showToast('Erreur', 'WebSocket non connecté : recalibrage impossible.', 'error');
+  }
+}
+
+// Annulation autopilote : envoyée dès que l'utilisateur reprend la main
+// (STOP, D-pad, bouton Annuler) pour que nav_node cesse de publier /cmd_vel.
+function sendNavCancel() {
+  if (appWs && appWs.readyState === WebSocket.OPEN) {
+    appWs.send(JSON.stringify({ type: 'nav_cancel' }));
+  }
+}
+
 function sendControlStop() {
+  sendNavCancel();
   stopWalking();
   window.keysPressed = {};
   // Stop the 3D viewer animation
@@ -230,6 +283,8 @@ function startWalking(dir) {
     return;
   }
   if (controlActiveDir === dir) return;
+  // Reprise en main manuelle : couper l'autopilote s'il est en route
+  if (window._lastNavStatus && window._lastNavStatus.state === 'active') sendNavCancel();
   controlActiveDir = dir;
 
   document.querySelectorAll(".dpad-btn").forEach(function (btn) {
@@ -333,6 +388,23 @@ function toggleDemoMode(checked) {
   if (appWs && appWs.readyState === WebSocket.OPEN)
     appWs.send(JSON.stringify({ type: 'demo_mode', enabled: checked }));
 
+  // 🧭 Assiette IMU : n'a de sens qu'en mode RÉEL (elle asservit le modèle 3D
+  // au gyroscope du robot physique). En SIMULATION il n'y a pas d'IMU réelle
+  // à suivre — masquer l'option et forcer sa désactivation ; la restaurer
+  // (préférence localStorage) au retour en mode RÉEL.
+  var imuWrap = document.getElementById('imu-3d-toggle-wrap');
+  var imuCheck = document.getElementById('imu-3d-checkbox');
+  if (checked) {
+    if (imuWrap) imuWrap.style.display = 'none';
+    if (imuCheck && imuCheck.checked) imuCheck.checked = false;
+    if (typeof toggleImu3D === 'function') toggleImu3D(false);
+  } else {
+    if (imuWrap) imuWrap.style.display = '';
+    var savedImu = localStorage.getItem('bastet_imu3d') === '1';
+    if (imuCheck) imuCheck.checked = savedImu;
+    if (typeof toggleImu3D === 'function') toggleImu3D(savedImu);
+  }
+
   if (checked) {
     // Passage en SIMULATION : reset la posture locale
     robotPosture.height = 100.0;
@@ -424,6 +496,16 @@ function applyRobotPostureSync(postureData) {
   });
   var demoCheck = document.getElementById('demo-mode-checkbox');
   if (demoCheck) demoCheck.checked = robotPosture.demo_mode;
+  // 🧭 Assiette IMU : n'a de sens qu'en mode RÉEL (voir toggleDemoMode).
+  // Resynchronise l'affichage si demo_mode arrive via le serveur (WS) plutôt
+  // que via un clic local sur le switch.
+  var imu3dWrap = document.getElementById('imu-3d-toggle-wrap');
+  if (imu3dWrap) imu3dWrap.style.display = robotPosture.demo_mode ? 'none' : '';
+  var imu3dCheck = document.getElementById('imu-3d-checkbox');
+  if (imu3dCheck && robotPosture.demo_mode && imu3dCheck.checked) {
+    imu3dCheck.checked = false;
+    if (typeof toggleImu3D === 'function') toggleImu3D(false);
+  }
   var imuCheck = document.getElementById('nav-imu-stab-checkbox');
   if (imuCheck) imuCheck.checked = robotPosture.imu_stab;
   var fallCheck = document.getElementById('nav-fall-protect-checkbox');
@@ -433,6 +515,10 @@ function applyRobotPostureSync(postureData) {
   var kpLabel  = document.getElementById('posture-val-balance_kp');
   if (kpSlider) kpSlider.value = robotPosture.balance_kp;
   if (kpLabel)  kpLabel.textContent = parseFloat(robotPosture.balance_kp).toFixed(2);
+  var kdSlider = document.getElementById('posture-slider-balance_kd');
+  var kdLabel  = document.getElementById('posture-val-balance_kd');
+  if (kdSlider) kdSlider.value = robotPosture.balance_kd;
+  if (kdLabel)  kdLabel.textContent = parseFloat(robotPosture.balance_kd).toFixed(2);
   var trimSlider = document.getElementById('posture-slider-stance_x_trim');
   var trimLabel  = document.getElementById('posture-val-stance_x_trim');
   if (trimSlider) trimSlider.value = Math.round(parseFloat(robotPosture.stance_x_trim) * 1000);
@@ -535,6 +621,7 @@ function onNavPopupClick(e) {
 }
 
 function clearNavGoal() {
+  sendNavCancel();
   navPointA = null; navPointB = null;
   var panel = document.getElementById("nav-target-panel");
   if (panel) { panel.style.opacity = "0"; panel.style.pointerEvents = "none"; }
@@ -739,6 +826,9 @@ window.onNavPopupClick = onNavPopupClick;
 window.clearNavGoal = clearNavGoal;
 window.sendNavGoal = sendNavGoal;
 window.drawNavPopupMap = drawNavPopupMap;
+window.toggleImu3D = toggleImu3D;
+window.zeroImu3D = zeroImu3D;
+window.sendNavCancel = sendNavCancel;
 // Kill old drawControlMap
 window.drawControlMap = function(){};
 window.onControlMapClick = function(){};

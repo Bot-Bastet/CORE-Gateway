@@ -46,7 +46,7 @@
         }
     </style>
     <link rel="stylesheet" href="/static/css/dashboard.css">
-    <script src="/static/js/spotmicro_3d.js?v=44" defer></script>
+    <script src="/static/js/spotmicro_3d.js?v=47" defer></script>
 </head>
 <body>
     <!-- Mobile Sidebar Overlay -->
@@ -938,7 +938,17 @@
                     <div class="card" style="display: flex; flex-direction: column; min-height: 480px; margin: 0; padding: 0; overflow: hidden;">
                         <div class="card-title" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1rem 0 1rem;">
                             <span>SpotMicro 3D — Vue Interactive</span>
-                            <div style="display: flex; gap: 0.5rem;">
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <!-- 🧭 Assiette IMU live : incline le modèle 3D selon le gyroscope réel
+                                     (écart vs référence). Permet de voir le robot pencher / tomber. -->
+                                <div id="imu-3d-toggle-wrap" style="display:flex; align-items:center; gap:0.4rem; background:rgba(255,255,255,0.03); padding:0.15rem 0.5rem; border-radius:6px; border:1px solid var(--border-color);">
+                                    <span style="font-size:0.7rem; font-weight:600; color:var(--text-secondary);" title="Incliner/pivoter le modèle 3D selon l'IMU réelle (roll/pitch/yaw relatifs)">🧭 Assiette IMU</span>
+                                    <label class="demo-toggle-switch" style="transform:scale(0.85);">
+                                        <input type="checkbox" id="imu-3d-checkbox" onchange="toggleImu3D(this.checked)">
+                                        <span class="demo-toggle-slider"></span>
+                                    </label>
+                                    <button id="imu-3d-zero-btn" onclick="zeroImu3D()" title="Recalibrer l'IMU (BNO085) : position actuelle = à plat, persisté en EEPROM — même référence que l'onglet Arduino & Calibration" style="display:none; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:4px; border:1px solid var(--border-color); background:rgba(255,255,255,0.05); color:var(--text-secondary); cursor:pointer;">⟳ Zéro</button>
+                                </div>
                                 <span id="robot-power-badge" class="status-badge" style="font-size:0.7rem; background:rgba(100,100,100,0.15); color:#888;">ÉTEINT</span>
                                 <span id="robot-mode-badge" class="status-badge" style="font-size:0.7rem; background:rgba(59,130,246,0.15); color:#3b82f6;">RÉEL</span>
                             </div>
@@ -1134,6 +1144,12 @@
                         <input type="range" id="posture-slider-balance_kp" min="0" max="1.5" step="0.05" value="0.6" style="width:90px;accent-color:var(--accent);" oninput="onPostureSliderChange('balance_kp', this.value)">
                         <span id="posture-val-balance_kp" style="font-size:0.72rem;font-family:monospace;color:var(--accent);min-width:2.2rem;">0.60</span>
                     </div>
+                    <!-- Curseur amortissement (Kd) -->
+                    <div style="display:flex;align-items:center;gap:0.4rem;">
+                        <span style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);white-space:nowrap;" title="Amortissement dérivé du PD d'équilibrage">🌊 Amorti</span>
+                        <input type="range" id="posture-slider-balance_kd" min="0" max="0.3" step="0.01" value="0.08" style="width:90px;accent-color:var(--accent);" oninput="onPostureSliderChange('balance_kd', this.value)">
+                        <span id="posture-val-balance_kd" style="font-size:0.72rem;font-family:monospace;color:var(--accent);min-width:2.2rem;">0.08</span>
+                    </div>
                     <!-- Curseur trim CoM avant/arrière -->
                     <div style="display:flex;align-items:center;gap:0.4rem;">
                         <span style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);white-space:nowrap;">↔️ Trim CoM</span>
@@ -1144,6 +1160,7 @@
                     <div style="display:flex;align-items:center;gap:0.5rem;margin-left:auto;">
                         <span style="font-size:0.72rem;color:var(--text-secondary);">Assiette :</span>
                         <span style="font-size:0.75rem;font-family:monospace;font-weight:700;">R <span id="nav-live-roll" style="color:var(--accent);">--</span> · P <span id="nav-live-pitch" style="color:var(--accent);">--</span></span>
+                        <span id="nav-autopilot-status" style="display:none;font-size:0.68rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:4px;"></span>
                         <span id="nav-balance-fault-badge" style="display:none;font-size:0.68rem;font-weight:700;color:#fff;background:var(--danger);padding:0.15rem 0.5rem;border-radius:4px;">⚠ ANTI-CHUTE DÉCLENCHÉ</span>
                         <span id="nav-balance-active-badge" style="display:none;font-size:0.68rem;font-weight:700;color:var(--success);background:rgba(16,185,129,0.15);padding:0.15rem 0.5rem;border-radius:4px;">● STAB ACTIVE</span>
                     </div>
@@ -1324,11 +1341,11 @@
 
     <script src="/static/js/dashboard.js?v=47" defer></script>
     <script src="/static/js/easyconfig_core.js?v=47" defer></script>
-    <script src="/static/js/easyconfig_motors.js?v=47" defer></script>
+    <script src="/static/js/easyconfig_motors.js?v=48" defer></script>
     <script src="/static/js/easyconfig_cameras.js?v=47" defer></script>
     <script src="/static/js/dashboard_calib.js?v=47" defer></script>
-    <script src="/static/js/ws.js?v=47" defer></script>
-    <script src="/static/js/control.js?v=47" defer></script>
+    <script src="/static/js/ws.js?v=50" defer></script>
+    <script src="/static/js/control.js?v=49" defer></script>
     <script src="/static/js/vslam.js?v=47" defer></script>
 
 <script>

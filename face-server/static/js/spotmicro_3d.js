@@ -30,6 +30,9 @@
   };
   var TROT_PHASE = { fl: 0, rr: 0, fr: PI, rl: PI };
   var STAND_H = 0.205, LIE_H = 0.045, L1 = 0.109, L2 = 0.130;
+  // Épaisseur du patin sous l'articulation de cheville : la cinématique
+  // hanche->pied (footDrop) s'arrête au joint, le patin dépasse en dessous.
+  var FOOT_CLEAR = 0.012;
   var GAIT_SPEED = 8;
 
   var scene, camera, renderer, controls, worldGrp, robotGrp, bodyGrp;
@@ -37,6 +40,19 @@
   var gaitT = 0;
   var cmd = "s";
   var posture = { height: 100, speed: 10, roll: 0, pitch: 0, yaw: 0, demo_mode: false, powered: false, posture: "sit" };
+  // Assiette IMU live (option dashboard) : roll/pitch/yaw [°] calibrés firmware
+  // (source unifiée avec la carte Gyroscope). tgt = dernière mesure, cur =
+  // valeur lissée appliquée au corps. Permet de VOIR le robot pencher/tomber/pivoter.
+  var imuAtt = { enabled: false, tgtRoll: 0, tgtPitch: 0, tgtYaw: 0, curRoll: 0, curPitch: 0, curYaw: 0 };
+
+  // Lissage du lacet par le plus court chemin (évite un tour complet visible
+  // quand la mesure traverse ±180°, ex: 179° -> -179°).
+  function shortestAngleDelta(target, current) {
+    var diff = (target - current) % 360;
+    if (diff > 180) diff -= 360;
+    else if (diff < -180) diff += 360;
+    return diff;
+  }
   var powerFrac = 0;
   var worldPos = { x: 0, z: 0, yaw: 0 };
   var keys = {};
@@ -83,6 +99,16 @@
     var gamma = Math.atan2(dx_c, -z_c);
     var t = gamma + alpha;
     return { s: s, t: t, c: c };
+  }
+
+  // Chute verticale hanche->pied pour une patte donnée (approx. 2 segments,
+  // sans tenir compte de l'abduction de hanche ni du tangage/roulis du corps —
+  // valable pour une pose proche du niveau). Sert à recaler la hauteur du
+  // corps sur les angles RÉELS des servos (voir animate()), au lieu d'un
+  // texte de posture ("sit"/"stand") déconnecté de la pose effective.
+  function footDrop(id) {
+    var t = cur[id + "_t"], c = cur[id + "_c"];
+    return L1 * Math.cos(t) + L2 * Math.cos(t + c);
   }
 
   // ─── Gait Engine (from original) ─────────────────────────────────
@@ -363,7 +389,15 @@
     worldGrp.position.z = -worldPos.z;
     worldGrp.rotation.y = worldPos.yaw;
 
-    if (!window._calibModeActive) {
+    // Pilotage RÉEL : télémétrie servo récente (<800ms) hors démo → les
+    // angles mesurés (updateSpotMicroServos) pilotent SEULS le modèle.
+    // Sans ce garde, computeTargets() réécrivait tgt à chaque frame (60fps)
+    // par-dessus les angles réels posés à ~5 Hz : le modèle oscillait entre
+    // pose simulée et pose réelle — c'était le "sautillement" observé.
+    var realDrive = !window._calibModeActive && !posture.demo_mode &&
+      window._lastRealServoTime !== undefined &&
+      (timestamp - window._lastRealServoTime < 800);
+    if (!window._calibModeActive && !realDrive) {
       computeTargets(dt);
     }
 
@@ -378,7 +412,16 @@
     });
 
     var targetH;
-    if (!posture.powered) {
+    if (realDrive) {
+      // Hauteur recalée sur les angles RÉELS (même robot éteint : les servos
+      // publient leur position) : la patte qui descend le plus bas touche le
+      // sol, + FOOT_CLEAR pour le patin qui dépasse sous l'articulation.
+      // Le texte de posture ("sit"/"stand") est ignoré ici — il peut ne plus
+      // correspondre à la pose effective, c'était la cause des pieds qui
+      // traversaient le sol ou flottaient au-dessus.
+      var footHeights = Object.keys(LEGS).map(footDrop);
+      targetH = Math.max(LIE_H, Math.min(STAND_H * 1.15, Math.max.apply(null, footHeights) + FOOT_CLEAR));
+    } else if (!posture.powered) {
       targetH = LIE_H;
     } else if (posture.posture === "sit") {
       targetH = 0.08;
@@ -389,8 +432,21 @@
     window._currentH += (targetH - window._currentH) * Math.min(1, dt * 6.0);
     var currentH = window._currentH;
     bodyGrp.position.z = currentH;
-    bodyGrp.rotation.set(posture.roll * DEG * powerFrac, posture.pitch * DEG * powerFrac, posture.yaw * DEG * powerFrac, "ZXY");
-    if (posture.powered && cmd === "s") bodyGrp.position.z += Math.sin(timestamp * 0.003) * 0.001;
+    // Assiette IMU : lissage vers la dernière mesure (0 si option coupée)
+    var imuRate = Math.min(1, dt * 8);
+    var iR = imuAtt.enabled ? imuAtt.tgtRoll : 0;
+    var iP = imuAtt.enabled ? imuAtt.tgtPitch : 0;
+    var iY = imuAtt.enabled ? imuAtt.tgtYaw : 0;
+    imuAtt.curRoll  += (iR - imuAtt.curRoll)  * imuRate;
+    imuAtt.curPitch += (iP - imuAtt.curPitch) * imuRate;
+    imuAtt.curYaw   += shortestAngleDelta(iY, imuAtt.curYaw) * imuRate;
+    bodyGrp.rotation.set(
+      (posture.roll  * powerFrac + imuAtt.curRoll)  * DEG,
+      (posture.pitch * powerFrac + imuAtt.curPitch) * DEG,
+      (posture.yaw   * powerFrac + imuAtt.curYaw)   * DEG, "ZXY");
+    // "Respiration" décorative : seulement en pose simulée — en pilotage réel
+    // le robot immobile ne doit pas onduler.
+    if (posture.powered && cmd === "s" && !realDrive) bodyGrp.position.z += Math.sin(timestamp * 0.003) * 0.001;
 
     if (!window._calibModeActive) {
       controls.target.set(worldGrp.position.x, currentH * 0.5, worldGrp.position.z);
@@ -597,6 +653,21 @@
     if (np.demo_mode !== undefined) posture.demo_mode = np.demo_mode;
     if (np.posture !== undefined) posture.posture = np.posture;
   };
+  // Assiette IMU live : rollDeg/pitchDeg/yawDeg = valeurs IMU calibrées firmware
+  // (mêmes valeurs que la carte Gyroscope, 0 = à plat/à zéro après reset_imu).
+  // Alimenté par ws.js à chaque trame télémétrie quand l'option est ON.
+  window.setSpotMicroIMUAttitude = function (rollDeg, pitchDeg, yawDeg) {
+    // Clamp ±60° sur roll/pitch : au-delà le modèle traverse le sol, la
+    // mesure est de toute façon "robot tombé". Le yaw (lacet, rotation
+    // autour de l'axe vertical) n'a pas cette contrainte : pas de clamp.
+    imuAtt.tgtRoll  = Math.max(-60, Math.min(60, rollDeg  || 0));
+    imuAtt.tgtPitch = Math.max(-60, Math.min(60, pitchDeg || 0));
+    imuAtt.tgtYaw   = yawDeg || 0;
+  };
+  window.setSpotMicroIMUEnabled = function (on) {
+    imuAtt.enabled = !!on;
+    if (!on) { imuAtt.tgtRoll = 0; imuAtt.tgtPitch = 0; imuAtt.tgtYaw = 0; }
+  };
   window.setSpotMicroDemoMode = function (enabled) { posture.demo_mode = enabled; if (enabled) { cmd = "s"; keys = {}; } };
   window.setSpotMicroPowered = function (on) { posture.powered = on; if (!on) { cmd = "s"; keys = {}; } };
   window.getSpotMicroPosture = function () { return posture; };
@@ -618,7 +689,11 @@
     // Pendant EasyConfig, la pose de référence (highlightSpotMicroJoint) doit
     // rester figée : ignorer la télémétrie temps réel qui l'écraserait à 5 Hz.
     if (window._calibModeActive) return;
+    // En SIMULATION le gait virtuel pilote seul : ignorer la télémétrie du
+    // vrai robot (qui continue d'arriver) pour ne pas se battre avec lui.
+    if (posture.demo_mode) return;
     if (!angles12 || angles12.length < 12) return;
+    window._lastRealServoTime = performance.now();
     var mapping = [
       { id: "fr", s: 0, t: 1, c: 2 },
       { id: "fl", s: 3, t: 4, c: 5 },

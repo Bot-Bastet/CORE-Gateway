@@ -710,103 +710,129 @@ var ecLRStreamA = null;
         }
 
         function ecConfirmCalibration(camId) {
-            const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
-            const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
-            
-            btnRun.disabled = true;
-            btnSkip.disabled = true;
-            btnRun.innerHTML = `<span>📷 Analyse...</span>`;
-            
-            ecStartScanningSim(camId);
-        }
-
-        function ecStartScanningSim(camId) {
+            // VRAIE calibration : le robot détecte automatiquement le damier
+            // (findChessboardCorners) et capture les frames aux moments où
+            // l'image est stable/nette (8 frames consécutives < 3px de
+            // mouvement), puis calcule les intrinsèques réels avec OpenCV
+            // et les sauvegarde lui-même sur la Gateway. Remplace l'ancienne
+            // simulation qui enregistrait des valeurs aléatoires.
             const overlayEl = document.getElementById(`ec-cam-status-overlay-${camId}`);
             const statusText = document.getElementById(`ec-cam-status-text-${camId}`);
             const btnRun = document.getElementById(`btn-ec-run-calib-${camId}`);
             const btnSkip = document.getElementById(`btn-ec-skip-${camId}`);
             const hudEl = document.getElementById(`ec-cam-hud-${camId}`);
             const videoEl = document.getElementById(`ec-cam-video-${camId}`);
-            
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 25;
-                if (progress >= 100) {
-                    clearInterval(progressInterval);
-                    
-                    const isCameraConnected = window.lastTelemetryState && window.lastTelemetryState.sensors && 
-                        window.lastTelemetryState.sensors[`cam${camId}_connected`] === true;
-                        
-                    if (isCameraConnected) {
-                        hudEl.style.display = 'none';
-                        videoEl.style.display = 'none';
-                        overlayEl.style.display = 'flex';
-                        overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
+
+            btnRun.disabled = false;
+            btnSkip.disabled = true;
+            btnRun.className = 'btn btn-danger';
+            btnRun.innerHTML = `<span>❌ Annuler</span>`;
+            btnRun.onclick = () => {
+                window.ecOnMonoCalib = null;
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({ type: 'stop_camera', camera: camId }));
+                }
+                btnRun.disabled = true;
+                btnRun.innerHTML = `<span>Annulation...</span>`;
+            };
+
+            // Couper le flux WebRTC de prévisualisation : la calibration ouvre
+            // la caméra en direct côté robot (le service ROS est suspendu).
+            if (ecPeerConnections[camId]) {
+                try { ecPeerConnections[camId].close(); } catch(e) {}
+                ecPeerConnections[camId] = null;
+            }
+            if (appWs && appWs.readyState === WebSocket.OPEN) {
+                appWs.send(JSON.stringify({ type: 'stop_camera', camera: camId }));
+            }
+
+            hudEl.style.display = 'none';
+            videoEl.style.display = 'none';
+            videoEl.srcObject = null;
+            overlayEl.style.display = 'flex';
+            overlayEl.style.backgroundColor = 'rgba(9,9,11,0.95)';
+            statusText.innerHTML = '<span style="font-size:0.9rem;">Préparation de la calibration…</span><br/><span style="font-size:0.75rem; color:var(--text-secondary);">0%</span>';
+
+            // Aperçu live des frames de calibration (damier surligné) : on crée
+            // un <img> à côté de la vidéo s'il n'existe pas encore.
+            let imgEl = document.getElementById(`ec-cam-img-${camId}`);
+            if (!imgEl && videoEl && videoEl.parentElement) {
+                imgEl = document.createElement('img');
+                imgEl.id = `ec-cam-img-${camId}`;
+                imgEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:none;';
+                videoEl.parentElement.insertBefore(imgEl, videoEl);
+            }
+
+            // Hook consommé par le handler WS global (dashboard.js) pour router
+            // les événements mono_calib_* vers l'UI EasyConfig.
+            window.ecOnMonoCalib = function(payload) {
+                if (parseInt(payload.camera) !== camId) return false;
+                if (payload.type === 'mono_calib_frame') {
+                    if (imgEl) {
+                        imgEl.src = 'data:image/jpeg;base64,' + payload.image;
+                        imgEl.style.display = 'block';
+                    }
+                    overlayEl.style.backgroundColor = 'rgba(9,9,11,0.25)';
+                    overlayEl.style.justifyContent = 'flex-end';
+                } else if (payload.type === 'mono_calib_progress') {
+                    overlayEl.style.display = 'flex';
+                    statusText.innerHTML = '<span style="font-size:0.9rem;">' + (payload.status || payload.message || '') + '</span><br/><span style="font-size:0.75rem; color:var(--text-secondary);">' + (payload.progress || 0) + '%</span>';
+                } else if (payload.type === 'mono_calib_result') {
+                    window.ecOnMonoCalib = null;
+                    if (imgEl) imgEl.style.display = 'none';
+                    overlayEl.style.display = 'flex';
+                    overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
+                    overlayEl.style.justifyContent = 'center';
+                    btnRun.className = 'btn btn-primary';
+                    if (payload.success) {
                         statusText.innerHTML = `
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(72, 209, 204, 0.1); border: 2px solid var(--success); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--success); margin: 0 auto 0.5rem;">✓</div>
                             <span style="color:var(--success); font-weight:bold; font-size: 0.95rem;">Calibration réussie !</span><br/>
-                            <span style="font-size:0.75rem; color:var(--text-secondary);">Mire détectée et paramètres intrinsèques enregistrés.</span>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">fx=` + (payload.fx || '?') + `px — erreur reproj. ` + (payload.reprojection_error != null ? payload.reprojection_error.toFixed(4) : '?') + `</span>
                         `;
-                        
                         if (camId === 1) ecCalibratedCam1 = true;
                         if (camId === 2) ecCalibratedCam2 = true;
-                        
                         document.getElementById('ec-btn-next').disabled = false;
                         btnSkip.disabled = false;
-
-                        // Save actual calibration data
-                        const calibratedData = {
-                            camera_name: `usb_cam_${camId}`,
-                            image_width: 640,
-                            image_height: 480,
-                            distortion_model: "plumb_bob",
-                            camera_matrix: [
-                                602.43 + (Math.random() - 0.5) * 5, 0.0, 318.12 + (Math.random() - 0.5) * 5,
-                                0.0, 601.87 + (Math.random() - 0.5) * 5, 239.54 + (Math.random() - 0.5) * 5,
-                                0.0, 0.0, 1.0
-                            ].map(v => Math.round(v * 100) / 100),
-                            distortion_coefficients: [
-                                -0.12 + (Math.random() - 0.5) * 0.05,
-                                0.18 + (Math.random() - 0.5) * 0.05,
-                                -0.001 + (Math.random() - 0.5) * 0.001,
-                                0.002 + (Math.random() - 0.5) * 0.001,
-                                0.0
-                            ].map(v => Math.round(v * 100000) / 100000),
-                            rectification_matrix: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-                            projection_matrix: [
-                                602.43, 0.0, 318.12, 0.0,
-                                0.0, 601.87, 239.54, 0.0,
-                                0.0, 0.0, 1.0, 0.0
-                            ].map(v => Math.round(v * 100) / 100),
-                            is_calibrated: true,
-                            calibrated_at: new Date().toLocaleString('fr-FR')
-                        };
-
-                        fetch(`/core/camera/calibration/${camId}`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-API-Token': apiToken
-                            },
-                            body: JSON.stringify(calibratedData)
-                        }).catch(err => console.error(err));
+                        btnRun.disabled = true;
+                        btnRun.innerHTML = `<span>✓ Calibré</span>`;
+                        btnRun.onclick = null;
                     } else {
-                        hudEl.style.display = 'none';
-                        videoEl.style.display = 'none';
-                        overlayEl.style.display = 'flex';
-                        overlayEl.style.backgroundColor = 'rgba(9,9,11,0.9)';
                         statusText.innerHTML = `
                             <div style="width: 50px; height: 50px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); border: 2px solid var(--danger); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--danger); margin: 0 auto 0.5rem;">✗</div>
                             <span style="color:var(--danger); font-weight:bold; font-size: 0.95rem;">Échec de la calibration</span><br/>
-                            <span style="font-size:0.75rem; color:var(--text-secondary);">Aucune mire de calibration détectée ou flux caméra instable.</span>
+                            <span style="font-size:0.75rem; color:var(--text-secondary);">` + (payload.message || 'Damier non détecté ou flux instable.') + `</span>
                         `;
                         btnRun.disabled = false;
                         btnSkip.disabled = false;
-                        btnRun.innerHTML = `<span>📷 Lancer la Calibration Cam${camId}</span>`;
+                        btnRun.innerHTML = `<span>📷 Réessayer</span>`;
                         btnRun.onclick = () => ecRunCameraCalib(camId);
                     }
                 }
-            }, 500);
+                return true;
+            };
+
+            // Laisser 2s au robot pour couper ffmpeg avant d'ouvrir la caméra
+            // en direct (même séquence que la Console de Calibration Système).
+            setTimeout(function() {
+                if (appWs && appWs.readyState === WebSocket.OPEN) {
+                    appWs.send(JSON.stringify({
+                        type: 'run_mono_calib',
+                        camera: camId,
+                        chessboard_cols: 9,
+                        chessboard_rows: 6,
+                        square_size_mm: 25,
+                        timeout_seconds: 300
+                    }));
+                } else {
+                    window.ecOnMonoCalib = null;
+                    statusText.innerHTML = '<span style="color:var(--danger);">WebSocket déconnecté. Vérifiez la connexion au robot.</span>';
+                    btnRun.disabled = false;
+                    btnRun.className = 'btn btn-primary';
+                    btnRun.innerHTML = `<span>📷 Réessayer</span>`;
+                    btnRun.onclick = () => ecConfirmCalibration(camId);
+                }
+            }, 2000);
         }
 
         function ecStartRobotAndClose() {

@@ -153,8 +153,8 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                     enabled = msg_json.get("enabled", False)
                     await handle_demo_mode_toggle(enabled, manager)
                     continue
-                elif msg_type in ("nav_goal", "nav_path"):
-                    # Forward navigation goal/path to robot
+                elif msg_type in ("nav_goal", "nav_path", "nav_cancel"):
+                    # Forward navigation goal/path/cancel to robot
                     await manager.broadcast(data, "robot")
                     continue
                 elif msg_type == "chat":

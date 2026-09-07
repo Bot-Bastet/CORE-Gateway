@@ -311,6 +311,9 @@ async def handle_robot_posture_update(key: str, value, manager):
         await manager.broadcast(_json.dumps({
             "type": "cmd_vel", "linear": 0.0, "angular": 0.0
         }), "robot")
+        # And cancel any active autopilot route (it would silently resume
+        # publishing cmd_vel at the next stand otherwise)
+        await manager.broadcast(_json.dumps({"type": "nav_cancel"}), "robot")
     elif key == "powered" and value:
         # Powered on: sit is safe default
         await manager.broadcast(_json.dumps({
