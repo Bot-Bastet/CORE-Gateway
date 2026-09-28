@@ -145,10 +145,29 @@
                         if (elPitch) elPitch.textContent = `${pitch.toFixed(1)}°`;
                         if (elYaw) elYaw.textContent = `${yaw.toFixed(1)}°`;
                         
-                        // Rotate 3D IMU CSS Cube
+                        // Rotate 3D IMU CSS Cube.
+                        // Axes écran du modèle CSS (tête à translateZ(+38px), pas de
+                        // rotation de base sur .spot-model) : rotateY = axe vertical
+                        // (lacet), rotateX = axe gauche/droite (tangage), rotateZ =
+                        // plan écran (roulis). L'ancien mapping envoyait roll→rotateY
+                        // et yaw→rotateZ : lacet et roulis étaient permutés à l'écran.
+                        // Ordre yaw→pitch→roll (Tait-Bryan) pour les angles combinés.
                         const cube = document.getElementById('imu-visual-cube');
                         if (cube) {
-                            cube.style.transform = `rotateX(${-pitch}deg) rotateY(${roll}deg) rotateZ(${-yaw}deg)`;
+                            cube.style.transform = `rotateY(${yaw}deg) rotateX(${-pitch}deg) rotateZ(${-roll}deg)`;
+                        }
+
+                        // 🧭 Assiette IMU dans la vue 3D interactive (option).
+                        // MÊME source que la carte « Gyroscope & Orientation IMU » :
+                        // payload.imu est déjà calibré par le firmware (q_offset^-1
+                        // capturé au reset_imu, persisté EEPROM). Aucune référence
+                        // côté client : « ⟳ Zéro » = reset_imu = remise à zéro
+                        // partout (cube, valeurs, modèle 3D) — source unifiée.
+                        if (window.imu3dEnabled && typeof window.setSpotMicroIMUAttitude === 'function') {
+                            // roll: -1 — convention IMU inversée vs axe X du viewer
+                            // (vérifié sur robot : penché à droite → modèle penchait à gauche)
+                            const signs = window.imu3dSigns || { roll: -1, pitch: 1, yaw: 1 };
+                            window.setSpotMicroIMUAttitude(signs.roll * roll, signs.pitch * pitch, (signs.yaw || 1) * yaw);
                         }
 
                         // BNO085 detection: if roll/pitch/yaw all 0.0 for >10s while Arduino is online, show warning
@@ -164,6 +183,51 @@
                                 warningEl.style.display = '';
                             } else if (window._bnoZeroCount === 0) {
                                 warningEl.style.display = 'none';
+                            }
+                        }
+                    }
+
+                    // ⚖️ Statut équilibrage (motion_node /balance_status) : assiette
+                    // live + badges dans le popup Navigation Autonome
+                    if (payload.balance) {
+                        const bal = payload.balance;
+                        const elNavRoll = document.getElementById('nav-live-roll');
+                        const elNavPitch = document.getElementById('nav-live-pitch');
+                        if (elNavRoll && bal.roll !== undefined) elNavRoll.textContent = `${bal.roll.toFixed(1)}°`;
+                        if (elNavPitch && bal.pitch !== undefined) elNavPitch.textContent = `${bal.pitch.toFixed(1)}°`;
+                        const faultBadge = document.getElementById('nav-balance-fault-badge');
+                        if (faultBadge) faultBadge.style.display = bal.fault ? '' : 'none';
+                        const activeBadge = document.getElementById('nav-balance-active-badge');
+                        if (activeBadge) activeBadge.style.display = (bal.active && !bal.fault) ? '' : 'none';
+                    }
+
+                    // 🗺️ Statut autopilote (nav_node /nav_status) : badge + détail
+                    // dans le popup Navigation Autonome
+                    if (payload.nav) {
+                        const nav = payload.nav;
+                        window._lastNavStatus = nav;
+                        const badge = document.getElementById('nav-autopilot-status');
+                        if (badge) {
+                            const styles = {
+                                active:    { txt: '🧭 EN ROUTE',   bg: 'rgba(99,102,241,0.15)',  col: 'var(--accent)' },
+                                done:      { txt: '✅ ARRIVÉ',     bg: 'rgba(16,185,129,0.15)',  col: 'var(--success)' },
+                                cancelled: { txt: '⏹ ANNULÉ',     bg: 'rgba(255,255,255,0.08)', col: 'var(--text-secondary)' },
+                                fault:     { txt: '⚠ ANTI-CHUTE', bg: 'rgba(239,68,68,0.2)',    col: 'var(--danger)' },
+                                stalled:   { txt: '⚠ BLOQUÉ',     bg: 'rgba(245,158,11,0.15)',  col: '#f59e0b' }
+                            };
+                            const st = styles[nav.state];
+                            if (st) {
+                                let txt = st.txt;
+                                if (nav.state === 'active') {
+                                    if (nav.detail === 'no_odom') txt += ' (attente odométrie — robot debout ?)';
+                                    else if (nav.dist !== undefined) txt += ` — ${nav.dist.toFixed(2)} m (pt ${nav.wp + 1}/${nav.n})`;
+                                }
+                                badge.textContent = txt;
+                                badge.style.background = st.bg;
+                                badge.style.color = st.col;
+                                badge.style.display = '';
+                            } else {
+                                badge.style.display = 'none';
                             }
                         }
                     }

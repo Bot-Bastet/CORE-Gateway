@@ -11,9 +11,16 @@
         var ecPhaseAOffset = 0;
         var ecJointModified = false;
 
-        // Delta logique (°) montré par le modèle 3D en étape C, par type d'articulation.
-        // Le genou fléchit en logique négative (convention IK : coude toujours négatif).
-        var EC_SHOWN_DELTA = { hip: 30, upper: 40, lower: -45 };
+        // Delta LOGIQUE (°) attendu pour reproduire la flexion montrée par le
+        // modèle 3D en étape C, par type d'articulation — IDENTIQUE des deux
+        // côtés et TOUT NÉGATIF. Table établie EMPIRIQUEMENT depuis les
+        // corrections manuelles constatées sur le robot (tibias G, genoux D et
+        // toutes les hanches mal détectés par les anciennes formules) : la
+        // convention IK (gauche = 90+θ, droite = 90−θ) annule déjà le miroir
+        // physique gauche/droite en espace logique, donc AUCUNE dépendance au
+        // côté ici. Ne pas réintroduire de flip par side sans re-vérifier sur
+        // le robot physique.
+        var EC_SHOWN_DELTA = { hip: -30, upper: -40, lower: -45 };
         // Limites par défaut (± depuis le zéro calibré) proposées quand aucune
         // calibration n'existe. Hanches : ±25° (course mécanique du châssis).
         var EC_DEFAULT_LIMITS = { hip: 25, upper: 60, lower: 60 };
@@ -469,14 +476,14 @@
                     }
                     return;
                 }
-                // Le modèle 3D montre un delta logique EC_SHOWN_DELTA[type]. Si l'utilisateur
-                // a dû aller dans le sens opposé pour reproduire la pose, le montage est inversé.
-                // Convention IK (ik_solver.py) : gauche = 90 + θ, droite = 90 − θ → pour la
-                // même flexion physique (tangage : upper/lower), le delta logique attendu est
-                // opposé côté droit. La hanche (roulis) est déjà miroir dans la pose affichée.
-                var shown = EC_SHOWN_DELTA[joint.type] || 30;
-                if (joint.side === 'right' && joint.type !== 'hip') shown = -shown;
-                inverted = (sliderVal > 0) !== (shown > 0);
+                // Si l'utilisateur a dû aller dans le sens logique opposé au delta
+                // attendu (EC_SHOWN_DELTA, table empirique — voir sa définition)
+                // pour reproduire la pose du modèle 3D, le montage est inversé.
+                // Pas de flip par côté : la convention IK annule déjà le miroir.
+                // (comparaison inversée le 2026-07-17 : la formule précédente donnait
+                // miroir/normal exactement inversés sur toutes les articulations testées)
+                var shown = EC_SHOWN_DELTA[joint.type] || -30;
+                inverted = (sliderVal > 0) === (shown > 0);
                 window._ecSessionDirty = true;
                 ecSendCmd({ type: 'arduino_cmd', cmd: 'set_invert', index: joint.idx, inverted: inverted });
                 // Restaurer les butées de l'étape B (ouvertes pendant la mesure du sens)

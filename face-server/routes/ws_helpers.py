@@ -267,6 +267,15 @@ async def handle_robot_posture_update(key: str, value, manager):
         value = bool(value)
     elif key == "imu_stab":
         value = bool(value)
+    elif key == "fall_protect":
+        value = bool(value)
+    elif key == "balance_kp":
+        value = max(0.0, min(2.0, float(value)))
+    elif key == "balance_kd":
+        value = max(0.0, min(0.5, float(value)))
+    elif key == "stance_x_trim":
+        # Trim CoM avant/arriere en METRES (UI en mm -> /1000 cote client)
+        value = max(-0.03, min(0.03, float(value)))
 
     robot_posture[key] = value
 

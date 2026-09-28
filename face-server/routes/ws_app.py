@@ -157,6 +157,11 @@ async def websocket_app(websocket: WebSocket, token: Optional[str] = Query(None)
                     # Forward navigation goal/path to robot
                     await manager.broadcast(data, "robot")
                     continue
+                elif msg_type == "chat":
+                    # Chat: relay to BOTH robot and node
+                    await manager.broadcast(data, "robot")
+                    await manager.broadcast(data, "node")
+                    continue
             except json.JSONDecodeError:
                 # Client sent malformed JSON — skip this message silently
                 pass

@@ -62,6 +62,10 @@ class GatewayState:
             "powered": False,    # True = robot active
             "posture": "sit",   # "stand" or "sit"
             "imu_stab": False,   # True = IMU stabilization active (autopilote)
+            "fall_protect": False,   # True = repli assis automatique si inclinaison critique
+            "balance_kp": 0.6,       # gain proportionnel equilibrage (0..2)
+            "balance_kd": 0.08,      # gain derive equilibrage (0..0.5)
+            "stance_x_trim": 0.0,    # trim CoM avant/arriere [m] (-0.03..0.03)
         }
         self.github_releases_cache: dict = {}
 
@@ -227,8 +231,8 @@ _saved = load_json(ROBOT_POSTURE_FILE, default={})
 if isinstance(_saved, dict):
     for k in _posture_defaults:
         if k in _saved:
-            # Preserve types: bool for demo_mode/powered/imu_stab, float for others
-            if k in ("demo_mode", "powered", "imu_stab"):
+            # Preserve types: bool for demo_mode/powered/imu_stab/fall_protect, float for others
+            if k in ("demo_mode", "powered", "imu_stab", "fall_protect"):
                 state.robot_posture[k] = bool(_saved[k])
             elif k == "posture":
                 state.robot_posture[k] = str(_saved[k])

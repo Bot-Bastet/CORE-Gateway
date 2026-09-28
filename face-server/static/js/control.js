@@ -8,7 +8,7 @@ controlActiveDir = null;
 controlWalkInterval = null;
 navPointA = null;
 navPointB = null;
-robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit", imu_stab: false };
+robotPosture = { height: 100.0, speed: 10.0, roll: 0.0, pitch: 0.0, yaw: 0.0, demo_mode: false, powered: false, posture: "sit", imu_stab: false, fall_protect: false, balance_kp: 0.6, balance_kd: 0.08, stance_x_trim: 0.0 };
 
 // LLM auto-execute: disabled by default
 window.llmAutoControl = false;
@@ -56,6 +56,16 @@ function _setBadge(powered, demo_mode) {
 function initControlTab() {
   // Neutralize the old drawControlMap that might be running
   if (typeof drawControlMap === "function") { window._oldDrawControlMap = drawControlMap; drawControlMap = function(){}; }
+
+  // 🧭 Assiette IMU 3D : restaurer la préférence locale (option d'affichage
+  // purement client, pas synchronisée serveur contrairement à robotPosture)
+  var imu3dCheck = document.getElementById('imu-3d-checkbox');
+  if (imu3dCheck && !window._imu3dPrefLoaded) {
+    var saved = localStorage.getItem('bastet_imu3d') === '1';
+    imu3dCheck.checked = saved;
+    toggleImu3D(saved);           // pas de toast : _imu3dPrefLoaded pas encore posé
+    window._imu3dPrefLoaded = true;
+  }
   
   if (!window._spot3dInitDone && typeof initSpotMicro3D === "function") {
     initSpotMicro3D("spotmicro-3d-container");
@@ -202,7 +212,50 @@ function sendControlCmd(cmd) {
   }
 }
 
+// ─── 🧭 Assiette IMU dans la vue 3D ───────────────────────────────────────
+// Option d'affichage : incliner le modèle 3D selon le gyroscope réel. La
+// source est payload.imu, DÉJÀ calibrée par le firmware (q_offset EEPROM) —
+// exactement les mêmes valeurs que la carte « Gyroscope & Orientation IMU »
+// de l'onglet Arduino & Calibration. Aucune référence côté client.
+function toggleImu3D(checked) {
+  window.imu3dEnabled = !!checked;
+  localStorage.setItem('bastet_imu3d', checked ? '1' : '0');
+  if (typeof window.setSpotMicroIMUEnabled === 'function') window.setSpotMicroIMUEnabled(checked);
+  var zeroBtn = document.getElementById('imu-3d-zero-btn');
+  if (zeroBtn) zeroBtn.style.display = checked ? '' : 'none';
+  if (typeof showToast === 'function' && window._imu3dPrefLoaded) {
+    showToast('Assiette IMU', checked
+      ? 'Vue 3D asservie au gyroscope (valeurs IMU calibrées)'
+      : 'Vue 3D revenue à la posture commandée', 'info');
+  }
+}
+
+// « ⟳ Zéro » = VRAIE recalibration BNO085 (même commande reset_imu que le
+// bouton « Recalibrer l'IMU » de l'onglet Arduino & Calibration, sans le
+// 'stop' qui détacherait les servos) : le firmware capture la pose actuelle
+// comme référence, la persiste en EEPROM, et TOUTES les vues (cube, valeurs
+// numériques, modèle 3D) repassent à ~0 ensemble — source unifiée.
+function zeroImu3D() {
+  if (appWs && appWs.readyState === WebSocket.OPEN) {
+    appWs.send(JSON.stringify({ type: 'arduino_cmd', cmd: 'reset_imu' }));
+    if (typeof showToast === 'function') {
+      showToast('Assiette IMU', 'Recalibrage BNO085 envoyé : position actuelle = à plat (persisté EEPROM)', 'info');
+    }
+  } else if (typeof showToast === 'function') {
+    showToast('Erreur', 'WebSocket non connecté : recalibrage impossible.', 'error');
+  }
+}
+
+// Annulation autopilote : envoyée dès que l'utilisateur reprend la main
+// (STOP, D-pad, bouton Annuler) pour que nav_node cesse de publier /cmd_vel.
+function sendNavCancel() {
+  if (appWs && appWs.readyState === WebSocket.OPEN) {
+    appWs.send(JSON.stringify({ type: 'nav_cancel' }));
+  }
+}
+
 function sendControlStop() {
+  sendNavCancel();
   stopWalking();
   window.keysPressed = {};
   // Stop the 3D viewer animation
@@ -230,6 +283,8 @@ function startWalking(dir) {
     return;
   }
   if (controlActiveDir === dir) return;
+  // Reprise en main manuelle : couper l'autopilote s'il est en route
+  if (window._lastNavStatus && window._lastNavStatus.state === 'active') sendNavCancel();
   controlActiveDir = dir;
 
   document.querySelectorAll(".dpad-btn").forEach(function (btn) {
@@ -307,6 +362,10 @@ function onPostureSliderChange(key, value) {
       labelEl.textContent = (parseFloat(value) / 10).toFixed(1) + 'x';
     } else if (key === 'height') {
       labelEl.textContent = value + '%';
+    } else if (key === 'balance_kp' || key === 'balance_kd') {
+      labelEl.textContent = parseFloat(value).toFixed(2);
+    } else if (key === 'stance_x_trim') {
+      labelEl.textContent = Math.round(parseFloat(value) * 1000) + ' mm';
     } else {
       labelEl.textContent = value + '°';
     }
@@ -328,6 +387,23 @@ function toggleDemoMode(checked) {
   if (typeof setSpotMicroDemoMode === 'function') setSpotMicroDemoMode(checked);
   if (appWs && appWs.readyState === WebSocket.OPEN)
     appWs.send(JSON.stringify({ type: 'demo_mode', enabled: checked }));
+
+  // 🧭 Assiette IMU : n'a de sens qu'en mode RÉEL (elle asservit le modèle 3D
+  // au gyroscope du robot physique). En SIMULATION il n'y a pas d'IMU réelle
+  // à suivre — masquer l'option et forcer sa désactivation ; la restaurer
+  // (préférence localStorage) au retour en mode RÉEL.
+  var imuWrap = document.getElementById('imu-3d-toggle-wrap');
+  var imuCheck = document.getElementById('imu-3d-checkbox');
+  if (checked) {
+    if (imuWrap) imuWrap.style.display = 'none';
+    if (imuCheck && imuCheck.checked) imuCheck.checked = false;
+    if (typeof toggleImu3D === 'function') toggleImu3D(false);
+  } else {
+    if (imuWrap) imuWrap.style.display = '';
+    var savedImu = localStorage.getItem('bastet_imu3d') === '1';
+    if (imuCheck) imuCheck.checked = savedImu;
+    if (typeof toggleImu3D === 'function') toggleImu3D(savedImu);
+  }
 
   if (checked) {
     // Passage en SIMULATION : reset la posture locale
@@ -420,8 +496,33 @@ function applyRobotPostureSync(postureData) {
   });
   var demoCheck = document.getElementById('demo-mode-checkbox');
   if (demoCheck) demoCheck.checked = robotPosture.demo_mode;
+  // 🧭 Assiette IMU : n'a de sens qu'en mode RÉEL (voir toggleDemoMode).
+  // Resynchronise l'affichage si demo_mode arrive via le serveur (WS) plutôt
+  // que via un clic local sur le switch.
+  var imu3dWrap = document.getElementById('imu-3d-toggle-wrap');
+  if (imu3dWrap) imu3dWrap.style.display = robotPosture.demo_mode ? 'none' : '';
+  var imu3dCheck = document.getElementById('imu-3d-checkbox');
+  if (imu3dCheck && robotPosture.demo_mode && imu3dCheck.checked) {
+    imu3dCheck.checked = false;
+    if (typeof toggleImu3D === 'function') toggleImu3D(false);
+  }
   var imuCheck = document.getElementById('nav-imu-stab-checkbox');
   if (imuCheck) imuCheck.checked = robotPosture.imu_stab;
+  var fallCheck = document.getElementById('nav-fall-protect-checkbox');
+  if (fallCheck) fallCheck.checked = robotPosture.fall_protect;
+  // Options équilibrage (menu Navigation Autonome)
+  var kpSlider = document.getElementById('posture-slider-balance_kp');
+  var kpLabel  = document.getElementById('posture-val-balance_kp');
+  if (kpSlider) kpSlider.value = robotPosture.balance_kp;
+  if (kpLabel)  kpLabel.textContent = parseFloat(robotPosture.balance_kp).toFixed(2);
+  var kdSlider = document.getElementById('posture-slider-balance_kd');
+  var kdLabel  = document.getElementById('posture-val-balance_kd');
+  if (kdSlider) kdSlider.value = robotPosture.balance_kd;
+  if (kdLabel)  kdLabel.textContent = parseFloat(robotPosture.balance_kd).toFixed(2);
+  var trimSlider = document.getElementById('posture-slider-stance_x_trim');
+  var trimLabel  = document.getElementById('posture-val-stance_x_trim');
+  if (trimSlider) trimSlider.value = Math.round(parseFloat(robotPosture.stance_x_trim) * 1000);
+  if (trimLabel)  trimLabel.textContent = Math.round(parseFloat(robotPosture.stance_x_trim) * 1000) + ' mm';
   var powerBtn = document.getElementById('power-toggle-btn');
   if (powerBtn) {
     powerBtn.textContent = robotPosture.powered ? '⏻ Allumé' : '⏻ Éteint';
@@ -458,7 +559,15 @@ function openNavPopup() {
   if (secB) secB.style.display = "none";
   var panel = document.getElementById("nav-target-panel");
   if (panel) { panel.style.opacity = "0"; panel.style.pointerEvents = "none"; }
-  drawNavPopupMap();
+  // Redraw après le layout (le canvas vient d'être affiché : clientWidth/Height
+  // ne sont corrects qu'au frame suivant) + suivre les redimensionnements.
+  requestAnimationFrame(drawNavPopupMap);
+  if (!window._navResizeHooked) {
+    window._navResizeHooked = true;
+    window.addEventListener('resize', function () {
+      if (window._navPopupActive) requestAnimationFrame(drawNavPopupMap);
+    });
+  }
 }
 
 function closeNavPopup() {
@@ -477,7 +586,10 @@ function onNavPopupClick(e) {
   var canvas = document.getElementById("nav-popup-canvas");
   if (!canvas) return;
   var rect = canvas.getBoundingClientRect();
-  var cx = rect.width / 2, cy = rect.height / 2, scale = 40;
+  // Échelle partagée avec drawNavPopupMap (adaptative) — l'ancienne valeur
+  // codée en dur (40) désalignait le clic et l'affichage dès que le zoom
+  // adaptatif s'écartait de 40 px/m.
+  var cx = rect.width / 2, cy = rect.height / 2, scale = window._navMapScale || 40;
   var pt = { x: parseFloat(((e.clientX - rect.left - cx) / scale).toFixed(2)), y: parseFloat((-(e.clientY - rect.top - cy) / scale).toFixed(2)) };
 
   if (!navPointA) { navPointA = pt; navPointB = null; }
@@ -509,6 +621,7 @@ function onNavPopupClick(e) {
 }
 
 function clearNavGoal() {
+  sendNavCancel();
   navPointA = null; navPointB = null;
   var panel = document.getElementById("nav-target-panel");
   if (panel) { panel.style.opacity = "0"; panel.style.pointerEvents = "none"; }
@@ -534,6 +647,14 @@ function sendNavGoal() {
 function drawNavPopupMap() {
   var canvas = document.getElementById('nav-popup-canvas');
   if (!canvas || !window._navPopupActive) return;
+  // Synchroniser la résolution interne du canvas avec sa taille CSS réelle.
+  // Sans ça, le buffer reste en 300×150 (défaut HTML) étiré par le CSS →
+  // ratio d'aspect faussé (cercles ovales) et zoom apparent énorme.
+  var dispW = canvas.clientWidth, dispH = canvas.clientHeight;
+  if (dispW > 0 && dispH > 0 && (canvas.width !== dispW || canvas.height !== dispH)) {
+    canvas.width = dispW;
+    canvas.height = dispH;
+  }
   var ctx = canvas.getContext('2d');
   var w = canvas.width, h = canvas.height;
   var cx = w / 2, cy = h / 2;
@@ -557,6 +678,9 @@ function drawNavPopupMap() {
       scale = Math.min(80, Math.max(20, Math.floor((Math.min(cx, cy) * 0.85) / maxCoord)));
     }
   }
+
+  // Mémoriser l'échelle pour onNavPopupClick (conversion px -> mètres cohérente)
+  window._navMapScale = scale;
 
   ctx.fillStyle = '#0f0f13';
   ctx.fillRect(0, 0, w, h);
@@ -702,6 +826,9 @@ window.onNavPopupClick = onNavPopupClick;
 window.clearNavGoal = clearNavGoal;
 window.sendNavGoal = sendNavGoal;
 window.drawNavPopupMap = drawNavPopupMap;
+window.toggleImu3D = toggleImu3D;
+window.zeroImu3D = zeroImu3D;
+window.sendNavCancel = sendNavCancel;
 // Kill old drawControlMap
 window.drawControlMap = function(){};
 window.onControlMapClick = function(){};
