@@ -1,0 +1,60 @@
+{
+    # Port 80 is used ONLY for ACME certificate challenges
+    # and automatic HTTP->HTTPS redirects. No content is served.
+    servers :80 {
+        protocols h1
+    }
+}
+
+192.168.0.100 {
+    tls internal
+    reverse_proxy 127.0.0.1:18789
+}
+
+ha.arthonetwork.fr:1660 {
+    reverse_proxy 127.0.0.1:1662
+}
+
+ha.arthonetwork.fr:8443 {
+    reverse_proxy 192.168.122.102:8123 {
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto https
+        header_up X-Real-IP {remote_host}
+    }
+}
+
+ha.arthonetwork.fr:44888 {
+    reverse_proxy http://localhost:44887
+}
+
+ha.arthonetwork.fr:48888 {
+    reverse_proxy http://localhost:48886
+}
+
+ha.arthonetwork.fr:48889 {
+    reverse_proxy http://localhost:48890
+}
+
+# Catch-all for port 80: reject any request that isn't
+# an ACME challenge or a known domain redirect
+http:// {
+    @not_acme not path /.well-known/acme-challenge/*
+    respond @not_acme 444
+}
+
+http://mail.arthonetwork.fr {
+    @not_acme not path /.well-known/acme-challenge/*
+    redir @not_acme https://{host}{uri}
+    reverse_proxy 127.0.0.1:9900 {
+        header_up Host {http.request.host}
+    }
+}
+
+https://mail.arthonetwork.fr {
+    reverse_proxy 127.0.0.1:9901 {
+        header_up Host {http.request.host}
+        transport http {
+            tls_insecure_skip_verify
+        }
+    }
+}
